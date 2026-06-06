@@ -1,0 +1,41 @@
+name: contract
+version: "1.0"
+description: "Contract review extraction schema"
+fields:
+  contract_type:
+    type: str
+    required: true
+    description: "Type of contract (MSA, NDA, employment, supplier, etc.)"
+  parties:
+    type: list
+    required: true
+    description: "Parties involved in the contract"
+    item_type: str
+  effective_date:
+    type: date
+    required: true
+    description: "Date the contract becomes effective"
+  expiry_date:
+    type: date
+    required: false
+    description: "Date the contract expires"
+  governing_law:
+    type: str
+    required: false
+    description: "Jurisdiction or governing law"
+  termination_clause:
+    type: str
+    required: false
+    description: "Summary of termination conditions"
+  liability_cap:
+    type: str
+    required: false
+    description: "Liability cap or limitation"
+  confidentiality:
+    type: bool
+    required: false
+    description: "Whether confidentiality clause is present"
+  summary:
+    type: str
+    required: false
+    description: "Brief summary of the contract"

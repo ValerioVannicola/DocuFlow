@@ -1,0 +1,76 @@
+[build-system]
+requires = ["setuptools>=75.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "docflow"
+version = "0.1.0"
+description = "Production workflow runtime for document agents: ingest, parse, extract, validate, cite evidence, store, review, and export business documents."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+authors = [
+    {name = "docflow contributors"},
+]
+keywords = ["document", "ai", "ocr", "extraction", "pipeline", "pydantic", "llm"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Typing :: Typed",
+]
+dependencies = [
+    "pydantic>=2.0",
+    "pyyaml>=6.0",
+    "aiofiles>=24.0",
+    "structlog>=24.0",
+    "click>=8.0",
+]
+
+[project.optional-dependencies]
+pdf = ["pymupdf>=1.24"]
+ocr = ["pytesseract>=0.3.10", "Pillow>=10.0"]
+llm = ["litellm>=1.40"]
+privacy = ["presidio-analyzer>=2.2", "presidio-anonymizer>=2.2"]
+docling = ["docling>=2.90"]
+mcp = ["mcp[cli]>=1.20"]
+serve = ["fastapi>=0.115", "uvicorn[standard]>=0.30", "python-multipart>=0.0.9"]
+all = ["docflow[pdf,ocr,llm,privacy,docling,mcp,serve]"]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=5.0",
+    "ruff>=0.5",
+]
+
+[project.scripts]
+docflow = "docflow.cli.main:main"
+docflow-mcp = "docflow.mcp_server:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+docflow = ["py.typed", "templates/builtin/*.yaml"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "B", "N", "I", "SIM", "RUF", "C90", "S"]
+ignore = ["E501", "S101", "S105", "S106", "C901"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["docflow"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+markers = [
+    "integration: marks tests that require external dependencies (deselect with '-m \"not integration\"')",
+]

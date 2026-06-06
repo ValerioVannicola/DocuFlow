@@ -1,0 +1,2080 @@
+# DocFlow — Complete User Guide
+
+> Extract structured data from documents using LLMs — with evidence, validation, review, and full audit trail.
+
+---
+
+## Table of Contents
+
+1. [Introduction](#1-introduction)
+2. [Installation](#2-installation)
+3. [Quick Start](#3-quick-start)
+4. [Core Concepts](#4-core-concepts)
+5. [Defining Schemas](#5-defining-schemas)
+6. [Parsers](#6-parsers)
+6b. [Structured Tables](#6b-structured-tables)
+7. [Extraction Engines](#7-extraction-engines)
+8. [The Pipeline](#8-the-pipeline)
+9. [Validation](#9-validation)
+10. [Review](#10-review)
+11. [Human Corrections & Approval](#11-human-corrections--approval)
+12. [Provenance](#12-provenance)
+13. [Privacy & Anonymization](#13-privacy--anonymization)
+14. [Batch Processing](#14-batch-processing)
+15. [Document Comparison](#15-document-comparison)
+16. [Document Search](#16-document-search)
+17. [Screenshots](#17-screenshots)
+18. [Quality Report](#18-quality-report)
+18b. [Workflow Config](#18b-workflow-config)
+19. [Storage](#19-storage)
+20. [Observability & Traces](#20-observability--traces)
+21. [Error Handling](#21-error-handling)
+22. [CLI Reference](#22-cli-reference)
+23. [API Reference](#23-api-reference)
+
+---
+
+## 1. Introduction
+
+### What DocFlow Does
+
+DocFlow is a Python library that extracts structured data from business documents — invoices, contracts, receipts, claims, KYC forms — using LLMs. You define what fields you want (as a Pydantic model), point it at a PDF, and get back:
+
+- **Extracted values** matching your schema
+- **Evidence** linking each value to its source text, page number, and bounding box
+- **Trust scores** based on multi-agent agreement and source verification (not LLM self-reported confidence)
+- **Validation results** against your business rules
+- **Review verdicts** from configurable rules and LLM-powered reviewers
+- **Full audit trail** of corrections, approvals, and processing history
+
+### What Makes DocFlow Different
+
+Most extraction tools stop at "here's your JSON." DocFlow covers what happens after extraction:
+
+- **Evidence grounding**: every field traces to a specific location in the source document
+- **Multi-agent consensus**: run multiple LLMs in parallel and let a decider pick the best answer
+- **Human-in-the-loop**: review rules, LLM reviewers, corrections, approve/reject workflow
+- **Privacy-first**: anonymize PII before it reaches the LLM
+- **Production tooling**: batch processing, document comparison, CSV export
+
+### Architecture Overview — How the Backend Works
+
+DocFlow processes documents through a configurable pipeline of steps:
+
+```
+Ingest → Parse → [Anonymize] → Extract → [Validate] → [Review] → [Store]
+```
+
+Steps in brackets are optional. Here's what happens at each stage, in detail:
+
+#### Step 1: Ingest
+
+The pipeline reads the file from disk and creates a `Document` object with metadata — file name, path, size, SHA-256 hash, MIME type. No content is read yet; this is just registration.
+
+The Document gets a UUID that follows it through every subsequent step. This ID is what links extraction results, evidence, traces, and corrections back to the source file.
+
+#### Step 2: Parse
+
+The parser converts the raw PDF into structured content. This is where the heavy lifting happens.
+
+**What the parser produces:**
+- `document.pages` — a list of `Page` objects, one per page
+- Each `Page` has `blocks` — individual text elements with bounding boxes (x0, y0, x1, y1 coordinates on the page)
+- Each `Block` has `text`, `block_type` (paragraph, title, table, image, etc.), and optionally `confidence` (from OCR)
+- `document.raw_text` — all page text concatenated, which is what gets sent to the LLM
+
+**The 4 parsers produce different levels of richness:**
+- **PyMuPDF**: reads the PDF's embedded text layer directly. Fast, but blocks have no confidence scores (the text is either there or it isn't). Fails on scanned PDFs (returns empty text).
+- **Tesseract**: renders each page to an image at 200 DPI, runs OCR, produces word-level blocks with per-word confidence scores (0-1). Works on scanned documents.
+- **Docling**: uses IBM's document AI model. Understands layout (titles, paragraphs, headers, footers, formulas). Produces structured `Table` objects with cell-level data, row/column headers, and spans. The richest output.
+- **Smart**: runs PyMuPDF first. For each page, checks if the text is usable (enough characters, not garbled, not just images). Pages that fail get OCR'd with Tesseract. This means digital pages are fast and scanned pages still work.
+
+After parsing, `document.status` changes from `"ingested"` to `"parsed"`.
+
+#### Step 3: Anonymize (optional)
+
+If a `PrivacyPolicy` is configured, the Anonymize step runs before the document text reaches the LLM.
+
+**What happens internally:**
+1. The privacy provider (Presidio by default) scans the document text for PII entities — names, emails, phone numbers, IBANs, etc.
+2. Detected entities are replaced according to the chosen mode:
+   - `redact`: replaced with `[REDACTED]`
+   - `mask`: replaced with `M**** R****`
+   - `pseudonymize`: replaced with stable tokens like `PERSON_001`, `EMAIL_001` (same entity = same token within the document)
+   - `hash`: replaced with SHA-256 hash
+3. If `reversible=True`, the token-to-original mappings are saved so extractions can be restored later
+4. `document.raw_text` and each `page.text` are replaced with the anonymized versions
+5. The original text is preserved in `state.metadata["original_raw_text"]`
+
+If `fail_closed=True` (default) and anonymization fails, the pipeline stops — no raw PII reaches the LLM.
+
+#### Step 4: Extract
+
+This is where the LLM reads the document and produces structured data. The extraction engine:
+
+1. **Builds a prompt** containing:
+   - A system message with extraction rules ("extract only values present in the text, don't hallucinate, return JSON")
+   - The user's schema as both human-readable field descriptions and a JSON schema
+   - A concrete example of the expected output format using the actual field names
+   - The document text organized by page (or page images for vision mode)
+   - Optional domain context ("you work in pharmaceutical regulatory affairs")
+
+2. **Calls the LLM** with JSON mode enforced (`response_format={"type": "json_object"}`). The LLM returns a JSON object with two keys:
+   - `"data"`: the extracted field values matching the schema
+   - `"evidence"`: per-field evidence with page number, source text quote, and confidence
+
+3. **Parses the response**. If JSON parsing fails, strips markdown fences and retries. If retry fails, raises `SchemaExtractionError`.
+
+4. **Validates against the schema** using Pydantic `model_validate()`. If the LLM's output doesn't match the schema, raises `SchemaExtractionError`.
+
+5. **Grounds the evidence**. For each field, `attach_evidence()` searches ALL pages for the LLM's quoted text (not trusting the LLM's reported page number). If the text matches a block, the evidence gets that block's bounding box and confidence. If found in page text but not a specific block, it gets the page number without a bbox.
+
+6. **Computes trust scores**:
+   - In **single mode**: trust is based on whether the value was found in the source text
+   - In **multi mode**: N parallel LLM calls run at different temperatures. A decider LLM reviews all candidates and picks the best value per field. Trust is based on how many agents agreed (consensus) plus source verification
+   - `auto_accept = True` only when all agents agree AND the value exists in the source text
+
+7. **Returns an `ExtractionResult`** with the extracted data, per-field details (value, trust, evidence, validation status), and overall confidence.
+
+#### How Multi-Agent Extraction Works Internally
+
+When `extraction_mode="multi"` with `n_instances=5`:
+
+1. The same prompt is sent to the LLM 5 times in parallel, each at a slightly different temperature (auto-generated spread around 0.3 for diversity)
+2. Each call returns independently — failures are filtered out
+3. If all 5 fail, the pipeline raises an error
+4. If only 1 succeeds, its result is used directly (no decider needed)
+5. If 2+ succeed, a **decider prompt** is built:
+   - Contains all candidate extractions as numbered JSON blocks
+   - Asks the decider to compare field by field and pick the most consistent value per field
+   - The decider also uses JSON mode
+6. The decider's output is parsed, validated, and evidence-grounded like a normal extraction
+
+For **hybrid mode**, it's the same but with two types of agents running in parallel:
+- N vision agents (page images → vision LLM)
+- N text agents (OCR markdown → text LLM)
+- The decider is a **vision** model that sees both the candidates AND the actual page images, so it can verify values visually
+
+#### Step 5: Validate (optional)
+
+Validators check the extraction result against rules:
+- `RequiredFields(["total", "supplier_name"])` — are these fields present and non-None?
+- `EvidenceRequired(["total"])` — does the field have source evidence?
+- `TypeValidation()` — are values the right type?
+- Custom rules via `CustomRule(name, fn)`
+
+Each field's `validation_status` is updated to `"valid"`, `"warning"`, or `"error"`. Validation errors are collected on `result.validation_errors`.
+
+#### Step 6: Review (optional)
+
+The Review step checks if the document needs human attention. It runs two types of checks:
+
+**Rule-based checks** (fast, no LLM call):
+- Confidence thresholds (overall or per-field)
+- Missing critical fields
+- Validation errors present
+- Fields without evidence
+
+**LLM reviewer checks** (one LLM call each):
+- Custom prompt-driven reviewers that inspect the extracted data, evidence, and document text
+- Each reviewer returns a structured `ReviewVerdict` with "Approved" or "Not Approved" plus reasoning
+
+If any check triggers, `result.needs_review = True` and the reasons are recorded in `result.review_reasons`. All LLM reviewer verdicts (even approvals) are stored in `result.review_verdicts`.
+
+#### Step 7: Store (optional)
+
+If storage is configured (`storage="local"`), the Store step persists everything to disk:
+- `{document_id}/original.pdf` — copy of the source file
+- `{document_id}/document.json` — the parsed Document (pages, blocks, text, tables)
+- `{document_id}/extraction.json` — the ExtractionResult (data, fields, evidence, trust, review status, corrections)
+- `{document_id}/trace.json` — processing trace (every step's timing, model calls, errors)
+
+**On failure**: if the pipeline fails at any step and storage is configured, partial state is automatically saved. The trace shows exactly which step failed and why.
+
+#### The PipelineState Object
+
+All steps communicate through a single `PipelineState` object that carries:
+- `document` — the Document (populated by Ingest, enriched by Parse)
+- `extraction_result` — the ExtractionResult (populated by Extract)
+- `trace` — accumulates events from every step (timing, model calls, errors)
+- `status` — "pending", "running", "completed", or "failed"
+- `errors` — list of error messages
+- `metadata` — free-form dict for passing data between steps (anonymization result, original text, etc.)
+
+Each step receives the state, does its work, and returns the updated state. The Pipeline runs steps sequentially and stops on the first failure.
+
+---
+
+## 2. Installation
+
+### Full Installation
+
+```bash
+pip install docflow[all]
+```
+
+This installs everything: all parsers (PyMuPDF, Tesseract, Docling), LLM support, privacy/anonymization, and all dependencies. This is the heaviest option (~500MB+ due to PyTorch from Docling).
+
+### Selective Installation
+
+Install only what you need:
+
+```bash
+pip install docflow[pdf,llm]        # PyMuPDF parser + LLM (lightweight)
+pip install docflow[ocr,llm]        # Tesseract OCR + LLM
+pip install docflow[docling,llm]    # Docling parser + LLM (best quality)
+pip install docflow[privacy]        # Presidio anonymization
+```
+
+### Optional Dependency Groups
+
+| Group | Packages | Purpose |
+|-------|----------|---------|
+| `pdf` | pymupdf | PDF text extraction and rendering |
+| `ocr` | pytesseract, Pillow | OCR with Tesseract |
+| `llm` | litellm | LLM calls (OpenAI, Anthropic, Gemini, etc.) |
+| `privacy` | presidio-analyzer, presidio-anonymizer | PII detection and anonymization |
+| `docling` | docling | Advanced document parsing with layout understanding |
+| `all` | All of the above | Everything |
+| `dev` | pytest, pytest-asyncio, pytest-cov, ruff | Development tools |
+
+### Installation Size
+
+DocFlow itself is ~3 MB. The dependencies vary significantly by what you install:
+
+| Installation | Disk space | What you get |
+|-------------|-----------|-------------|
+| `docflow` (core only) | ~15 MB | Pydantic, YAML, aiofiles, click — no parsing or LLM |
+| `docflow[pdf]` | ~70 MB | + PyMuPDF (~50 MB) — digital PDF parsing |
+| `docflow[ocr]` | ~30 MB | + pytesseract + Pillow (~15 MB) — OCR (requires Tesseract binary) |
+| `docflow[llm]` | ~80 MB | + litellm (~55 MB) + OpenAI/HTTP clients |
+| `docflow[pdf,llm]` | ~140 MB | PyMuPDF + LLM — the lightweight production setup |
+| `docflow[ocr,llm]` | ~110 MB | Tesseract + LLM — for scanned documents |
+| `docflow[privacy]` | ~50 MB | + Presidio analyzer + anonymizer + spaCy model |
+| `docflow[docling]` | ~800 MB | + Docling + PyTorch (~470 MB) + transformers — best parsing quality |
+| `docflow[mcp]` | ~30 MB | + MCP SDK + uvicorn — AI agent integration |
+| `docflow[all]` | ~1.3 GB | Everything including Docling/PyTorch |
+
+**Recommendation:** Start with `docflow[pdf,llm]` (~140 MB) for digital PDFs. Add `[ocr]` if you have scanned documents. Only add `[docling]` if you need advanced table extraction — it pulls in PyTorch which is the bulk of the size.
+
+### Requirements
+
+- Python >= 3.11
+- For Tesseract parser: Tesseract binary must be installed on the system
+- For LLM extraction: API key for your chosen provider (set via environment variable)
+
+---
+
+## 3. Quick Start
+
+### Simplest Usage — One Function Call
+
+```python
+from pydantic import BaseModel
+from docflow import extract
+
+class Invoice(BaseModel):
+    supplier_name: str
+    invoice_number: str
+    total: float
+
+# Set your API key
+import os
+os.environ["OPENAI_API_KEY"] = "sk-..."
+
+result = extract("invoice.pdf", schema=Invoice)
+print(result.data)
+# {"supplier_name": "Acme Corp", "invoice_number": "INV-001", "total": 1234.56}
+```
+
+### Using a Built-in Template
+
+```python
+from docflow import extract
+from docflow.templates import load_template
+
+Invoice = load_template("invoice")
+result = extract("invoice.pdf", schema=Invoice)
+```
+
+### Reusable Pipeline
+
+```python
+from docflow import DocumentPipeline
+
+pipeline = DocumentPipeline(
+    parser="tesseract",
+    model="openai/gpt-4o",
+    storage="local",
+)
+
+# Process multiple documents with the same config
+for pdf in ["inv1.pdf", "inv2.pdf", "inv3.pdf"]:
+    result = pipeline.run_sync(pdf, schema=Invoice)
+    print(f"{pdf}: {result.data['total']}")
+```
+
+### Inspecting Results
+
+```python
+result = pipeline.run_sync("invoice.pdf", schema=Invoice)
+
+# The extracted data as a dict
+print(result.data)
+
+# Per-field details
+for name, field in result.fields.items():
+    print(f"\n{name}:")
+    print(f"  Value: {field.value}")
+    print(f"  Confidence: {field.confidence:.2f}")
+    if field.trust:
+        print(f"  Trust: {field.trust.agreement} agreed, found_in_source={field.trust.found_in_source}")
+        print(f"  Auto-accept: {field.trust.auto_accept}")
+    print(f"  Validation: {field.validation_status}")
+    for ev in field.evidence:
+        print(f"  Evidence: page {ev.page_number}, text={ev.text!r}")
+        if ev.bbox:
+            print(f"    BBox: ({ev.bbox.x0}, {ev.bbox.y0}) -> ({ev.bbox.x1}, {ev.bbox.y1})")
+
+# Overall result
+print(f"\nOverall confidence: {result.confidence:.2f}")
+print(f"Needs review: {result.needs_review}")
+print(f"Model used: {result.model_name}")
+```
+
+---
+
+## 4. Core Concepts
+
+### Document
+
+A `Document` represents a file and all derived content. After ingestion, it has metadata (file name, path, size, hash, MIME type). After parsing, it gets populated with pages, blocks, and text.
+
+```python
+from docflow.documents.models import Document
+
+doc = Document.from_file_sync("invoice.pdf")
+print(doc.id)                    # UUID
+print(doc.metadata.file_name)    # "invoice.pdf"
+print(doc.metadata.mime_type)    # "application/pdf"
+print(doc.status)                # "ingested"
+```
+
+### Page
+
+A `Page` represents one page of the document, with its text content and layout blocks.
+
+```python
+for page in document.pages:
+    print(f"Page {page.page_number}: {page.block_count} blocks")
+    print(f"  Dimensions: {page.width} x {page.height}")
+    print(f"  Text: {page.text[:100]}...")
+```
+
+### Block
+
+A `Block` is a single text element on a page — a paragraph, title, table cell, etc. — with its position (bounding box) and optional confidence score.
+
+```python
+for block in page.blocks:
+    print(f"  [{block.block_type.value}] {block.text[:50]}")
+    if block.bbox:
+        print(f"    Position: ({block.bbox.x0}, {block.bbox.y0}) -> ({block.bbox.x1}, {block.bbox.y1})")
+    if block.confidence is not None:
+        print(f"    OCR confidence: {block.confidence:.2f}")
+```
+
+Block types: `TEXT`, `TITLE`, `TABLE`, `IMAGE`, `HEADER`, `FOOTER`, `LIST_ITEM`, `FORMULA`, `PARAGRAPH`.
+
+### Evidence
+
+An `Evidence` object links an extracted field value back to a specific location in the source document.
+
+```python
+evidence = result.fields["total"].evidence[0]
+print(evidence.document_id)   # which document
+print(evidence.page_number)   # which page (0-indexed)
+print(evidence.text)          # the source text snippet
+print(evidence.bbox)          # position on page (BoundingBox)
+print(evidence.block_id)      # which block it matched to
+print(evidence.confidence)    # OCR confidence (if available)
+```
+
+Evidence is grounded by searching all pages for the text — it doesn't trust the LLM's reported page number. If the text is found in a block, the evidence gets the block's bounding box. If found only in page text, it gets the page number but no bbox.
+
+### ExtractionResult
+
+The complete output of the extraction pipeline. Contains the extracted data, per-field details, review status, corrections, and provenance.
+
+Key fields:
+- `data` — extracted values as a dict
+- `fields` — dict of `ExtractedField` objects with confidence, evidence, validation status
+- `confidence` — overall confidence (average of field confidences)
+- `needs_review` — True if any review rule flagged this document
+- `review_status` — "pending", "approved", or "rejected"
+- `review_reasons` — why it was flagged
+- `review_verdicts` — structured verdicts from LLM reviewers
+- `corrections` — audit trail of human corrections
+- `validation_errors` — validation rule failures
+
+---
+
+## 5. Defining Schemas
+
+### Python Classes (Recommended)
+
+Define your extraction schema as a Pydantic `BaseModel`. Use `Field(description=...)` to help the LLM understand what to extract.
+
+```python
+from pydantic import BaseModel, Field
+
+class Invoice(BaseModel):
+    supplier_name: str = Field(description="Name of the supplier or vendor")
+    invoice_number: str = Field(description="Invoice reference number")
+    invoice_date: str = Field(description="Date the invoice was issued")
+    currency: str = Field(default="EUR", description="Currency code (ISO 4217)")
+    subtotal: float | None = Field(default=None, description="Amount before tax")
+    vat_amount: float | None = Field(default=None, description="VAT/tax amount")
+    total: float = Field(description="Total amount including tax")
+```
+
+Tips:
+- Use `str` for dates (the LLM will format them as it reads them)
+- Use `float | None` for optional numeric fields
+- The `description` is sent to the LLM in the prompt — be specific
+- The field name itself matters — `supplier_name` is clearer than `name`
+
+### Nested Models
+
+```python
+class LineItem(BaseModel):
+    description: str
+    quantity: float | None = None
+    unit_price: float | None = None
+    amount: float
+
+class Invoice(BaseModel):
+    supplier_name: str
+    total: float
+    line_items: list[LineItem] = Field(default_factory=list)
+```
+
+### YAML Templates
+
+DocFlow ships with 3 built-in templates and supports user-defined YAML templates.
+
+```python
+from docflow.templates import load_template, list_templates
+
+# See what's available
+for t in list_templates():
+    print(f"{t.name} ({t.source}): {t.description}")
+
+# Load a template — returns a Pydantic class
+Invoice = load_template("invoice")
+Contract = load_template("contract")
+Receipt = load_template("receipt")
+```
+
+Built-in templates:
+- **invoice** — supplier, number, dates, totals, VAT, line items
+- **contract** — type, parties, dates, terms, liability, governing law
+- **receipt** — merchant, date, total, payment method, items
+
+### Custom YAML Templates
+
+Create a YAML file in `./docflow_templates/` or `~/.docflow/templates/`:
+
+```yaml
+# ./docflow_templates/purchase_order.yaml
+name: purchase_order
+version: "1.0"
+description: "Purchase order extraction schema"
+fields:
+  po_number:
+    type: str
+    required: true
+    description: "Purchase order number"
+  buyer:
+    type: str
+    required: true
+  seller:
+    type: str
+    required: true
+  order_date:
+    type: date
+    required: true
+  total:
+    type: float
+    required: true
+  items:
+    type: list
+    required: false
+    item_fields:
+      description:
+        type: str
+        required: true
+      quantity:
+        type: float
+      unit_price:
+        type: float
+      amount:
+        type: float
+        required: true
+```
+
+Supported types: `str`, `int`, `float`, `bool`, `date`, `datetime`, `list` (with `item_fields` or `item_type`).
+
+Template discovery order: `./docflow_templates/` > `~/.docflow/templates/` > built-in. First match wins, so placing a file with the same name as a built-in template overrides it.
+
+### Initializing Templates
+
+Copy a built-in template to your project for customization:
+
+```bash
+docflow templates init invoice
+# Creates ./docflow_templates/invoice.yaml
+```
+
+### Auto-Discovering Schemas
+
+Don't know what fields are in your document? Let the LLM figure it out:
+
+```python
+from docflow import discover_schema
+
+# LLM reads the document and suggests a schema
+discovery = discover_schema("invoice.pdf")
+
+print(discovery.document_type)  # "invoice"
+print(discovery.description)    # "A supplier invoice with line items"
+
+# See what fields were found
+for f in discovery.fields:
+    print(f"  {f.name}: {f.type} ({'required' if f.required else 'optional'})")
+    print(f"    {f.description}")
+```
+
+The result gives you three things:
+
+**1. A ready-to-use Pydantic class:**
+```python
+Invoice = discovery.schema_class
+
+# Use it immediately for extraction
+from docflow import extract
+result = extract("invoice.pdf", schema=Invoice)
+```
+
+**2. A YAML template you can save and customize:**
+```python
+print(discovery.yaml_template)
+# name: invoice
+# version: "1.0"
+# fields:
+#   supplier_name:
+#     type: str
+#     required: true
+#     description: "Vendor name"
+#   total:
+#     type: float
+#     required: true
+#     description: "Total amount"
+
+# Save for reuse
+with open("docflow_templates/my_invoice.yaml", "w") as f:
+    f.write(discovery.yaml_template)
+```
+
+**3. The raw field list for inspection:**
+```python
+for f in discovery.fields:
+    print(f.name, f.type, f.required, f.description)
+```
+
+Parameters:
+- `path` — path to the document
+- `model` — LLM model (default: `"openai/gpt-4o"`)
+- `parser` — which parser to use for reading the document (default: `"pymupdf"`)
+
+This is useful when you have a new document type and want a quick starting point. Discover the schema from one example, review/edit the YAML, then use it for batch processing.
+
+---
+
+## 6. Parsers
+
+Parsers convert raw PDF files into structured `Document` objects with pages, blocks, bounding boxes, and text. DocFlow includes 4 parsers.
+
+### PyMuPDFParser (`"pymupdf"`)
+
+Extracts embedded text directly from the PDF's internal text layer. Fast, accurate for digital PDFs, but returns empty text for scanned documents.
+
+```python
+pipeline = DocumentPipeline(parser="pymupdf")
+```
+
+- **Speed**: ~100ms per document
+- **Best for**: digitally-created PDFs, contracts, reports
+- **Produces**: text blocks with bounding boxes, no confidence scores
+- **Fails on**: scanned documents, image-only PDFs
+- **Install**: `pip install docflow[pdf]`
+
+### TesseractParser (`"tesseract"`)
+
+Renders PDF pages to images, then runs Tesseract OCR to extract text. Works on scanned documents. Produces per-word confidence scores.
+
+```python
+pipeline = DocumentPipeline(parser="tesseract")
+
+# With custom config
+from docflow.parsing.tesseract_parser import TesseractParser
+parser = TesseractParser(languages=["eng", "ita"], dpi=300, preprocess_steps=["denoise"])
+pipeline = DocumentPipeline(parser=parser)
+```
+
+Parameters:
+- `languages` — OCR languages (default: `["eng"]`). Use Tesseract language codes.
+- `dpi` — rendering DPI (default: 200). Higher = better OCR but slower.
+- `preprocess_steps` — image preprocessing before OCR. Options: `"grayscale"`, `"denoise"`, `"threshold"`, `"deskew"`.
+
+- **Speed**: 1-5 seconds per page
+- **Best for**: scanned documents, image-heavy PDFs
+- **Produces**: word-level blocks with bounding boxes AND confidence scores (0-1)
+- **Requires**: Tesseract binary installed on the system
+- **Install**: `pip install docflow[ocr]`
+
+### DoclingParser (`"docling"`)
+
+Uses IBM's Docling library for advanced document understanding. Detects layout structure (titles, paragraphs, tables, figures), reconstructs reading order, and handles complex formats.
+
+```python
+pipeline = DocumentPipeline(parser="docling")
+```
+
+- **Speed**: 4-5 seconds per page
+- **Best for**: complex layouts, tables, multi-column documents, non-PDF formats
+- **Produces**: semantic blocks (title, paragraph, table, formula, etc.) with bounding boxes
+- **Formats**: PDF, DOCX, PPTX, XLSX, HTML, images
+- **Table extraction**: 97.9% accuracy on complex tables — far better than PyMuPDF/Tesseract
+- **Install**: `pip install docflow[docling]` (heavy — includes PyTorch)
+
+### SmartParser (`"smart"`)
+
+Automatically picks the best approach per page. First tries native text extraction (PyMuPDF). For pages where that fails (scanned, sparse, garbled), falls back to Tesseract OCR.
+
+```python
+pipeline = DocumentPipeline(parser="smart")
+
+# Custom config
+from docflow.parsing.smart_parser import SmartParser
+parser = SmartParser(ocr_languages=["eng", "fra"], dpi=300)
+pipeline = DocumentPipeline(parser=parser)
+```
+
+Parameters:
+- `ocr_languages` — languages for OCR fallback (default: `["eng"]`)
+- `dpi` — rendering DPI for OCR pages (default: 200)
+- `min_text_length` — minimum characters before a page is considered "good" (default: 20)
+
+A page triggers OCR if:
+- Text is shorter than 20 characters
+- No text blocks exist
+- Page has embedded images but little text
+- More than 10% of characters are garbled (Unicode private-use area)
+
+- **Speed**: fast for digital pages, slow only for pages that need OCR
+- **Best for**: mixed documents where some pages are digital and some are scanned
+- **Install**: `pip install docflow[pdf,ocr]`
+
+### Comparison Table
+
+| Feature | PyMuPDF | Tesseract | Docling | Smart |
+|---------|---------|-----------|---------|-------|
+| Digital PDFs | Excellent | Good | Excellent | Excellent |
+| Scanned PDFs | Fails | Good | Good | Good |
+| Speed | ~100ms | 1-5s/page | 4-5s/page | Varies |
+| Bounding boxes | Yes | Yes | Yes | Yes |
+| Per-word confidence | No | Yes (0-1) | No | Per page |
+| Table extraction | Basic | Basic | Excellent | Per page |
+| Non-PDF formats | No | No | Yes | No |
+| Layout understanding | Blocks only | Words only | Semantic | Per page |
+
+### Using a Custom Parser
+
+Any object implementing the `Parser` protocol works:
+
+```python
+from docflow.parsing.base import Parser
+from docflow.documents.models import Document
+
+class MyParser:
+    async def parse(self, document: Document) -> Document:
+        # Your parsing logic
+        document.pages = [...]
+        document.raw_text = "..."
+        document.status = "parsed"
+        return document
+
+pipeline = DocumentPipeline(parser=MyParser())
+```
+
+---
+
+## 6b. Structured Tables
+
+When using the Docling parser, tables are extracted as first-class structured objects — not flattened text. Each table preserves its cell grid, row/column headers, spans, and per-cell bounding boxes.
+
+### The Table and Cell Models
+
+```python
+from docflow.documents.tables import Table, Cell
+
+# After parsing with Docling
+pipeline = DocumentPipeline(parser="docling")
+result = pipeline.run_sync("financial_report.pdf", schema=FinancialData)
+
+# Access tables from parsed pages
+for page in result.pages:  # (via pipeline state, not ExtractionResult)
+    for table in page.tables:
+        print(f"Table: {table.num_rows}x{table.num_cols}")
+```
+
+### Cell — Every Cell Knows Its Headers
+
+The key differentiator: each data cell carries resolved `row_headers` and `col_headers` — the actual header text, not just indices. A cell can answer "I am the value at Revenue × Q3 2024."
+
+```python
+cell = table.cell_at(1, 1)
+cell.text              # "4,200"
+cell.row, cell.col     # 1, 1
+cell.row_span          # 1 (or more for merged cells)
+cell.col_span          # 1
+cell.is_column_header  # False
+cell.is_row_header     # False
+cell.row_headers       # ["Revenue"]   — which row this belongs to
+cell.col_headers       # ["Q3 2024"]   — which column this belongs to
+cell.bbox              # BoundingBox for this specific cell
+```
+
+### Table Navigation
+
+```python
+# Header rows
+for row in table.header_rows:
+    print([cell.text for cell in row])
+# ["", "Q3 2024", "Q3 2023"]
+
+# Data rows (excludes headers)
+for row in table.data_rows:
+    print([cell.text for cell in row])
+# ["Revenue", "4,200", "3,800"]
+# ["Cost", "2,100", "1,900"]
+
+# Access by position (handles spans)
+table.cell_at(1, 1)        # Cell at row 1, col 1
+table.column_values(1)     # All data cells in column 1
+table.row_values(1)        # All cells in row 1
+
+# Convert to list of dicts (like pandas records)
+records = table.to_dict_records()
+# [{"Q3 2024": "4,200", "Q3 2023": "3,800"}, {"Q3 2024": "2,100", "Q3 2023": "1,900"}]
+```
+
+### Which Parsers Produce Tables?
+
+| Parser | `page.tables` | Table quality |
+|--------|--------------|---------------|
+| Docling | Structured `Table` objects | Full cells, headers, spans, bboxes |
+| PyMuPDF | Empty `[]` | Tables appear as text blocks |
+| Tesseract | Empty `[]` | Tables appear as OCR'd text |
+| Smart | Empty `[]` | Tables appear as text blocks |
+
+Only Docling produces structured tables. Other parsers include table content in their text blocks — the LLM can still read markdown tables, but you don't get cell-level structure.
+
+### How Tables Reach the LLM
+
+Tables are sent to the LLM as markdown (Docling's `export_to_markdown()`), which LLMs read well. The structured `Table`/`Cell` objects are available for:
+- **Evidence matching** — match extracted values to specific cells with bboxes
+- **Post-extraction validation** — verify subtotals add up
+- **Direct access** — skip the LLM for simple table lookups
+- **Cell-level highlighting** — show exactly which cell a value came from in a review UI
+
+---
+
+## 7. Extraction Engines
+
+After parsing, the extraction engine sends the document content to an LLM and gets back structured data matching your schema.
+
+### Extraction Types
+
+DocFlow has 3 extraction types, each using a different approach to read the document.
+
+#### Text Extraction (`extraction_type="text"`)
+
+The parser produces text → the LLM reads that text. This is the default.
+
+```python
+pipeline = DocumentPipeline(
+    parser="pymupdf",           # or "tesseract", "docling", "smart"
+    extraction_type="text",     # default
+)
+```
+
+Pipeline: `Ingest → Parse → Extract`
+
+The LLM receives the document text organized by page, plus the schema definition and an example of the expected output format.
+
+#### Vision Extraction (`extraction_type="vision"`)
+
+Pages are rendered as images and sent directly to a vision-capable LLM. No parser needed — the LLM reads the document visually.
+
+```python
+pipeline = DocumentPipeline(
+    parser=None,                # no parser — vision reads images directly
+    extraction_type="vision",
+    model="openai/gpt-4o",     # must be a vision-capable model
+)
+```
+
+Pipeline: `Ingest → ExtractVision`
+
+Internally, the vision engine:
+1. Renders all pages to PNG images at the configured DPI
+2. Runs Tesseract OCR on those same images (automatically, for evidence grounding)
+3. Encodes images as base64 and sends them to the LLM with the schema
+4. Matches LLM evidence against OCR blocks for bounding boxes
+
+This means vision extraction produces the same rich evidence (bboxes, block IDs, OCR confidence) as text extraction — even though the LLM read images, not text.
+
+**Important**: `parser` must be `None` when using vision. If you set a parser, DocFlow raises a `ValueError` at pipeline construction.
+
+#### Hybrid Extraction (`extraction_type="hybrid"`)
+
+Runs both vision and text agents in parallel for maximum diversity, then a vision-capable decider reviews all candidates against the actual page images.
+
+```python
+pipeline = DocumentPipeline(
+    parser=None,
+    extraction_type="hybrid",
+    n_instances=2,              # 2 vision + 2 text + 1 decider = 5 LLM calls
+)
+```
+
+Pipeline: `Ingest → ExtractHybrid`
+
+How it works:
+1. Render pages to images + run Tesseract OCR (once, shared)
+2. N vision LLM calls (page images → LLM) at varied temperatures
+3. N text LLM calls (OCR markdown → LLM) at varied temperatures
+4. 1 vision decider call: receives ALL candidates (labelled "vision" or "text") + page images, picks the best value per field
+
+The decider can actually look at the document to break ties — it's not just a majority vote.
+
+### Extraction Modes
+
+Each extraction type supports two modes:
+
+#### Single Mode (`extraction_mode="single"`)
+
+One LLM call. Fast, cheap, good for most documents.
+
+```python
+pipeline = DocumentPipeline(extraction_mode="single")  # default
+```
+
+#### Multi-Agent Mode (`extraction_mode="multi"`)
+
+N parallel LLM calls at different temperatures for diversity, then a decider picks the best answer per field.
+
+```python
+pipeline = DocumentPipeline(
+    extraction_mode="multi",
+    n_instances=3,              # 3 parallel calls + 1 decider = 4 LLM calls
+)
+```
+
+Parameters:
+- `n_instances` — number of parallel extraction calls (default: 5)
+- `temperatures` — optional list of floats (one per instance). If not provided, auto-generated with a spread around 0.3.
+
+The decider:
+- Compares all candidate extractions field by field
+- Picks the most consistent value per field
+- Prefers values with stronger evidence
+- Sets confidence based on agreement (1.0 if all agree, 0.7 if majority, 0.4 if split)
+
+### Summary Table
+
+| extraction_type | extraction_mode | Parser needed? | LLM calls | Best for |
+|----------------|----------------|---------------|-----------|----------|
+| text | single | Yes | 1 | Simple digital PDFs |
+| text | multi | Yes | N+1 | Important documents |
+| vision | single | No | 1 | Complex layouts, forms |
+| vision | multi | No | N+1 | High-value visual docs |
+| hybrid | (always multi) | No | 2N+1 | Critical documents |
+
+### Trust Scoring — Agreement + Source Verification
+
+DocFlow does NOT use the LLM's self-reported confidence. Models can't reliably know when they're wrong — they'll report high confidence on hallucinations. Instead, trust is based on two verifiable signals:
+
+**1. Agreement across independent runs** (multi/hybrid mode): Did multiple LLM calls produce the same value? If 3 out of 3 runs agree, the value is almost certainly correct. If they disagree, at least one is wrong — review it.
+
+**2. Source verification**: Does the extracted value actually exist in the document text? This catches hallucinations — values the model invented that aren't in the source.
+
+Every field gets a `trust` object:
+
+```python
+field = result.fields["total"]
+field.trust.agreement        # "3/3" — all runs agreed
+field.trust.found_in_source  # True — value exists in document text
+field.trust.valid            # True — passes basic checks
+field.trust.auto_accept      # True — safe to skip review
+field.trust.explanation      # "Agreement: 3/3; Found in source: True; Auto-accept: yes"
+```
+
+**The decision is nearly binary:**
+- **Auto-accept** (`trust.auto_accept = True`): all runs agree AND value found in source AND valid → skip review
+- **Needs review** (`trust.auto_accept = False`): anything else → human should look
+
+| Extraction mode | What agreement looks like |
+|----------------|--------------------------|
+| single (1 call) | Always "1/1" — trust depends on source verification only |
+| multi (3 calls) | "3/3" (unanimous), "2/3" (split), "1/3" (all different) |
+| hybrid (2+2 calls) | "4/4", "3/4", etc. — cross-approach agreement is the strongest signal |
+
+The `confidence` float (0-1) still exists for backward compatibility: 1.0 = auto-accept, 0.5 = found in source but not unanimous, 0.2 = not found in source. But the `trust` object is the real decision maker.
+
+### JSON Reliability
+
+All LLM calls enforce reliable JSON output through 4 mechanisms:
+
+1. **JSON mode** — `response_format={"type": "json_object"}` is passed to every LLM call
+2. **Concrete example** — the prompt includes a filled-out example using the actual field names from your schema
+3. **Markdown fence stripping** — if the LLM wraps JSON in code fences, they're stripped
+4. **Auto-retry** — if JSON parsing fails, a repair message is sent with JSON mode enforced
+
+### Domain Context
+
+Provide industry-specific context to improve extraction accuracy:
+
+```python
+pipeline = DocumentPipeline(
+    context=(
+        "You work in pharmaceutical regulatory affairs. "
+        "Documents are clinical trial reports. "
+        "Dates should be in DD-MMM-YYYY format. "
+        "Drug names should use INN (International Nonproprietary Name)."
+    ),
+)
+```
+
+The context is appended to the LLM system prompt as a "Domain context" section. It works across all extraction types and modes.
+
+### LLM Providers
+
+DocFlow uses litellm under the hood, which supports 100+ LLM providers. The `model` parameter uses litellm's format:
+
+```python
+# OpenAI
+pipeline = DocumentPipeline(model="openai/gpt-4o")
+pipeline = DocumentPipeline(model="openai/gpt-4o-mini")
+
+# Anthropic
+pipeline = DocumentPipeline(model="anthropic/claude-sonnet-4-20250514")
+
+# Google Gemini
+pipeline = DocumentPipeline(model="gemini/gemini-2.0-flash")
+
+# Azure OpenAI
+pipeline = DocumentPipeline(model="azure/my-deployment")
+
+# Local models (via Ollama)
+pipeline = DocumentPipeline(model="ollama/llama3")
+```
+
+Set your API key via environment variable (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, etc.) or pass it directly:
+
+```python
+from docflow.extraction.llm.litellm_adapter import LiteLLMAdapter
+llm = LiteLLMAdapter(model="openai/gpt-4o", api_key="sk-...")
+pipeline = DocumentPipeline(parser="pymupdf")
+# Use manual Pipeline with Extract(llm=llm) for custom LLM instances
+```
+
+---
+
+## 8. The Pipeline
+
+### Three Ways to Build a Pipeline
+
+#### 1. `extract()` — One-liner
+
+```python
+from docflow import extract
+
+result = extract(
+    "invoice.pdf",
+    schema=Invoice,
+    model="openai/gpt-4o",
+    parser="pymupdf",
+    storage="local",
+    privacy=PrivacyPolicy(...),
+)
+```
+
+Creates a `DocumentPipeline` internally, runs it once, returns the result.
+
+#### 2. `DocumentPipeline` — Configurable, Reusable
+
+```python
+from docflow import DocumentPipeline
+
+pipeline = DocumentPipeline(
+    parser="smart",
+    model="openai/gpt-4o",
+    storage="local",
+    validators=[RequiredFields(["total"])],
+    review_rules=[OverallConfidenceBelow(0.7)],
+    privacy=PrivacyPolicy(provider=PresidioProvider()),
+    extraction_mode="multi",
+    extraction_type="text",
+    n_instances=3,
+    context="You work in insurance claims processing.",
+)
+
+# Reuse for multiple documents
+result1 = pipeline.run_sync("claim1.pdf", schema=ClaimSchema)
+result2 = pipeline.run_sync("claim2.pdf", schema=ClaimSchema)
+```
+
+All parameters:
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `parser` | str or Parser | `"pymupdf"` | `"pymupdf"`, `"tesseract"`, `"docling"`, `"smart"`, `None` |
+| `model` | str | `"openai/gpt-4o"` | LLM model (litellm format) |
+| `storage` | str or Storage | `None` | `None`, `"local"`, or Storage instance |
+| `validators` | list | `None` | List of Validator instances |
+| `review_rules` | list | `None` | List of ReviewRule or LLMReviewer instances |
+| `privacy` | PrivacyPolicy | `None` | Privacy/anonymization config |
+| `extraction_mode` | str | `"single"` | `"single"` or `"multi"` |
+| `extraction_type` | str | `"text"` | `"text"`, `"vision"`, or `"hybrid"` |
+| `n_instances` | int | `5` | Number of parallel LLM calls (multi mode) |
+| `temperatures` | list[float] | `None` | Custom temperature per instance |
+| `vision_dpi` | int | `200` | DPI for page rendering |
+| `context` | str | `None` | Domain context for LLM prompt |
+
+#### 3. Manual `Pipeline` — Full Control
+
+Build your own step sequence:
+
+```python
+from docflow.workflow import (
+    Pipeline, Ingest, Parse, Extract, ExtractVision, ExtractHybrid,
+    Anonymize, Validate, Review, Store,
+)
+from docflow.extraction.llm.litellm_adapter import LiteLLMAdapter
+from docflow.storage.local import LocalDocumentStore
+
+llm = LiteLLMAdapter(model="openai/gpt-4o")
+
+pipeline = Pipeline([
+    Ingest(path="invoice.pdf"),
+    Parse(parser="tesseract"),
+    Anonymize(policy=PrivacyPolicy(provider=PresidioProvider())),
+    Extract(schema=Invoice, llm=llm, mode="multi", n_instances=3, context="Insurance"),
+    Validate(validators=[RequiredFields(["total"]), EvidenceRequired()]),
+    Review(rules=[OverallConfidenceBelow(0.7), my_llm_reviewer]),
+    Store(storage=LocalDocumentStore("./output")),
+])
+
+result = pipeline.run_sync()
+print(result.success)
+print(result.state.extraction_result.data)
+```
+
+### Pipeline Steps Reference
+
+| Step | Name | Purpose |
+|------|------|---------|
+| `Ingest(path)` | ingest | Load file, create Document with metadata |
+| `Parse(parser)` | parse | Extract text and blocks from document |
+| `Anonymize(policy)` | anonymize | Detect and mask PII before extraction |
+| `Extract(schema, llm, ...)` | extract | Send text to LLM, get structured data |
+| `ExtractVision(schema, llm, ...)` | extract_vision | Send page images to vision LLM |
+| `ExtractHybrid(schema, llm, ...)` | extract_hybrid | Vision + text agents in parallel |
+| `Validate(validators)` | validate | Check fields against rules |
+| `Review(rules)` | review | Flag documents for human review |
+| `Store(storage)` | store | Persist document, result, and trace |
+
+### Pipeline Failure Behavior
+
+When a step fails:
+1. The error is recorded in `state.errors`
+2. The pipeline stops (no subsequent steps run)
+3. If storage is configured, partial state is saved automatically
+4. `DocumentPipeline` raises `WorkflowError` with the full result attached
+
+```python
+from docflow.errors import WorkflowError
+
+try:
+    result = pipeline.run_sync("bad_file.pdf", schema=Invoice)
+except WorkflowError as e:
+    print(e.result.errors)             # ["Step 'extract' failed: ..."]
+    print(e.result.state.current_step) # "extract"
+    print(e.result.state.document)     # Document (if ingestion succeeded)
+    print(e.result.trace.events)       # all events up to failure
+```
+
+---
+
+## 9. Validation
+
+Validation checks extraction results against rules and updates field statuses.
+
+### Built-in Validators
+
+```python
+from docflow.validation import RequiredFields, EvidenceRequired, TypeValidation, CustomRule
+
+pipeline = DocumentPipeline(
+    validators=[
+        RequiredFields(["supplier_name", "total", "invoice_number"]),
+        EvidenceRequired(["total", "supplier_name"]),
+        TypeValidation(),
+    ],
+)
+```
+
+| Validator | Parameters | What it checks |
+|-----------|-----------|----------------|
+| `RequiredFields(fields)` | `fields: list[str]` | Fields must exist and have non-None values |
+| `EvidenceRequired(fields)` | `fields: list[str] \| None` | Fields must have at least one Evidence object |
+| `TypeValidation()` | (none) | Warns on empty string values |
+| `CustomRule(name, fn)` | `name: str`, `fn: Callable` | User-defined validation function |
+
+### Custom Validation Rules
+
+```python
+from docflow.validation import CustomRule, ValidationError
+
+def check_total_positive(result):
+    errors = []
+    total = result.fields.get("total")
+    if total and total.value is not None and total.value < 0:
+        errors.append(ValidationError(
+            field_name="total",
+            rule_name="positive_total",
+            message="Total must be positive",
+        ))
+    return errors
+
+pipeline = DocumentPipeline(
+    validators=[CustomRule("positive_total", check_total_positive)],
+)
+```
+
+### Validation Results
+
+After validation, each field's `validation_status` is updated:
+- `"valid"` — all rules passed
+- `"warning"` — warning-level issues found
+- `"error"` — error-level issues found
+
+```python
+result = pipeline.run_sync("invoice.pdf", schema=Invoice)
+for name, field in result.fields.items():
+    print(f"{name}: {field.validation_status}")
+    if field.errors:
+        print(f"  Errors: {field.errors}")
+```
+
+---
+
+## 10. Review
+
+The Review step checks extraction results against configurable rules and LLM-powered reviewers. If any rule triggers, the document is flagged with `needs_review=True`.
+
+### Review Rules
+
+```python
+from docflow.review import (
+    OverallConfidenceBelow,
+    FieldConfidenceBelow,
+    AnyFieldConfidenceBelow,
+    HasValidationErrors,
+    FieldMissing,
+    NoEvidence,
+)
+
+pipeline = DocumentPipeline(
+    review_rules=[
+        OverallConfidenceBelow(0.7),
+        FieldConfidenceBelow({"total": 0.8, "supplier_name": 0.7}),
+        FieldMissing(["total", "invoice_number"]),
+        HasValidationErrors(),
+    ],
+)
+```
+
+| Rule | Parameters | When it flags |
+|------|-----------|---------------|
+| `OverallConfidenceBelow(threshold)` | `threshold: float = 0.7` | Average confidence below threshold |
+| `FieldConfidenceBelow(fields)` | `fields: dict[str, float]` | Any named field below its threshold |
+| `AnyFieldConfidenceBelow(threshold)` | `threshold: float = 0.6` | Any single field below threshold |
+| `HasValidationErrors()` | (none) | Validation step found errors |
+| `FieldMissing(fields)` | `fields: list[str]` | Critical fields are None or absent |
+| `NoEvidence(fields)` | `fields: list[str] \| None` | Fields have no supporting evidence |
+
+### LLM Reviewer
+
+Create prompt-driven reviewers that use an LLM to inspect the extraction:
+
+```python
+from docflow.review import LLMReviewer
+from docflow.extraction.llm.litellm_adapter import LiteLLMAdapter
+
+llm = LiteLLMAdapter(model="openai/gpt-4o")
+
+auditor = LLMReviewer(
+    name="financial_auditor",
+    prompt="Check if the extracted totals, VAT, and line items are mathematically consistent. Flag any discrepancies.",
+    llm=llm,
+)
+
+compliance = LLMReviewer(
+    name="compliance_check",
+    prompt="Check if any extracted field contains PII that should not be stored. Flag any concerns.",
+    llm=llm,
+)
+
+pipeline = DocumentPipeline(
+    review_rules=[
+        OverallConfidenceBelow(0.7),  # fast rule
+        auditor,                       # LLM reviewer
+        compliance,                    # LLM reviewer
+    ],
+)
+```
+
+Rules and reviewers mix freely. Rules are fast (no LLM call), reviewers are thorough (one LLM call each).
+
+### Review Verdicts
+
+Each LLM reviewer produces a `ReviewVerdict` — always stored on the result, even if approved:
+
+```python
+result = pipeline.run_sync("invoice.pdf", schema=Invoice)
+
+for v in result.review_verdicts:
+    print(f"{v.reviewer}: {v.verdict} — {v.reasoning}")
+# financial_auditor: Approved — Math checks out
+# compliance_check: Not Approved — PII found in supplier_name field
+
+print(result.needs_review)    # True (compliance flagged it)
+print(result.review_reasons)  # ["compliance_check: PII found in supplier_name field"]
+```
+
+---
+
+## 11. Human Corrections & Approval
+
+### Correcting Fields
+
+After review, humans can correct extracted values with a full audit trail:
+
+```python
+result.correct_field(
+    "total", 1235.00,
+    corrected_by="john@company.com",
+    reason="OCR misread 5 as 6"
+)
+
+# The correction is tracked
+print(result.fields["total"].value)           # 1235.00 (corrected)
+print(result.fields["total"].original_value)  # 1234.56 (always preserved)
+print(result.fields["total"].corrected)       # True
+print(result.data["total"])                   # 1235.00 (data dict updated too)
+```
+
+Multiple corrections on the same field stack in the audit trail. The `original_value` always points to what the LLM originally extracted — it's never overwritten.
+
+```python
+for c in result.corrections:
+    print(f"{c.field_name}: {c.old_value} → {c.new_value}")
+    print(f"  By: {c.corrected_by}, Reason: {c.reason}")
+    print(f"  At: {c.timestamp}")
+```
+
+### Approve / Reject
+
+```python
+# Approve
+result.approve(approved_by="john@company.com")
+print(result.review_status)  # "approved"
+print(result.reviewed_by)    # "john@company.com"
+print(result.reviewed_at)    # datetime
+
+# Or reject
+result.reject(rejected_by="john@company.com", reason="Wrong document type")
+print(result.review_status)   # "rejected"
+print(result.rejection_reason) # "Wrong document type"
+```
+
+Guards:
+- Can't approve or reject twice (raises `ValueError`)
+- Can't approve after rejection or vice versa
+
+### Typical Workflow
+
+```python
+result = pipeline.run_sync("invoice.pdf", schema=Invoice)
+
+if result.needs_review:
+    # Human looks at the result + evidence
+    # Corrects any wrong fields
+    result.correct_field("total", 1235.00, corrected_by="john", reason="OCR error")
+
+    # Approves or rejects
+    result.approve(approved_by="john")
+
+# Save the final state (including corrections and approval)
+from docflow.storage.local import LocalDocumentStore
+store = LocalDocumentStore("./output")
+import asyncio
+asyncio.run(store.save_result(result))
+```
+
+---
+
+## 12. Provenance
+
+Every field has a complete audit chain — one call gives you the full story from source PDF to approved value.
+
+```python
+prov = result.provenance()  # all fields
+prov = result.provenance("total")  # single field
+
+for field_name, p in prov.items():
+    print(f"\n--- {field_name} ---")
+    print(f"Value: {p.value}")
+    print(f"Original value: {p.original_value}")
+    print(f"Source text: {p.source_text!r}")
+    print(f"Page: {p.page}")
+    print(f"BBox: {p.bbox}")
+    print(f"Block ID: {p.block_id}")
+    print(f"Confidence: {p.confidence}")
+    print(f"Evidence confidence: {p.evidence_confidence}")
+    print(f"Parser: {p.parser_name}")
+    print(f"Model: {p.model_name}")
+    print(f"Validation: {p.validation_status}")
+    print(f"Review status: {p.review_status}")
+    print(f"Reviewed by: {p.reviewed_by}")
+    print(f"Review verdicts: {p.review_verdicts}")
+    print(f"Corrected: {p.corrected}")
+    print(f"Corrected by: {p.corrected_by}")
+    print(f"Correction reason: {p.correction_reason}")
+```
+
+Provenance is a read-only view assembled from `ExtractionResult` and `ExtractedField` data. It serializes to JSON via `p.model_dump_json()`.
+
+---
+
+## 13. Privacy & Anonymization
+
+The privacy module detects and anonymizes PII before document content reaches the LLM. It runs as a pipeline step between Parse and Extract.
+
+### Basic Usage
+
+```python
+from docflow import DocumentPipeline, PrivacyPolicy
+from docflow.privacy import PresidioProvider
+
+pipeline = DocumentPipeline(
+    parser="tesseract",
+    privacy=PrivacyPolicy(
+        provider=PresidioProvider(),
+        mode="pseudonymize",
+        reversible=True,
+        fail_closed=True,
+    ),
+)
+result = pipeline.run_sync("claim.pdf", schema=ClaimSchema)
+```
+
+### Anonymization Modes
+
+| Mode | Example | Use case |
+|------|---------|----------|
+| `"redact"` | Mario Rossi → `[REDACTED]` | Maximum privacy, irreversible |
+| `"mask"` | Mario Rossi → `M**** R****` | Partial masking for review UIs |
+| `"pseudonymize"` | Mario Rossi → `PERSON_001` | LLM workflows (reversible, default) |
+| `"hash"` | Mario Rossi → `a3f2c1...` | Duplicate detection |
+
+### PrivacyPolicy Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `anonymize_before_llm` | bool | `True` | Anonymize before LLM calls |
+| `mode` | AnonymizationMode | `"pseudonymize"` | How to replace PII |
+| `reversible` | bool | `True` | Store mappings for restoration (pseudonymize only) |
+| `provider` | PrivacyProvider | `None` | PII detection engine (e.g., PresidioProvider) |
+| `entities` | list[str] | 7 common types | Which PII types to detect |
+| `fail_closed` | bool | `True` | Stop pipeline if anonymization fails |
+| `score_threshold` | float | `0.35` | Minimum detection confidence |
+| `log_scrubbing` | bool | `True` | Remove PII from logs/traces |
+| `mapping_store` | MappingStore | `None` | Where to store reversible mappings |
+
+Default entities: `PERSON`, `EMAIL_ADDRESS`, `PHONE_NUMBER`, `IBAN_CODE`, `CREDIT_CARD`, `LOCATION`, `DATE_TIME`.
+
+### Reversible Pseudonymization
+
+When `reversible=True`, the same entity gets the same token within a document scope. Tokens can be restored after extraction.
+
+```python
+from docflow.privacy import Anonymizer, PresidioProvider
+from docflow.privacy.mapping_store import LocalMappingStore
+
+anonymizer = Anonymizer(PrivacyPolicy(
+    provider=PresidioProvider(),
+    mode="pseudonymize",
+    reversible=True,
+    mapping_store=LocalMappingStore("./mappings"),
+))
+
+# Anonymize
+anon = await anonymizer.anonymize_text("John Doe sent email john@example.com")
+print(anon.text)       # "PERSON_001 sent email EMAIL_ADDRESS_001"
+print(anon.mapping_id) # UUID for this mapping
+
+# Restore
+restored = await anonymizer.restore_text(anon.text, anon.mapping_id)
+print(restored)        # "John Doe sent email john@example.com"
+```
+
+### Fail-Closed Behavior
+
+When `fail_closed=True` (default), if anonymization fails before an LLM call, the pipeline stops rather than sending raw PII to an external model.
+
+### Image Redaction
+
+For vision extraction, PII can be redacted from page images:
+
+```python
+from docflow.privacy.image_redaction import ImageRedactor
+
+redactor = ImageRedactor(provider=PresidioProvider())
+redacted_image, findings = await redactor.redact_page_image(page_image)
+# Black rectangles drawn over PII regions using OCR bounding boxes
+```
+
+### Trace Scrubbing
+
+Remove PII from processing traces:
+
+```python
+from docflow.privacy.scrubber import TraceScrubber
+
+scrubber = TraceScrubber(provider=PresidioProvider())
+clean_trace = await scrubber.scrub_trace(result_trace)
+# PII replaced with [SCRUBBED] in all trace event metadata
+```
+
+---
+
+## 14. Batch Processing
+
+Process multiple documents and get a summary report.
+
+```python
+from docflow import DocumentPipeline, process_batch
+
+pipeline = DocumentPipeline(parser="smart", model="openai/gpt-4o")
+
+report = process_batch(
+    files=["inv1.pdf", "inv2.pdf", "inv3.pdf", ...],
+    schema=Invoice,
+    pipeline=pipeline,
+    concurrency=5,  # max parallel extractions
+)
+
+# Summary
+print(f"Total: {report.total}")
+print(f"Succeeded: {report.succeeded}")
+print(f"Failed: {report.failed}")
+print(f"Needs review: {report.needs_review}")
+print(f"Approved: {report.approved}")
+print(f"Avg confidence: {report.average_confidence:.2f}")
+
+# Top reasons for review
+for reason, count in report.top_review_reasons.items():
+    print(f"  {count}x {reason}")
+
+# Per-document details
+for doc in report.documents:
+    print(f"{doc.file_name}: {'OK' if doc.success else 'FAILED'}")
+    if doc.error:
+        print(f"  Error: {doc.error}")
+```
+
+### Export to CSV
+
+```python
+csv_text = report.to_csv()
+with open("results.csv", "w") as f:
+    f.write(csv_text)
+
+# Output columns: file_name, success, confidence, needs_review, <field1>, <field2>, ...
+```
+
+### Export to DataFrame
+
+```python
+df = report.to_dataframe()  # requires pandas
+print(df[df["needs_review"] == True])
+df.to_excel("results.xlsx")
+```
+
+---
+
+## 15. Document Comparison
+
+Compare extracted fields across multiple documents.
+
+```python
+from docflow import DocumentPipeline, compare_documents
+
+pipeline = DocumentPipeline(parser="tesseract", model="openai/gpt-4o")
+
+comparison = compare_documents(
+    files=["contract_v1.pdf", "contract_v2.pdf", "contract_v3.pdf"],
+    schema=Contract,
+    pipeline=pipeline,
+)
+
+for field_name, cells in comparison.fields.items():
+    diff = comparison.differences[field_name]
+    status = "SAME" if diff.all_agree else "DIFFERENT"
+    print(f"\n{field_name}: {status}")
+    print(f"  Summary: {diff.summary}")
+    for cell in cells:
+        print(f"  {cell.file_name}: {cell.value} (conf: {cell.confidence:.2f})")
+        for ev in cell.evidence:
+            print(f"    Page {ev.page_number}, bbox: {ev.bbox}")
+```
+
+Each cell carries the full evidence (page, bbox, text) for highlighting where the value was found in each document.
+
+---
+
+## 16. Document Search
+
+Search for text across a parsed document with spatial location.
+
+```python
+from docflow.search import search_document
+
+result = search_document(document, "Acme Corp")
+print(f"Found {result.total_hits} matches")
+
+for hit in result.hits:
+    print(f"  Page {hit.page_number}: '{hit.text}'")
+    print(f"    Block: {hit.block_id}")
+    print(f"    BBox: {hit.bbox}")
+    print(f"    Context: ...{hit.context}...")
+```
+
+Parameters:
+- `query` — text to search for
+- `case_sensitive` — default `False`
+- `context_chars` — characters of surrounding context to include (default: 50)
+
+Returns bounding box and block ID for each match — ready for highlighting in a UI.
+
+---
+
+## 17. Screenshots
+
+Render document pages as PNG images for review UIs or visual inspection.
+
+```python
+from docflow.screenshots import screenshot_pages_sync
+
+# All pages
+shots = screenshot_pages_sync("document.pdf", output_dir="./pages")
+
+# Specific pages
+shots = screenshot_pages_sync("document.pdf", output_dir="./pages", pages=[0, 2, 5])
+
+# Custom DPI
+shots = screenshot_pages_sync("document.pdf", output_dir="./pages", dpi=300)
+
+for shot in shots:
+    print(f"Page {shot.page_number}: {shot.width}x{shot.height} -> {shot.file_path}")
+```
+
+All parsers and the screenshot function use the same default DPI (200), so bounding box coordinates from evidence will align with screenshot pixels.
+
+---
+
+## 18. Quality Report
+
+`quality_report()` is a stateless function that assesses how well the model did on a single extraction (or a batch). No baseline needed — it reads the signals already in your `ExtractionResult`.
+
+```python
+from docflow import quality_report
+
+report = quality_report(result)
+```
+
+### Metrics
+
+| Metric | What it measures |
+|---|---|
+| `score` | Weighted overall quality (0–1). Formula: 15% completeness + 25% evidence coverage + 25% grounding rate + 20% confidence + 15% auto-accept rate |
+| `completeness_rate` | Fraction of fields with a non-None value (detects fields the model failed to extract) |
+| `grounding_rate` | Fraction of present fields whose extracted value was found verbatim in the source text |
+| `evidence_coverage` | Fraction of present fields that have at least one evidence object (page, bbox, text) |
+| `mean_confidence` | Average confidence across present fields |
+| `auto_accept_rate` | Fraction of present fields that pass the trust threshold (no review needed) |
+| `correction_rate` | Fraction of present fields that were human-corrected via `correct_field()` |
+| `ok` | `True` if `score >= threshold` (default threshold: 0.7) |
+
+### Warnings
+
+`report.warnings` is a list of human-readable strings explaining every issue:
+
+```python
+report.warnings
+# ["Field 'total': not auto-accepted (agent disagreement)",
+#  "Field 'date': value not found in source text",
+#  "Field 'total': human-corrected"]
+```
+
+### Per-field drill-down
+
+```python
+fq = report.field_details["total"]
+fq.confidence       # 0.88
+fq.found_in_source  # True
+fq.has_evidence     # True
+fq.auto_accept      # False
+fq.corrected        # True
+fq.missing          # False (True if value is None)
+fq.warning          # "agent disagreement"
+```
+
+### Batch mode
+
+Pass a list of results. Metrics are averaged, warnings are prefixed with the result index, and `worst_fields` shows the fields with lowest average quality across the batch.
+
+```python
+report = quality_report([result1, result2, result3])
+report.n_results      # 3
+report.score          # average score across all results
+report.worst_fields   # ["total", "date"] — weakest fields
+report.field_count    # total fields across all results
+```
+
+### Custom threshold
+
+```python
+report = quality_report(result, threshold=0.9)
+report.ok  # True only if score >= 0.9
+```
+
+### Quality Snapshot and Log
+
+Record quality over time with `QualityLog` — an append-only JSONL file of timestamped snapshots. Each snapshot captures the report's metrics plus freeform tags for slicing (by schema, model, data source, etc.).
+
+```python
+from docflow.quality import QualityLog
+
+log = QualityLog("./quality.jsonl")
+
+# After each extraction
+report = quality_report(result)
+await log.record(report, tags={"schema": "Invoice", "model": "gpt-4o"})
+
+# Sync variant
+log.record_sync(report, tags={"schema": "Invoice", "model": "gpt-4o"})
+
+# Read back — filter by tags, limit to last N
+history = await log.history(last_n=50, tags={"schema": "Invoice"})
+# or sync
+history = log.history_sync(last_n=50, tags={"schema": "Invoice"})
+```
+
+Each snapshot contains: `snapshot_id`, `timestamp`, `tags`, `score`, `completeness_rate`, `grounding_rate`, `evidence_coverage`, `mean_confidence`, `auto_accept_rate`, `correction_rate`, `field_count`, `ok`.
+
+You can also build a snapshot manually:
+
+```python
+from docflow.quality import QualitySnapshot
+
+snap = QualitySnapshot.from_report(report, tags={"schema": "Invoice"})
+snap.snapshot_id   # unique UUID
+snap.timestamp     # when it was created
+snap.score         # 0.85
+snap.tags          # {"schema": "Invoice"}
+```
+
+---
+
+## 18b. Workflow Config
+
+Define your entire extraction workflow in a single YAML file — schema, parser, model, validation, review rules — and run it with one line. No Python imports to learn, no classes to wire together.
+
+### YAML format
+
+```yaml
+name: invoice-extraction
+version: "1.0"
+description: Standard invoice processing workflow
+
+schema:
+  supplier_name: {type: str, required: true, description: "Name of the supplier"}
+  invoice_number: {type: str, description: "Invoice reference number"}
+  total: {type: float, required: true, description: "Total amount including tax"}
+  currency: {type: str, default: "EUR", description: "Currency code"}
+
+parser: smart
+model: openai/gpt-4o
+extraction_mode: multi
+n_instances: 3
+
+validation:
+  - required_fields: [supplier_name, total]
+  - evidence_required: [total]
+
+review:
+  - overall_confidence_below: 0.7
+  - field_missing: [total, invoice_number]
+
+quality_threshold: 0.8
+context: "You are processing pharmaceutical invoices."
+```
+
+### Running a workflow
+
+```python
+from docflow import run_workflow
+
+result = run_workflow("invoice.yaml", "invoice.pdf")
+result.data       # {"supplier_name": "Acme", "total": 1234.56, ...}
+result.confidence # 0.88
+```
+
+Or from the CLI:
+
+```bash
+docflow run invoice.yaml invoice.pdf --output result.json
+```
+
+### Configuration reference
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `name` | str | `"workflow"` | Workflow name |
+| `version` | str | `"1.0"` | Version string |
+| `schema` | dict | required | Field definitions (same format as YAML templates) |
+| `parser` | str | `"pymupdf"` | `"pymupdf"` \| `"tesseract"` \| `"docling"` \| `"smart"` |
+| `model` | str | `"openai/gpt-4o"` | Any litellm model string |
+| `extraction_type` | str | `"text"` | `"text"` \| `"vision"` \| `"hybrid"` |
+| `extraction_mode` | str | `"single"` | `"single"` \| `"multi"` |
+| `n_instances` | int | `5` | Parallel instances for multi mode |
+| `scoring` | str | `"qualitative"` | `"qualitative"` \| `"quantitative"` |
+| `context` | str | null | Domain context for the LLM |
+| `validation` | list | `[]` | Validation rules (see below) |
+| `review` | list | `[]` | Review rules (see below) |
+| `quality_threshold` | float | `0.7` | Score threshold for `ok` flag |
+
+### Validation rules (YAML)
+
+```yaml
+validation:
+  - required_fields: [field1, field2]
+  - evidence_required: [field1]
+  - type_validation: true
+```
+
+### Review rules (YAML)
+
+```yaml
+review:
+  - overall_confidence_below: 0.7
+  - any_field_confidence_below: 0.5
+  - field_confidence_below: {total: 0.9, date: 0.8}
+  - has_validation_errors: true
+  - field_missing: [total, invoice_number]
+  - no_evidence: [total]          # specific fields
+  - no_evidence: true             # all fields
+  - llm_reviewer:
+      name: auditor
+      prompt: "Check if totals are mathematically consistent."
+      model: openai/gpt-4o        # optional, defaults to workflow model
+```
+
+### Exporting a pipeline to YAML
+
+If you already have a Python pipeline, export it:
+
+```python
+from docflow import DocumentPipeline
+
+pipeline = DocumentPipeline(
+    parser="smart", model="openai/gpt-4o", extraction_mode="multi",
+    validators=[RequiredFields(["total"])],
+)
+
+# Export as dict
+config = pipeline.export(Invoice, name="invoice", version="1.0")
+
+# Export as YAML string
+yaml_str = pipeline.export_yaml(Invoice, name="invoice")
+
+# Save to file
+with open("invoice.yaml", "w") as f:
+    f.write(yaml_str)
+```
+
+### Loading programmatically
+
+```python
+from docflow.workflow_config import load_workflow_config
+
+cfg = load_workflow_config("invoice.yaml")  # or a dict
+pipeline = cfg.build_pipeline()
+schema = cfg.build_schema()
+```
+
+---
+
+## 19. Storage
+
+Storage persists documents, extraction results, and traces to disk.
+
+### Local Storage
+
+```python
+pipeline = DocumentPipeline(storage="local")
+# Saves to ./.docflow_store/{document_id}/
+```
+
+Files saved per document:
+- `original.pdf` — copy of the source file
+- `document.json` — parsed Document (pages, blocks, text, metadata)
+- `extraction.json` — ExtractionResult (fields, values, evidence, corrections, review status)
+- `trace.json` — processing trace (events, timing)
+
+### On Failure
+
+When the pipeline fails with storage configured, partial state is automatically saved. This means you can inspect what happened:
+
+```python
+# After a failure, check .docflow_store/{document_id}/
+# document.json — exists if ingestion/parsing succeeded
+# trace.json — exists with events up to the failure point
+```
+
+### Loading Results
+
+```python
+from docflow.storage.local import LocalDocumentStore
+
+store = LocalDocumentStore("./.docflow_store")
+result = await store.load_result("document-uuid")
+document = await store.load_document("document-uuid")
+```
+
+### Custom Storage
+
+Implement the `Storage` protocol:
+
+```python
+from docflow.storage.base import Storage
+
+class MyStorage:
+    async def save_document(self, document: Document) -> str: ...
+    async def save_result(self, result: ExtractionResult) -> str: ...
+    async def save_trace(self, trace: Trace) -> str: ...
+    async def load_result(self, document_id: str) -> ExtractionResult | None: ...
+
+pipeline = DocumentPipeline(storage=MyStorage())
+```
+
+---
+
+## 20. Observability & Traces
+
+Every pipeline step records trace events with timing information.
+
+```python
+# From DocumentPipeline (via WorkflowError on failure)
+try:
+    result = pipeline.run_sync("file.pdf", schema=Invoice)
+except WorkflowError as e:
+    for event in e.result.trace.events:
+        print(f"{event.event_type}: {event.step_name} ({event.duration_ms:.0f}ms)")
+        print(f"  Metadata: {event.metadata}")
+
+# From manual Pipeline
+pipeline_result = Pipeline([...]).run_sync()
+for event in pipeline_result.trace.events:
+    print(f"{event.event_type}: {event.step_name} ({event.duration_ms:.0f}ms)")
+```
+
+Event types include: `ingest`, `parse`, `anonymize`, `llm_call`, `vision_render`, `vision_ocr_enrichment`, `vision_llm_call`, `multi_extract_candidates`, `multi_extract_decider`, `hybrid_render`, `hybrid_candidates`, `hybrid_decider`, `validate`, `review`, `store`, `error`.
+
+---
+
+## 21. Error Handling
+
+All DocFlow errors inherit from `DocflowError`:
+
+```python
+from docflow.errors import (
+    DocflowError,            # base class
+    UnsupportedFileTypeError,# unknown file extension
+    ParsingError,            # PDF parsing or file access failure
+    OCRError,                # Tesseract OCR failure
+    SchemaExtractionError,   # LLM call or JSON parse failure
+    ValidationError,         # field validation failure
+    EvidenceNotFoundError,   # evidence matching failure
+    StorageError,            # storage read/write failure
+    WorkflowError,           # pipeline step failure (carries result)
+    PrivacyError,            # privacy operation failure
+    AnonymizationError,      # anonymization failure
+)
+```
+
+### Handling Pipeline Failures
+
+```python
+from docflow.errors import WorkflowError
+
+try:
+    result = pipeline.run_sync("file.pdf", schema=Invoice)
+except WorkflowError as e:
+    print(f"Error: {e}")
+    print(f"Errors: {e.result.errors}")
+    print(f"Failed step: {e.result.state.current_step}")
+    print(f"Document: {e.result.state.document}")
+    print(f"Trace: {e.result.trace.events}")
+```
+
+The `WorkflowError.result` contains the full `PipelineResult` with partial state, so you can inspect exactly what succeeded and what failed.
+
+---
+
+## 22. CLI Reference
+
+### Extract a Single Document
+
+```bash
+docflow extract invoice.pdf --schema invoice --model openai/gpt-4o --output result.json
+```
+
+Options:
+- `--schema, -s` (required) — schema name or Python dotted path
+- `--model, -m` — LLM model (default: `openai/gpt-4o`)
+- `--output, -o` — output file (default: stdout)
+- `--store` — storage backend (e.g., `local`)
+
+### Extract a Folder
+
+```bash
+docflow extract-folder ./invoices --schema invoice --output results.csv --parser smart --concurrency 10
+```
+
+Options:
+- `--schema, -s` (required) — schema name or Python dotted path
+- `--model, -m` — LLM model (default: `openai/gpt-4o`)
+- `--parser, -p` — parser (default: `pymupdf`). Options: `pymupdf`, `tesseract`, `docling`, `smart`
+- `--output, -o` — output CSV file
+- `--pattern` — file glob pattern (default: `**/*.pdf`)
+- `--concurrency, -c` — max parallel extractions (default: 5)
+
+### Take Screenshots
+
+```bash
+docflow screenshot document.pdf -o ./pages --dpi 300
+docflow screenshot document.pdf -o ./pages --pages 0,2,5
+```
+
+Options:
+- `--output, -o` (required) — output directory
+- `--dpi` — rendering DPI (default: 200)
+- `--pages` — comma-separated page numbers (default: all)
+
+### Manage Templates
+
+```bash
+docflow templates list
+docflow templates show invoice
+docflow templates init invoice --dir ./my_templates
+```
+
+---
+
+## 23. API Reference
+
+### Top-Level Imports
+
+```python
+# Core
+from docflow import extract, DocumentPipeline, Pipeline, PrivacyPolicy
+from docflow import process_batch, compare_documents
+
+# Parsers
+from docflow.parsing.pymupdf import PyMuPDFParser
+from docflow.parsing.tesseract_parser import TesseractParser
+from docflow.parsing.docling_parser import DoclingParser
+from docflow.parsing.smart_parser import SmartParser
+
+# Templates
+from docflow.templates import load_template, list_templates
+
+# Validation
+from docflow.validation import RequiredFields, EvidenceRequired, TypeValidation, CustomRule
+
+# Review
+from docflow.review import (
+    OverallConfidenceBelow, FieldConfidenceBelow, AnyFieldConfidenceBelow,
+    HasValidationErrors, FieldMissing, NoEvidence, LLMReviewer,
+)
+
+# Privacy
+from docflow.privacy import PrivacyPolicy, Anonymizer, PresidioProvider
+from docflow.privacy.mapping_store import LocalMappingStore
+from docflow.privacy.image_redaction import ImageRedactor
+from docflow.privacy.scrubber import TraceScrubber
+
+# Storage
+from docflow.storage.local import LocalDocumentStore
+
+# LLM
+from docflow.extraction.llm.litellm_adapter import LiteLLMAdapter
+
+# Pipeline Steps
+from docflow.workflow import (
+    Pipeline, Ingest, Parse, Extract, ExtractVision, ExtractHybrid,
+    Anonymize, Validate, Review, Store,
+)
+
+# Utilities
+from docflow.search import search_document
+from docflow.screenshots import screenshot_pages_sync
+from docflow.quality import quality_report, QualityReport
+from docflow.batch import process_batch, BatchReport
+from docflow.comparison import compare_documents, ComparisonResult
+
+# Models
+from docflow.documents.models import Document, Page, Block, BoundingBox, BlockType
+from docflow.documents.evidence import Evidence
+from docflow.extraction.models import (
+    ExtractionResult, ExtractedField, FieldCorrection,
+    ReviewVerdict, FieldProvenance,
+)
+```

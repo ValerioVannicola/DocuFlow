@@ -1,0 +1,62 @@
+name: invoice
+version: "1.0"
+description: "Standard invoice extraction schema"
+fields:
+  supplier_name:
+    type: str
+    required: true
+    description: "Name of the supplier or vendor"
+  invoice_number:
+    type: str
+    required: true
+    description: "Invoice reference number"
+  invoice_date:
+    type: date
+    required: true
+    description: "Date the invoice was issued"
+  due_date:
+    type: date
+    required: false
+    description: "Payment due date"
+  currency:
+    type: str
+    required: false
+    default: "EUR"
+    description: "Currency code (ISO 4217)"
+  subtotal:
+    type: float
+    required: false
+    description: "Amount before tax"
+  vat_rate:
+    type: float
+    required: false
+    description: "VAT/tax rate as percentage"
+  vat_amount:
+    type: float
+    required: false
+    description: "VAT/tax amount"
+  total:
+    type: float
+    required: true
+    description: "Total amount including tax"
+  payment_reference:
+    type: str
+    required: false
+    description: "Payment reference or bank details"
+  line_items:
+    type: list
+    required: false
+    description: "Individual line items on the invoice"
+    item_fields:
+      description:
+        type: str
+        required: true
+      quantity:
+        type: float
+        required: false
+      unit_price:
+        type: float
+        required: false
+      amount:
+        type: float
+        required: true

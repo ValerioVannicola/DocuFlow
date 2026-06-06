@@ -1,0 +1,38 @@
+name: receipt
+version: "1.0"
+description: "Receipt extraction schema"
+fields:
+  merchant_name:
+    type: str
+    required: true
+    description: "Name of the merchant or store"
+  date:
+    type: date
+    required: true
+    description: "Date of purchase"
+  total:
+    type: float
+    required: true
+    description: "Total amount paid"
+  currency:
+    type: str
+    required: false
+    default: "EUR"
+  payment_method:
+    type: str
+    required: false
+    description: "Payment method used (cash, card, etc.)"
+  items:
+    type: list
+    required: false
+    description: "Individual items purchased"
+    item_fields:
+      name:
+        type: str
+        required: true
+      quantity:
+        type: float
+        required: false
+      price:
+        type: float
+        required: true
