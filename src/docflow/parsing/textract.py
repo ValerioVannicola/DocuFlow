@@ -141,20 +141,26 @@ class TextractParser:
         # Textract geometry is relative (0-1); project onto point-space page
         # dims so all bboxes land in the canonical coordinate space.
         scale = 72.0 / self.dpi
-        pages: list[Page] = []
-        for i, image in enumerate(images):
+        # Bounded parallel page calls — concurrency capped to stay friendly
+        # to Textract's per-account rate limits.
+        semaphore = asyncio.Semaphore(4)
+
+        async def _process_page(i: int, image) -> Page:
             buf = io.BytesIO()
             # JPEG keeps each page under Textract's 5 MB synchronous API
             # limit; PNG at 200+ DPI can exceed it.
             image.convert("RGB").save(buf, format="JPEG", quality=90)
-            response = await loop.run_in_executor(
-                _EXECUTOR, partial(_detect_sync, client, buf.getvalue()),
-            )
-            pages.append(
-                map_textract_response(
-                    response, i, float(image.width) * scale, float(image.height) * scale,
+            async with semaphore:
+                response = await loop.run_in_executor(
+                    _EXECUTOR, partial(_detect_sync, client, buf.getvalue()),
                 )
+            return map_textract_response(
+                response, i, float(image.width) * scale, float(image.height) * scale,
             )
+
+        pages: list[Page] = list(await asyncio.gather(
+            *(_process_page(i, image) for i, image in enumerate(images))
+        ))
 
         document.pages = pages
         document.raw_text = "\n\n".join(p.text for p in pages)

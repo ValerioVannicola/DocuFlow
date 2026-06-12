@@ -184,41 +184,68 @@ async def verify_result(
     if not candidates:
         return 0
 
+    import asyncio
+
     from docflow.rendering.renderer import render_page
 
     pages_by_number = {p.page_number: p for p in document.pages}
-    rendered: dict[int, Any] = {}
     n_verified = 0
 
+    # Resolve regions and pre-render the needed pages once, then run all
+    # verification calls concurrently — they are independent of each other.
+    regions: list[tuple[str, Any, str, int, Any]] = []
+    needed_pages: list[int] = []
     for name, field, reason in candidates:
         region = _field_region(field)
         if region is None:
             continue
         page_number, bbox = region
-        page = pages_by_number.get(page_number)
+        regions.append((name, field, reason, page_number, bbox))
+        if page_number not in needed_pages:
+            needed_pages.append(page_number)
 
+    rendered: dict[int, Any] = {}
+    for page_number in needed_pages:
         try:
-            if page_number not in rendered:
-                rendered[page_number] = await render_page(
-                    document.metadata.file_path, page_number, dpi=policy.dpi,
-                )
-            image = rendered[page_number]
-            if bbox is not None and page is not None:
-                image = _crop_region(image, bbox, page, policy.padding)
-
-            response = await llm.complete(
-                _build_messages(name, field, image),
-                temperature=0.0,
-                response_format={"type": "json_object"},
+            rendered[page_number] = await render_page(
+                document.metadata.file_path, page_number, dpi=policy.dpi,
             )
-            parsed = json.loads(_strip_fences(response.content))
         except Exception as exc:
             if trace:
                 trace.add_event(
                     "field_verification_error", step_name="verify_fields",
-                    field=name, error=str(exc),
+                    page=page_number, error=str(exc),
+                )
+
+    async def _ask(name: str, field: Any, page_number: int, bbox: Any):
+        image = rendered[page_number]
+        page = pages_by_number.get(page_number)
+        if bbox is not None and page is not None:
+            image = _crop_region(image, bbox, page, policy.padding)
+        response = await llm.complete(
+            _build_messages(name, field, image),
+            temperature=0.0,
+            response_format={"type": "json_object"},
+        )
+        return json.loads(_strip_fences(response.content)), response
+
+    regions = [r for r in regions if r[3] in rendered]
+    outcomes = await asyncio.gather(
+        *(_ask(name, field, pn, bbox) for name, field, _, pn, bbox in regions),
+        return_exceptions=True,
+    )
+
+    for (name, field, reason, page_number, _bbox), outcome in zip(
+        regions, outcomes, strict=True,
+    ):
+        if isinstance(outcome, BaseException):
+            if trace:
+                trace.add_event(
+                    "field_verification_error", step_name="verify_fields",
+                    field=name, error=str(outcome),
                 )
             continue
+        parsed, response = outcome
 
         readable = bool(parsed.get("readable", False))
         raw_value = parsed.get("value")

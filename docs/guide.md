@@ -1125,6 +1125,13 @@ The decider:
 - Prefers values with stronger evidence
 - Sets confidence based on agreement (1.0 if all agree, 0.7 if majority, 0.4 if split)
 
+
+**Consensus short-circuit:** the decider only runs when it can add something — when
+candidates disagree. If all N candidates produce identical values for every field
+(the common case on clean documents), the decider call is skipped entirely: one less
+LLM round trip (~half the multi-mode latency) and its tokens saved. Consensus scores
+are computed identically either way; a `decider_skipped` trace event records it.
+
 ### Summary Table
 
 | extraction_type | extraction_mode | Parser needed? | LLM calls | Best for |

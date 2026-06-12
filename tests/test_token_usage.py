@@ -103,10 +103,10 @@ class TestEngineUsageAggregation:
             _make_document(), schema=Invoice, mode="multi", n_instances=3,
         )
 
-        # 3 candidates + 1 decider
+        # 3 candidates; unanimous mock responses skip the decider
         assert result.usage is not None
-        assert result.usage.n_llm_calls == 4
-        assert result.usage.total_tokens == 600 * 4
+        assert result.usage.n_llm_calls == 3
+        assert result.usage.total_tokens == 600 * 3
 
     async def test_no_usage_reported_gives_none(self):
         mock_llm = AsyncMock()

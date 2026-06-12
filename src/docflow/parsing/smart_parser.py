@@ -71,15 +71,17 @@ class SmartParser:
             preprocess_steps=[],
         )
 
+        import asyncio
+
         # OCR'd pages convert to points so they share the coordinate space
         # of the native-parsed pages in the same document.
         scale = 72.0 / self.dpi
-        for page in pages_needing_ocr:
-            image = await render_page(file_path, page.page_number, dpi=self.dpi)
-            lang = "+".join(self.ocr_languages)
-            ocr_result = await ocr.ocr(image, language=lang)
+        lang = "+".join(self.ocr_languages)
 
-            ocr_page = Page(
+        async def _ocr_page(page: Page) -> tuple[int, Page]:
+            image = await render_page(file_path, page.page_number, dpi=self.dpi)
+            ocr_result = await ocr.ocr(image, language=lang)
+            return page.page_number, Page(
                 page_number=page.page_number,
                 width=float(image.width) * scale,
                 height=float(image.height) * scale,
@@ -87,9 +89,15 @@ class SmartParser:
                 text=ocr_result.text,
             )
 
+        # Pages render+OCR concurrently (rendering serializes on the PDFium
+        # lock internally; OCR fans out across the executor workers)
+        ocr_pages = await asyncio.gather(
+            *(_ocr_page(p) for p in pages_needing_ocr)
+        )
+        for page_number, ocr_page in ocr_pages:
             idx = next(
                 i for i, p in enumerate(document.pages)
-                if p.page_number == page.page_number
+                if p.page_number == page_number
             )
             document.pages[idx] = ocr_page
 

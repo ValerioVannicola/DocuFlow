@@ -194,8 +194,8 @@ class TestVisionExtractionEngine:
         )
 
         assert isinstance(result, ExtractionResult)
-        # 3 candidates + 1 decider = 4
-        assert mock_llm.complete.call_count == 4
+        # 3 candidates; unanimous responses skip the decider
+        assert mock_llm.complete.call_count == 3
 
     async def test_ocr_enrichment_populates_document(self):
         from unittest.mock import MagicMock

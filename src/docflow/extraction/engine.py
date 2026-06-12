@@ -345,6 +345,29 @@ async def _single_llm_call(
         return None
 
 
+def _candidates_unanimous(candidates: list[dict]) -> bool:
+    """True when every candidate extracted the same normalized value for
+    every field. With unanimity the decider call adds nothing — any
+    candidate IS the answer — so it can be skipped (latency and cost).
+
+    Conservative by design: a field missing from any candidate, or any
+    value difference, counts as disagreement and the decider runs.
+    """
+    datas = [c.get("data", c) for c in candidates]
+    keys: set[str] = set()
+    for d in datas:
+        keys.update(d.keys())
+    for key in keys:
+        values = []
+        for d in datas:
+            if key not in d:
+                return False
+            values.append(_normalize_value(d[key]))
+        if len(set(values)) > 1:
+            return False
+    return True
+
+
 async def _run_multi(
     llm: LLMAdapter,
     document: Document,
@@ -355,6 +378,7 @@ async def _run_multi(
     n_instances: int,
     temperatures: list[float] | None,
     scoring: str = "qualitative",
+    pre_build: asyncio.Task | None = None,
 ) -> ExtractionResult:
     import time
 
@@ -364,6 +388,12 @@ async def _run_multi(
 
     tasks = [_single_llm_call(llm, messages, t) for t in temps]
     raw_results = await asyncio.gather(*tasks)
+
+    # Work that was overlapped with the candidate calls (e.g. OCR
+    # enrichment for evidence grounding) must finish before the document
+    # is read for the decider prompt or result building.
+    if pre_build is not None:
+        await pre_build
 
     candidates: list[dict] = []
     for r in raw_results:
@@ -395,6 +425,21 @@ async def _run_multi(
         return _build_result(
             document, schema, candidates[0], first_model, trace,
             scoring=scoring, usage=_usage_of(llm),
+        )
+
+    if _candidates_unanimous(candidates):
+        if trace:
+            trace.add_event(
+                "decider_skipped", step_name="extraction",
+                reason="all candidates unanimous", n_candidates=len(candidates),
+            )
+        first_model = next(
+            (r["model"] for r in raw_results if r is not None), "",
+        )
+        return _build_result(
+            document, schema, candidates[0], first_model, trace,
+            candidates=candidates, scoring=scoring, n_instances=n_instances,
+            usage=_usage_of(llm),
         )
 
     decider_messages = _build_decider_prompt(schema, candidates, document.raw_text)
@@ -516,18 +561,18 @@ class VisionExtractionEngine:
 
         ocr = TesseractOCR(preprocess_steps=[])
         scale = 72.0 / dpi
-        pages: list[Page] = []
-        for i, image in enumerate(images):
-            ocr_result = await ocr.ocr(image)
-            pages.append(
-                Page(
-                    page_number=i,
-                    width=float(image.width) * scale,
-                    height=float(image.height) * scale,
-                    blocks=blocks_to_points(ocr_result.blocks, dpi),
-                    text=ocr_result.text,
-                )
+        # Pages OCR concurrently — the Tesseract executor runs 4 workers
+        ocr_results = await asyncio.gather(*(ocr.ocr(image) for image in images))
+        pages: list[Page] = [
+            Page(
+                page_number=i,
+                width=float(image.width) * scale,
+                height=float(image.height) * scale,
+                blocks=blocks_to_points(ocr_result.blocks, dpi),
+                text=ocr_result.text,
             )
+            for i, (image, ocr_result) in enumerate(zip(images, ocr_results, strict=True))
+        ]
         document.pages = pages
         document.raw_text = "\n\n".join(p.text for p in pages)
         document.metadata.page_count = len(pages)
@@ -559,32 +604,46 @@ class VisionExtractionEngine:
                 dpi=self.dpi,
             )
 
+        # The vision LLM reads images, not OCR text — OCR enrichment is only
+        # needed for evidence grounding AFTER the response, so it overlaps
+        # with the LLM call(s) instead of preceding them.
         ocr_start = time.monotonic()
-        await self._enrich_document_with_ocr(document, images, dpi=self.dpi)
-        ocr_ms = (time.monotonic() - ocr_start) * 1000
-        if trace:
-            trace.add_event(
-                "vision_ocr_enrichment",
-                step_name="extraction",
-                duration_ms=ocr_ms,
-                n_pages=len(images),
-            )
+        enrich_task = asyncio.ensure_future(
+            self._enrich_document_with_ocr(document, images, dpi=self.dpi)
+        )
+
+        def _trace_enrichment() -> None:
+            if trace:
+                trace.add_event(
+                    "vision_ocr_enrichment",
+                    step_name="extraction",
+                    duration_ms=(time.monotonic() - ocr_start) * 1000,
+                    n_pages=len(images),
+                    overlapped_with_llm=True,
+                )
 
         messages = build_vision_extraction_prompt(schema, images_b64, context=self.context)
         llm = _UsageTracker(self.llm)
 
         if mode == "multi":
-            return await _run_multi(
-                llm, document, schema, messages, trace, start,
-                n_instances=n_instances, temperatures=temperatures,
-                scoring=scoring,
-            )
+            try:
+                result = await _run_multi(
+                    llm, document, schema, messages, trace, start,
+                    n_instances=n_instances, temperatures=temperatures,
+                    scoring=scoring, pre_build=enrich_task,
+                )
+            finally:
+                if not enrich_task.done():
+                    enrich_task.cancel()
+            _trace_enrichment()
+            return result
 
         try:
             response = await llm.complete(
                 messages, temperature=0.0, response_format=JSON_MODE,
             )
         except Exception as exc:
+            enrich_task.cancel()
             raise SchemaExtractionError(f"Vision LLM extraction failed: {exc}") from exc
 
         duration_ms = (time.monotonic() - start) * 1000
@@ -595,6 +654,9 @@ class VisionExtractionEngine:
             )
 
         parsed = await _parse_json_with_retry(llm, response.content, messages)
+
+        await enrich_task
+        _trace_enrichment()
 
         return _build_result(
             document, schema, parsed, response.model, trace,
@@ -704,29 +766,47 @@ class HybridExtractionEngine:
                 duration_ms=render_ms, n_pages=len(images), dpi=self.dpi,
             )
 
-        ocr_start = time.monotonic()
-        await VisionExtractionEngine._enrich_document_with_ocr(document, images, dpi=self.dpi)
-        ocr_ms = (time.monotonic() - ocr_start) * 1000
-        if trace:
-            trace.add_event(
-                "hybrid_ocr_enrichment", step_name="extraction",
-                duration_ms=ocr_ms, n_pages=len(images),
-            )
-
-        vision_messages = build_vision_extraction_prompt(
-            schema, images_b64, context=self.context,
-        )
-        page_texts = [p.text for p in document.pages] if document.pages else None
-        text_messages = build_extraction_prompt(
-            schema, document.raw_text, page_texts, context=self.context,
-        )
-
         temps = temperatures or _generate_temperatures(n_instances)
         if len(temps) != n_instances:
             temps = _generate_temperatures(n_instances)
 
         llm = _UsageTracker(self.llm)
-        vision_tasks = [_single_llm_call(llm, vision_messages, t) for t in temps]
+        vision_messages = build_vision_extraction_prompt(
+            schema, images_b64, context=self.context,
+        )
+
+        # Vision candidates need only the images — launch them immediately
+        # and run OCR enrichment concurrently. Text candidates need the OCR
+        # text, so they start as soon as enrichment completes.
+        ocr_start = time.monotonic()
+        enrich_task = asyncio.ensure_future(
+            VisionExtractionEngine._enrich_document_with_ocr(
+                document, images, dpi=self.dpi,
+            )
+        )
+        vision_tasks = [
+            asyncio.ensure_future(_single_llm_call(llm, vision_messages, t))
+            for t in temps
+        ]
+
+        try:
+            await enrich_task
+        except Exception:
+            for t in vision_tasks:
+                t.cancel()
+            raise
+        ocr_ms = (time.monotonic() - ocr_start) * 1000
+        if trace:
+            trace.add_event(
+                "hybrid_ocr_enrichment", step_name="extraction",
+                duration_ms=ocr_ms, n_pages=len(images),
+                overlapped_with_llm=True,
+            )
+
+        page_texts = [p.text for p in document.pages] if document.pages else None
+        text_messages = build_extraction_prompt(
+            schema, document.raw_text, page_texts, context=self.context,
+        )
         text_tasks = [_single_llm_call(llm, text_messages, t) for t in temps]
         all_results = await asyncio.gather(*vision_tasks, *text_tasks)
 
@@ -760,6 +840,22 @@ class HybridExtractionEngine:
             return _build_result(
                 document, schema, candidates[0], first_model, trace,
                 scoring=scoring, usage=llm.total(),
+            )
+
+        if _candidates_unanimous(candidates):
+            if trace:
+                trace.add_event(
+                    "decider_skipped", step_name="extraction",
+                    reason="all candidates unanimous",
+                    n_candidates=len(candidates),
+                )
+            first_model = next(
+                (r["model"] for r in all_results if r is not None), "",
+            )
+            return _build_result(
+                document, schema, candidates[0], first_model, trace,
+                candidates=candidates, scoring=scoring,
+                n_instances=n_instances * 2, usage=llm.total(),
             )
 
         decider_messages = _build_hybrid_decider_prompt(

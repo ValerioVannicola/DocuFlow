@@ -456,13 +456,23 @@ class Review:
 
         document_text = state.document.raw_text if state.document else ""
 
+        import asyncio
+
         start = time.monotonic()
+
+        # LLM reviewers are independent — run them concurrently. Sync rules
+        # are cheap and run inline; reasons keep the original rule order.
+        async_rules = [r for r in self.rules if hasattr(r, "acheck")]
+        async_results = await asyncio.gather(*(
+            rule.acheck(state.extraction_result, document_text=document_text)
+            for rule in async_rules
+        ))
+        async_iter = iter(async_results)
+
         reasons: list[str] = []
         for rule in self.rules:
             if hasattr(rule, "acheck"):
-                result = await rule.acheck(
-                    state.extraction_result, document_text=document_text,
-                )
+                result = next(async_iter)
                 if isinstance(result, ReviewVerdict):
                     state.extraction_result.review_verdicts.append(result)
                     if result.usage:

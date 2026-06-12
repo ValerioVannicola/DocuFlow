@@ -34,20 +34,26 @@ class TesseractParser:
             preprocess_steps=self.preprocess_steps,
         )
 
+        import asyncio
+
         scale = 72.0 / self.dpi
-        pages: list[Page] = []
-        for i, image in enumerate(images):
-            lang = "+".join(self.languages)
-            ocr_result = await ocr.ocr(image, language=lang)
-            pages.append(
-                Page(
-                    page_number=i,
-                    width=float(image.width) * scale,
-                    height=float(image.height) * scale,
-                    blocks=blocks_to_points(ocr_result.blocks, self.dpi),
-                    text=ocr_result.text,
-                )
+        lang = "+".join(self.languages)
+        # Pages OCR concurrently — the Tesseract executor runs 4 workers
+        ocr_results = await asyncio.gather(
+            *(ocr.ocr(image, language=lang) for image in images)
+        )
+        pages: list[Page] = [
+            Page(
+                page_number=i,
+                width=float(image.width) * scale,
+                height=float(image.height) * scale,
+                blocks=blocks_to_points(ocr_result.blocks, self.dpi),
+                text=ocr_result.text,
             )
+            for i, (image, ocr_result) in enumerate(
+                zip(images, ocr_results, strict=True)
+            )
+        ]
 
         document.pages = pages
         document.raw_text = "\n\n".join(p.text for p in pages)

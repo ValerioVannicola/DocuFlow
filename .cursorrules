@@ -174,7 +174,7 @@ pipeline = DocumentPipeline(parser=None, extraction_type="vision", model="openai
 | Mode | LLM calls | Description |
 |------|-----------|-------------|
 | `"single"` | 1 | One LLM call |
-| `"multi"` | N+1 | N parallel calls at varied temperatures → decider picks best |
+| `"multi"` | N+1 (N when unanimous) | N parallel calls at varied temperatures → decider picks best; the decider is skipped when all candidates agree on every field |
 
 ```python
 pipeline = DocumentPipeline(extraction_mode="multi", n_instances=3)

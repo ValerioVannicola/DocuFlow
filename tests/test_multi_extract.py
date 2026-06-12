@@ -73,6 +73,65 @@ class TestSingleExtract:
         mock_llm.complete.assert_called_once()
 
 
+class TestConsensusShortCircuit:
+    async def test_unanimous_candidates_skip_decider(self):
+        mock_llm = AsyncMock()
+        mock_llm.complete = AsyncMock(return_value=_make_llm_response())
+
+        engine = ExtractionEngine(llm=mock_llm)
+        result = await engine.extract(
+            _make_doc(), schema=Invoice, mode="multi", n_instances=3,
+        )
+
+        assert mock_llm.complete.call_count == 3  # no decider
+        # consensus scores still computed
+        assert result.fields["total"].consensus is not None
+        assert result.fields["total"].consensus.agreement == "3/3"
+
+    async def test_disagreeing_candidates_still_run_decider(self):
+        mock_llm = AsyncMock()
+        # two candidates say 1234.56, one says 9999.99, decider resolves
+        mock_llm.complete = AsyncMock(side_effect=[
+            _make_llm_response(total=1234.56),
+            _make_llm_response(total=9999.99),
+            _make_llm_response(total=1234.56),
+            _make_llm_response(total=1234.56),  # decider
+        ])
+
+        engine = ExtractionEngine(llm=mock_llm)
+        result = await engine.extract(
+            _make_doc(), schema=Invoice, mode="multi", n_instances=3,
+        )
+
+        assert mock_llm.complete.call_count == 4  # decider ran
+        assert result.data["total"] == 1234.56
+        assert result.fields["total"].consensus.agreement == "2/3"
+
+    async def test_missing_field_in_one_candidate_runs_decider(self):
+        import json as _json
+
+        incomplete = LLMResponse(
+            content=_json.dumps({
+                "data": {"supplier_name": "Acme Corp"},  # total missing
+                "evidence": {"supplier_name": {"page": 0, "text": "Acme Corp"}},
+            }),
+            model="gpt-4o",
+        )
+        mock_llm = AsyncMock()
+        mock_llm.complete = AsyncMock(side_effect=[
+            _make_llm_response(),
+            incomplete,
+            _make_llm_response(),
+            _make_llm_response(),  # decider
+        ])
+
+        engine = ExtractionEngine(llm=mock_llm)
+        await engine.extract(
+            _make_doc(), schema=Invoice, mode="multi", n_instances=3,
+        )
+        assert mock_llm.complete.call_count == 4
+
+
 class TestMultiExtract:
     async def test_multi_mode_runs_n_instances(self):
         mock_llm = AsyncMock()
@@ -85,8 +144,9 @@ class TestMultiExtract:
 
         assert isinstance(result, ExtractionResult)
         assert result.data["supplier_name"] == "Acme Corp"
-        # 3 candidate calls + 1 decider call = 4 total
-        assert mock_llm.complete.call_count == 4
+        # 3 candidate calls; identical responses are unanimous, so the
+        # decider is skipped (consensus short-circuit)
+        assert mock_llm.complete.call_count == 3
 
     async def test_multi_mode_custom_temperatures(self):
         mock_llm = AsyncMock()

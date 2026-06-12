@@ -140,8 +140,8 @@ class TestHybridExtractionEngine:
 
         assert isinstance(result, ExtractionResult)
         assert result.data["supplier_name"] == "Acme Corp"
-        # 2 vision + 2 text + 1 decider = 5
-        assert mock_llm.complete.call_count == 5
+        # 2 vision + 2 text; unanimous candidates skip the decider
+        assert mock_llm.complete.call_count == 4
 
     async def test_n_instances_controls_split(self):
         mock_llm = AsyncMock()
@@ -153,8 +153,8 @@ class TestHybridExtractionEngine:
             engine = HybridExtractionEngine(llm=mock_llm, dpi=100)
             await engine.extract(_make_doc(), schema=Invoice, n_instances=3)
 
-        # 3 vision + 3 text + 1 decider = 7
-        assert mock_llm.complete.call_count == 7
+        # 3 vision + 3 text; unanimous candidates skip the decider
+        assert mock_llm.complete.call_count == 6
 
     async def test_handles_partial_failures(self):
         call_count = 0
