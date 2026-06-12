@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import yaml
 from pydantic import BaseModel, Field
 
 from docflow.extraction.models import ExtractionResult
 from docflow.templates.loader import yaml_to_pydantic
+
+if TYPE_CHECKING:
+    from docflow.processor import DocumentPipeline
 
 
 # ---------------------------------------------------------------------------
@@ -55,7 +58,7 @@ class WorkflowConfig(BaseModel):
         return yaml_to_pydantic({"name": self.name, "fields": self.schema_})
 
     def build_validators(self) -> list:
-        from docflow.validation import RequiredFields, EvidenceRequired
+        from docflow.validation import EvidenceRequired, RequiredFields
 
         validators = []
         for rule in self.validation:
@@ -70,12 +73,12 @@ class WorkflowConfig(BaseModel):
 
     def build_review_rules(self) -> list:
         from docflow.review import (
-            OverallConfidenceBelow,
-            FieldConfidenceBelow,
             AnyFieldConfidenceBelow,
-            HasValidationErrors,
+            FieldConfidenceBelow,
             FieldMissing,
+            HasValidationErrors,
             NoEvidence,
+            OverallConfidenceBelow,
         )
 
         rules = []
@@ -108,8 +111,8 @@ class WorkflowConfig(BaseModel):
     def build_privacy(self) -> Any:
         if not self.privacy:
             return None
-        from docflow.privacy.policy import PrivacyPolicy
         from docflow.privacy.models import AnonymizationMode
+        from docflow.privacy.policy import PrivacyPolicy
         cfg = dict(self.privacy)
         if "mode" in cfg:
             cfg["mode"] = AnonymizationMode(cfg["mode"])
@@ -273,7 +276,7 @@ def _schema_to_fields(schema: type[BaseModel]) -> dict[str, Any]:
 
 
 def _validators_to_list(validators: list) -> list[dict[str, Any]]:
-    from docflow.validation import RequiredFields, EvidenceRequired
+    from docflow.validation import EvidenceRequired, RequiredFields
 
     result = []
     for v in validators:
@@ -286,12 +289,12 @@ def _validators_to_list(validators: list) -> list[dict[str, Any]]:
 
 def _review_rules_to_list(rules: list) -> list[dict[str, Any]]:
     from docflow.review import (
-        OverallConfidenceBelow,
-        FieldConfidenceBelow,
         AnyFieldConfidenceBelow,
-        HasValidationErrors,
+        FieldConfidenceBelow,
         FieldMissing,
+        HasValidationErrors,
         NoEvidence,
+        OverallConfidenceBelow,
     )
 
     result = []

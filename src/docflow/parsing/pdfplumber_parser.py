@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
+from itertools import pairwise
 from pathlib import Path
 
 from docflow.documents.models import (
@@ -19,17 +20,31 @@ _EXECUTOR = ThreadPoolExecutor(max_workers=4)
 
 # Words whose tops are within this distance (PDF points) belong to one line.
 _LINE_TOLERANCE = 3.0
+# Horizontal gaps larger than this (PDF points) split a visual line into
+# separate blocks — column boundaries, table label/value gaps. Without it,
+# unrelated text across a two-column layout merges into one block.
+_MAX_INLINE_GAP = 18.0
 
 
 def _group_words_into_lines(raw_words: list[dict]) -> list[list[dict]]:
-    lines: list[list[dict]] = []
+    rows: list[list[dict]] = []
     for w in sorted(raw_words, key=lambda w: (w["top"], w["x0"])):
-        if lines and abs(w["top"] - lines[-1][0]["top"]) <= _LINE_TOLERANCE:
-            lines[-1].append(w)
+        if rows and abs(w["top"] - rows[-1][0]["top"]) <= _LINE_TOLERANCE:
+            rows[-1].append(w)
         else:
-            lines.append([w])
-    for line in lines:
-        line.sort(key=lambda w: w["x0"])
+            rows.append([w])
+
+    lines: list[list[dict]] = []
+    for row in rows:
+        row.sort(key=lambda w: w["x0"])
+        current = [row[0]]
+        for prev, cur in pairwise(row):
+            if cur["x0"] - prev["x1"] > _MAX_INLINE_GAP:
+                lines.append(current)
+                current = [cur]
+            else:
+                current.append(cur)
+        lines.append(current)
     return lines
 
 

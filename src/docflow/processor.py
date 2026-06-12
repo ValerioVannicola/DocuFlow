@@ -62,6 +62,14 @@ class DocumentPipeline:
                     "Set parser=None or parser='none'."
                 )
 
+        if self._extraction_type in ("vision", "hybrid") and self._privacy is not None:
+            raise ValueError(
+                f"extraction_type='{self._extraction_type}' cannot be combined with a "
+                "privacy policy: vision sends raw page images to the LLM, bypassing "
+                "text anonymization. Use extraction_type='text' or 'auto' (auto keeps "
+                "the anonymized text path and never escalates when privacy is on)."
+            )
+
     def _resolve_parser(self) -> Any:
         if self._parser is None or self._parser == "none":
             return None
@@ -256,12 +264,12 @@ class DocumentPipeline:
             parser_cfg = self._parser
             if parser_cfg in (None, "none", "pdfplumber"):
                 parser_cfg = "smart"
-            saved_parser = self._parser
-            self._parser = parser_cfg
-            try:
-                parser = self._resolve_parser()
-            finally:
-                self._parser = saved_parser
+            if isinstance(parser_cfg, dict):
+                parser = self._resolve_parser_from_dict(parser_cfg)
+            elif isinstance(parser_cfg, str):
+                parser = self._resolve_parser_from_str(parser_cfg)
+            else:
+                parser = parser_cfg
             steps.append(Parse(parser=parser))
             if self._privacy:
                 from docflow.workflow.steps import Anonymize

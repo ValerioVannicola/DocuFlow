@@ -2,11 +2,40 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from docflow.documents.models import Block, BoundingBox
 from docflow.privacy.models import PrivacyFinding
 from docflow.privacy.provider import PrivacyProvider
 
 if TYPE_CHECKING:
     from PIL.Image import Image
+
+
+def _finding_bbox(block: Block, finding) -> BoundingBox | None:
+    """Union bbox of the words overlapping the finding's char range.
+
+    Blocks are line-level; redacting the whole line for one PII token inside
+    it blacks out unrelated text. With word detail available, redact only
+    the words the finding actually covers.
+    """
+    if not block.words:
+        return None
+
+    matched: list[BoundingBox] = []
+    offset = 0
+    for word in block.words:
+        start, end = offset, offset + len(word.text)
+        if start < finding.end and end > finding.start and word.bbox is not None:
+            matched.append(word.bbox)
+        offset = end + 1  # words join with a single space in block.text
+
+    if not matched:
+        return None
+    return BoundingBox(
+        x0=min(b.x0 for b in matched),
+        y0=min(b.y0 for b in matched),
+        x1=max(b.x1 for b in matched),
+        y1=max(b.y1 for b in matched),
+    )
 
 
 class ImageRedactor:
@@ -45,6 +74,7 @@ class ImageRedactor:
             )
 
             for finding in findings:
+                region_bbox = _finding_bbox(block, finding) or block.bbox
                 all_findings.append(
                     PrivacyFinding(
                         entity_type=finding.entity_type,
@@ -52,11 +82,11 @@ class ImageRedactor:
                         end=finding.end,
                         text=finding.text,
                         score=finding.score,
-                        bbox=block.bbox,
+                        bbox=region_bbox,
                     )
                 )
                 redact_regions.append(
-                    (block.bbox.x0, block.bbox.y0, block.bbox.x1, block.bbox.y1)
+                    (region_bbox.x0, region_bbox.y0, region_bbox.x1, region_bbox.y1)
                 )
 
         if redact_regions:

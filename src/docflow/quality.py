@@ -6,7 +6,6 @@ from pathlib import Path
 from uuid import uuid4
 
 import aiofiles
-
 from pydantic import BaseModel, Field
 
 from docflow.extraction.models import ExtractionResult

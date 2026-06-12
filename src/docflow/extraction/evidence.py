@@ -32,21 +32,29 @@ def attach_evidence(
     if extracted_value is not None and str(extracted_value) != text_snippet:
         targets.append(str(extracted_value))
 
+    best_span = None
     for target in targets:
         spans = locate_text(document, target, hint_page=hint_page)
-        if spans:
-            span = spans[0]
-            return [
-                Evidence(
-                    document_id=document.id,
-                    page_number=span.page_number,
-                    text=text_snippet,
-                    bbox=span.bbox,
-                    rects=span.rects,
-                    block_id=span.block_ids[0] if span.block_ids else None,
-                    confidence=span.confidence,
-                )
-            ]
+        if not spans:
+            continue
+        if spans[0].method == "exact":
+            best_span = spans[0]
+            break
+        if best_span is None:
+            best_span = spans[0]
+    if best_span is not None:
+        span = best_span
+        return [
+            Evidence(
+                document_id=document.id,
+                page_number=span.page_number,
+                text=text_snippet,
+                bbox=span.bbox,
+                rects=span.rects,
+                block_id=span.block_ids[0] if span.block_ids else None,
+                confidence=span.confidence,
+            )
+        ]
 
     # Page-level fallback: text exists in the page text but not in any block
     # (e.g. tables serialized to page text only).

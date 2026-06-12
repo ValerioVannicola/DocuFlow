@@ -57,9 +57,10 @@ class TestGenerateDeployment:
         with tempfile.TemporaryDirectory() as out:
             result = generate_deployment(workflow_yaml, out)
             content = (result / "requirements.txt").read_text()
-            assert "docflow" in content
-            assert "fastapi" in content
-            assert "uvicorn" in content
+            # fastapi/uvicorn come via the serve extra
+            assert "docflow[" in content
+            assert "serve" in content
+            assert "llm" in content
 
     def test_workflow_copied(self, workflow_yaml):
         with tempfile.TemporaryDirectory() as out:
@@ -94,9 +95,8 @@ class TestGenerateDeployment:
             assert "volumes:" in content
 
     def test_missing_config_raises(self):
-        with tempfile.TemporaryDirectory() as out:
-            with pytest.raises(FileNotFoundError):
-                generate_deployment("/nonexistent/workflow.yaml", out)
+        with tempfile.TemporaryDirectory() as out, pytest.raises(FileNotFoundError):
+            generate_deployment("/nonexistent/workflow.yaml", out)
 
     def test_dockerignore(self, workflow_yaml):
         with tempfile.TemporaryDirectory() as out:
@@ -109,6 +109,7 @@ class TestGenerateDeployment:
 class TestCLI:
     def test_dockerize_command(self, workflow_yaml):
         from click.testing import CliRunner
+
         from docflow.cli.main import dockerize
 
         runner = CliRunner()
@@ -120,6 +121,7 @@ class TestCLI:
 
     def test_dockerize_missing_config(self):
         from click.testing import CliRunner
+
         from docflow.cli.main import dockerize
 
         runner = CliRunner()

@@ -9,7 +9,7 @@ from docflow.workflow_config import load_workflow_config
 
 _DOCKERFILE = """\
 FROM python:3.11-slim
-
+{system_deps}
 WORKDIR /app
 
 COPY requirements.txt .
@@ -22,6 +22,11 @@ EXPOSE 8000
 CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8000"]
 """
 
+_TESSERACT_APT = """
+RUN apt-get update && apt-get install -y --no-install-recommends \\
+    tesseract-ocr && rm -rf /var/lib/apt/lists/*
+"""
+
 _SERVER_PY = """\
 \"\"\"Auto-generated DocFlow server — do not edit manually.\"\"\"
 
@@ -32,12 +37,33 @@ config = load_workflow_config("workflow.yaml")
 app = create_app(config)
 """
 
-_REQUIREMENTS = """\
-docflow[pdf,llm]
-fastapi>=0.115
-uvicorn[standard]>=0.30
-python-multipart>=0.0.9
-"""
+def _required_extras(config) -> tuple[set[str], bool]:
+    """Derive the docflow extras and system deps the workflow needs.
+
+    Returns (extras, needs_tesseract_binary)."""
+    extras = {"llm", "serve"}
+    needs_tesseract = False
+
+    parser = config.parser_type
+    extraction = config.extraction_type
+
+    if parser in ("pdfplumber", "smart") or extraction in ("vision", "hybrid", "auto"):
+        extras.add("pdf")
+    if parser in ("tesseract", "smart") or extraction in ("vision", "hybrid", "auto"):
+        extras.update({"pdf", "ocr"})
+        needs_tesseract = True
+    if parser == "docling":
+        extras.add("docling")
+    if parser == "azure-di":
+        extras.add("azure")
+    if parser == "textract":
+        extras.update({"aws", "pdf"})
+    if parser == "google-docai":
+        extras.add("gcp")
+    if config.privacy:
+        extras.add("privacy")
+
+    return extras, needs_tesseract
 
 _DOCKER_COMPOSE = """\
 services:
@@ -73,15 +99,21 @@ def generate_deployment(
     if not config_path.is_file():
         raise FileNotFoundError(f"Workflow config not found: {config_path}")
 
-    load_workflow_config(config_path)
+    config = load_workflow_config(config_path)
 
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
 
+    extras, needs_tesseract = _required_extras(config)
+    requirements = f"docflow[{','.join(sorted(extras))}]\n"
+    dockerfile = _DOCKERFILE.format(
+        system_deps=_TESSERACT_APT if needs_tesseract else "",
+    )
+
     shutil.copy2(str(config_path), str(out / "workflow.yaml"))
-    (out / "Dockerfile").write_text(_DOCKERFILE, encoding="utf-8")
+    (out / "Dockerfile").write_text(dockerfile, encoding="utf-8")
     (out / "server.py").write_text(_SERVER_PY, encoding="utf-8")
-    (out / "requirements.txt").write_text(_REQUIREMENTS, encoding="utf-8")
+    (out / "requirements.txt").write_text(requirements, encoding="utf-8")
 
     volumes_section = _COMPOSE_VOLUMES_SECTION if with_storage else ""
     volumes_def = _COMPOSE_VOLUMES_DEF if with_storage else ""

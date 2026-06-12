@@ -185,6 +185,18 @@ class TestFieldConsensus:
     def test_field_missing_from_candidates(self):
         c = [{"data": {"other": 1}}, {"data": {"other": 2}}]
         result = compute_field_consensus(100.0, "total", c, n_instances=2)
-        assert result.agreement == "0/0"
+        assert result.agreement == "0/2"
         assert result.agreement_ratio == 0.0
         assert result.n_succeeded == 2
+
+    def test_missing_field_counts_as_disagreement(self):
+        # 2 of 3 candidates produced the field and agree; the third omitted
+        # it — that is NOT unanimity
+        c = [
+            {"data": {"total": 100.0}},
+            {"data": {"total": 100.0}},
+            {"data": {"other": 1}},
+        ]
+        result = compute_field_consensus(100.0, "total", c, n_instances=3)
+        assert result.agreement == "2/3"
+        assert result.agreement_ratio == pytest.approx(2 / 3, abs=1e-4)

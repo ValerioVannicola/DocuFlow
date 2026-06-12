@@ -144,7 +144,9 @@ class TextractParser:
         pages: list[Page] = []
         for i, image in enumerate(images):
             buf = io.BytesIO()
-            image.save(buf, format="PNG")
+            # JPEG keeps each page under Textract's 5 MB synchronous API
+            # limit; PNG at 200+ DPI can exceed it.
+            image.convert("RGB").save(buf, format="JPEG", quality=90)
             response = await loop.run_in_executor(
                 _EXECUTOR, partial(_detect_sync, client, buf.getvalue()),
             )

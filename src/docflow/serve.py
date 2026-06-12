@@ -10,7 +10,7 @@ from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import JSONResponse
 
 from docflow.quality import quality_report
-from docflow.workflow_config import WorkflowConfig, load_workflow_config, run_workflow_sync
+from docflow.workflow_config import WorkflowConfig, load_workflow_config
 
 
 def create_app(config: WorkflowConfig) -> FastAPI:
@@ -40,7 +40,7 @@ def create_app(config: WorkflowConfig) -> FastAPI:
         }
 
     @app.post("/extract")
-    async def extract(file: UploadFile = File(...)) -> JSONResponse:
+    async def extract(file: UploadFile = File(...)) -> JSONResponse:  # noqa: B008 — FastAPI idiom
         suffix = Path(file.filename).suffix if file.filename else ".pdf"
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
             content = await file.read()
@@ -56,7 +56,7 @@ def create_app(config: WorkflowConfig) -> FastAPI:
 
         report = quality_report(result)
 
-        response = result.model_dump()
+        response = result.model_dump(mode="json")
         response["quality_score"] = report.score
         response["quality_ok"] = report.ok
 
@@ -67,7 +67,7 @@ def create_app(config: WorkflowConfig) -> FastAPI:
 
 def run_server(
     config_source: str | Path | dict,
-    host: str = "0.0.0.0",
+    host: str = "0.0.0.0",  # noqa: S104 — bind-all is intended for containers
     port: int = 8000,
 ) -> None:
     """Load a workflow config and start the server."""

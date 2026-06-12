@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 from pathlib import Path
@@ -12,6 +13,11 @@ if TYPE_CHECKING:
     from PIL.Image import Image
 
 _EXECUTOR = ThreadPoolExecutor(max_workers=4)
+
+# PDFium is not thread-safe — all calls into it must be serialized, even
+# on separate documents. The executor still gives async callers a
+# non-blocking interface; rendering itself runs one page at a time.
+_PDFIUM_LOCK = threading.Lock()
 
 
 def _import_pdfium():
@@ -27,35 +33,37 @@ def _import_pdfium():
 def _render_page_sync(file_path: str, page_number: int, dpi: int) -> Image:
     pdfium = _import_pdfium()
 
-    try:
-        pdf = pdfium.PdfDocument(file_path)
-    except Exception as exc:
-        raise ParsingError(f"Failed to open PDF: {file_path}") from exc
+    with _PDFIUM_LOCK:
+        try:
+            pdf = pdfium.PdfDocument(file_path)
+        except Exception as exc:
+            raise ParsingError(f"Failed to open PDF: {file_path}") from exc
 
-    try:
-        if page_number < 0 or page_number >= len(pdf):
-            raise ParsingError(
-                f"Page {page_number} out of range (document has {len(pdf)} pages)"
-            )
-        page = pdf[page_number]
-        bitmap = page.render(scale=dpi / 72.0)
-        img = bitmap.to_pil().convert("RGB")
-    finally:
-        pdf.close()
+        try:
+            if page_number < 0 or page_number >= len(pdf):
+                raise ParsingError(
+                    f"Page {page_number} out of range (document has {len(pdf)} pages)"
+                )
+            page = pdf[page_number]
+            bitmap = page.render(scale=dpi / 72.0)
+            img = bitmap.to_pil().convert("RGB")
+        finally:
+            pdf.close()
     return img
 
 
 def _page_count_sync(file_path: str) -> int:
     pdfium = _import_pdfium()
 
-    try:
-        pdf = pdfium.PdfDocument(file_path)
-    except Exception as exc:
-        raise ParsingError(f"Failed to open PDF: {file_path}") from exc
-    try:
-        return len(pdf)
-    finally:
-        pdf.close()
+    with _PDFIUM_LOCK:
+        try:
+            pdf = pdfium.PdfDocument(file_path)
+        except Exception as exc:
+            raise ParsingError(f"Failed to open PDF: {file_path}") from exc
+        try:
+            return len(pdf)
+        finally:
+            pdf.close()
 
 
 async def render_page(file_path: str | Path, page_number: int = 0, dpi: int = DEFAULT_DPI) -> Image:

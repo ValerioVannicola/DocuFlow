@@ -88,6 +88,7 @@ def compute_field_ocr_confidence(
     if not targets:
         return OCRFieldConfidence()
 
+    fuzzy_fallback: OCRFieldConfidence | None = None
     for target in targets:
         spans = locate_text(
             document, target,
@@ -96,8 +97,11 @@ def compute_field_ocr_confidence(
         if not spans:
             continue
         span = spans[0]
-        return OCRFieldConfidence(
-            score=span.confidence if span.confidence is not None else 0.0,
+        # None score means the span sits on a page without OCR (e.g. a
+        # native page in a smart-parsed document) — "no OCR confidence
+        # applies here", which is different from a bad read.
+        candidate = OCRFieldConfidence(
+            score=span.confidence,
             match_method="exact_block" if span.method == "exact" else "fuzzy_block",
             match_ratio=span.match_ratio,
             matched_text=span.text,
@@ -105,6 +109,12 @@ def compute_field_ocr_confidence(
             bbox=span.bbox,
             rects=span.rects,
         )
+        if span.method == "exact":
+            return candidate
+        if fuzzy_fallback is None:
+            fuzzy_fallback = candidate
+    if fuzzy_fallback is not None:
+        return fuzzy_fallback
 
     for target in targets:
         normalized = _normalize(target)
@@ -128,15 +138,27 @@ def compute_field_consensus(
     candidates: list[dict],
     n_instances: int,
 ) -> FieldConsensus:
-    """Agreement of candidate extractions with the final (chosen) value."""
+    """Agreement of candidate extractions with the final (chosen) value.
+
+    The denominator is ALL succeeded candidates, not just those that produced
+    the field — an instance that omitted the field disagrees with any value.
+    """
+    if not candidates:
+        return FieldConsensus(n_instances=n_instances)
+
     values: list[str] = []
     for c in candidates:
         data = c.get("data", c)
         if field_name in data:
             values.append(_normalize(data[field_name]))
 
+    n_total = len(candidates)
     if not values:
-        return FieldConsensus(n_instances=n_instances, n_succeeded=len(candidates))
+        return FieldConsensus(
+            n_instances=n_instances,
+            n_succeeded=n_total,
+            agreement=f"0/{n_total}",
+        )
 
     normalized_final = _normalize(final_value)
     n_agree = sum(1 for v in values if v == normalized_final)
@@ -144,8 +166,8 @@ def compute_field_consensus(
 
     return FieldConsensus(
         n_instances=n_instances,
-        n_succeeded=len(candidates),
-        agreement=f"{n_agree}/{len(values)}",
-        agreement_ratio=round(n_agree / len(values), 4),
-        majority_ratio=round(majority_count / len(values), 4),
+        n_succeeded=n_total,
+        agreement=f"{n_agree}/{n_total}",
+        agreement_ratio=round(n_agree / n_total, 4),
+        majority_ratio=round(majority_count / n_total, 4),
     )

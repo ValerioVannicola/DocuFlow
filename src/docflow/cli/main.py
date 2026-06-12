@@ -189,7 +189,7 @@ def screenshot(
 
 @main.command()
 @click.argument("config_path")
-@click.option("--host", default="0.0.0.0", help="Host to bind to")
+@click.option("--host", default="0.0.0.0", help="Host to bind to")  # noqa: S104
 @click.option("--port", "-p", default=8000, help="Port to bind to")
 def serve(config_path: str, host: str, port: int) -> None:
     """Start an HTTP server for a workflow config."""
@@ -240,15 +240,15 @@ def dockerize(config_path: str, output: str, port: int, with_storage: bool) -> N
         sys.exit(1)
 
     click.echo(f"Deployment generated in {out}/")
-    click.echo(f"  Dockerfile")
-    click.echo(f"  server.py")
-    click.echo(f"  workflow.yaml")
-    click.echo(f"  docker-compose.yml")
-    click.echo(f"  requirements.txt")
+    click.echo("  Dockerfile")
+    click.echo("  server.py")
+    click.echo("  workflow.yaml")
+    click.echo("  docker-compose.yml")
+    click.echo("  requirements.txt")
     click.echo()
     click.echo("Next steps:")
     click.echo(f"  cd {out}")
-    click.echo(f"  docker compose up --build")
+    click.echo("  docker compose up --build")
 
 
 @main.group(name="templates")
