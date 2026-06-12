@@ -1,6 +1,16 @@
+<p align="center">
+  <img src="docs/assets/docflow-logo.png" alt="DocFlow logo" width="520">
+</p>
+
 # DocFlow
 
 Extract structured data from documents using LLMs — with evidence, validation, review, and full audit trail.
+
+## Why DocFlow?
+
+Most document extraction tools focus on one part of the problem: parsing a PDF, running OCR, or calling an LLM. In real workflows, that is rarely enough. Teams also need schemas, evidence, confidence scores, validation, privacy controls, review steps, corrections, storage, and an audit trail they can trust.
+
+DocFlow was built as a workflow runtime for document extraction. It lets you combine parsers, OCR, LLMs, validation rules, review logic, and deployment options into one reproducible pipeline, so extracted data can move from messy documents into production systems with traceability and control.
 
 ## Installation
 
