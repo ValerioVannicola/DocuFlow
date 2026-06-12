@@ -151,5 +151,3 @@ docuflow templates list
 ## Documentation
 
 See the [Complete User Guide](docs/guide.md) for in-depth documentation of every feature, with code examples.
-
-(`CLAUDE.md` is integration context for AI coding agents, not user documentation.)
