@@ -78,6 +78,14 @@ def __getattr__(name: str) -> object:
         from docuflow.discover import discover_schema
 
         return discover_schema
+    if name == "WorkflowRouter":
+        from docuflow.router import WorkflowRouter
+
+        return WorkflowRouter
+    if name == "RoutedReport":
+        from docuflow.router import RoutedReport
+
+        return RoutedReport
     raise AttributeError(f"module 'docuflow' has no attribute {name!r}")
 
 
@@ -85,6 +93,7 @@ __all__ = [
     "DocumentPipeline",
     "Pipeline",
     "PrivacyPolicy",
+    "WorkflowRouter",
     "__version__",
     "extract",
     "extract_async",

@@ -331,6 +331,26 @@ report.to_csv()            # CSV string
 report.to_dataframe()      # pandas DataFrame
 ```
 
+## Routing Mixed Document Streams
+
+```python
+from docuflow import WorkflowRouter
+
+router = WorkflowRouter()  # classifier: gemini/gemini-2.5-flash (one cheap call/doc)
+router.register("invoice", "workflows/invoices.yaml")
+router.register("claim", pipeline=claims_pipeline, schema=ClaimForm,
+                description="motor insurance claim forms")
+
+report = router.route_sync(files, concurrency=5)
+report.by_workflow      # {"invoice": [RoutedResult...], "claim": [...]}
+report.unclassified     # never force-extracted with the wrong schema
+report.usage            # includes classification token cost
+```
+
+CLI: `docuflow route routes.yaml ./inbox --output results.csv` (routes.yaml lists
+name/description/workflow entries). Scans with no text layer classify from a
+low-DPI page-1 image. One file = one document (no packet splitting).
+
 ## Document Comparison
 
 ```python

@@ -25,6 +25,7 @@
 12. [Provenance](#12-provenance)
 13. [Privacy & Anonymization](#13-privacy--anonymization)
 14. [Batch Processing](#14-batch-processing)
+14b. [Routing Mixed Document Streams](#14b-routing-mixed-document-streams)
 15. [Document Comparison](#15-document-comparison)
 16. [Document Search & Highlighting](#16-document-search--highlighting)
 17. [Screenshots](#17-screenshots)
@@ -1898,6 +1899,67 @@ df.to_excel("results.xlsx")
 
 ---
 
+## 14b. Routing Mixed Document Streams
+
+Real inboxes are mixed: invoices, claim forms and contracts arrive together, each
+needing a different workflow. The `WorkflowRouter` classifies each document with one
+cheap LLM call and runs the matching registered workflow — documents that match
+nothing land in `unclassified` with the classifier's reason, never force-extracted
+with the wrong schema.
+
+```python
+from docuflow import WorkflowRouter
+
+router = WorkflowRouter()                      # classifier model: gemini/gemini-2.5-flash
+router.register("invoice", "workflows/invoices.yaml")
+router.register("claim", "workflows/claims.yaml",
+                description="motor insurance claim forms with policy numbers")
+
+report = router.route_sync(["inbox/a.pdf", "inbox/b.pdf"], concurrency=5)
+
+report.by_workflow["invoice"]   # results grouped per workflow
+report.unclassified             # files that matched nothing, with the reason
+report.failed                   # classified but extraction errored
+report.usage                    # tokens/cost including the classification calls
+report.to_csv()
+```
+
+How classification works: the router peeks at the first page (text layer; falls back
+to a low-DPI page image for scans) and asks the classifier model to pick among the
+registered names + descriptions. Below `confidence_threshold` (default 0.5) the
+document goes to `unclassified` rather than guessing. Each routed result records the
+classification decision, confidence and reason for auditability.
+
+Registration accepts YAML workflow configs (path or dict) or explicit
+`pipeline=` + `schema=` pairs. Descriptions matter — they are what the classifier
+sees — and default to the workflow description or the schema's field names.
+
+No-code version — a routes file:
+
+```yaml
+# routes.yaml
+model: gemini/gemini-2.5-flash
+workflows:
+  - name: invoice
+    description: supplier invoices with totals and line items
+    workflow: workflows/invoices.yaml
+  - name: claim
+    description: motor insurance claim forms
+    workflow: workflows/claims.yaml
+```
+
+```bash
+docuflow route routes.yaml ./inbox --output results.csv
+```
+
+Honest costs and limits: classification adds one cheap LLM call per document
+(~500 tokens). Misroutes can happen — the mitigation is built in: a misrouted
+document extracted against the wrong schema produces nulls and unmatched evidence,
+its quality score tanks, and review rules flag it. The router assumes one file = one
+logical document; it does not split multi-document packets.
+
+---
+
 ## 15. Document Comparison
 
 Compare extracted fields across multiple documents.
@@ -2489,6 +2551,14 @@ Options:
 - `--model, -m` — LLM model (default: `openai/gpt-4o`)
 - `--output, -o` — output file (default: stdout)
 - `--store` — storage backend (e.g., `local`)
+
+### Route a Mixed Folder
+
+```bash
+docuflow route routes.yaml ./inbox --output results.csv
+```
+
+Classifies each document and runs the matching workflow from the routes file.
 
 ### Extract a Folder
 

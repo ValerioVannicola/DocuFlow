@@ -251,6 +251,56 @@ def dockerize(config_path: str, output: str, port: int, with_storage: bool) -> N
     click.echo("  docker compose up --build")
 
 
+@main.command(name="route")
+@click.argument("routes_path")
+@click.argument("input_path")
+@click.option("--output", "-o", default=None, help="Output CSV file path")
+@click.option("--pattern", default="**/*.pdf", help="File glob pattern for folders")
+@click.option("--concurrency", "-c", default=5, help="Max concurrent documents")
+def route(
+    routes_path: str,
+    input_path: str,
+    output: str | None,
+    pattern: str,
+    concurrency: int,
+) -> None:
+    """Classify documents in INPUT_PATH and run the matching workflow from ROUTES_PATH."""
+    from pathlib import Path
+
+    from docuflow.router import WorkflowRouter
+
+    router = WorkflowRouter.from_config(routes_path)
+
+    path = Path(input_path)
+    files = (
+        [str(path)] if path.is_file()
+        else sorted(str(p) for p in path.glob(pattern))
+    )
+    if not files:
+        click.echo(f"No files found in {input_path}")
+        raise SystemExit(1)
+
+    report = router.route_sync(files, concurrency=concurrency)
+
+    click.echo(f"Routed {report.total} document(s):")
+    for name, results in report.by_workflow.items():
+        ok = len([r for r in results if r.success])
+        click.echo(f"  {name}: {len(results)} ({ok} succeeded)")
+    if report.unclassified:
+        click.echo(f"  unclassified: {len(report.unclassified)}")
+        for r in report.unclassified:
+            click.echo(f"    {r.file_name}: {r.classification_reason}")
+    if report.usage:
+        click.echo(
+            f"Tokens: {report.usage.total_tokens} across "
+            f"{report.usage.n_llm_calls} LLM calls"
+        )
+
+    if output:
+        Path(output).write_text(report.to_csv(), encoding="utf-8")
+        click.echo(f"Results written to {output}")
+
+
 @main.group(name="templates")
 def templates_group() -> None:
     """Manage extraction templates."""

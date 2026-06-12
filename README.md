@@ -128,6 +128,7 @@ Three endpoints: `GET /health`, `GET /schema`, `POST /extract` (file upload → 
 
 ### Production Tools
 - **Batch processing**: process folders of documents, get summary reports, export to CSV/DataFrame
+- **Workflow routing**: mixed document streams auto-classified and dispatched to the right workflow (`WorkflowRouter` / `docuflow route`); unmatched documents are surfaced, never force-extracted
 - **Document comparison**: field-by-field diff across multiple documents
 - **Document search**: find text across pages with spatial location
 - **Screenshots**: render pages as PNGs for review UIs
@@ -140,6 +141,7 @@ Three endpoints: `GET /health`, `GET /schema`, `POST /extract` (file upload → 
 docuflow run invoice.yaml invoice.pdf --output result.json
 docuflow extract invoice.pdf --schema invoice
 docuflow extract-folder ./invoices --schema invoice --output results.csv
+docuflow route routes.yaml ./inbox --output results.csv
 docuflow serve workflow.yaml --port 8000
 docuflow dockerize workflow.yaml --output ./deploy --with-storage
 docuflow screenshot document.pdf -o ./pages
