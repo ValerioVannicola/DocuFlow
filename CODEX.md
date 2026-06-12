@@ -10,7 +10,7 @@ DocFlow extracts structured data from documents (PDFs, scans, images) using LLMs
 
 ```bash
 pip install docflow[all]          # Everything
-pip install docflow[pdf,llm]      # Lightweight: PyMuPDF + LLM only
+pip install docflow[pdf,llm]      # Lightweight: pdfplumber + LLM only
 pip install docflow[ocr,llm]      # Tesseract OCR + LLM
 pip install docflow[docling,llm]  # Docling (best parsing) + LLM
 ```
@@ -33,7 +33,7 @@ result = extract("invoice.pdf", schema=Invoice, model="openai/gpt-4o")
 from docflow import DocumentPipeline
 
 pipeline = DocumentPipeline(
-    parser="pymupdf",           # "pymupdf" | "tesseract" | "docling" | "smart"
+    parser="pdfplumber",           # "pdfplumber" | "tesseract" | "docling" | "smart"
     model="openai/gpt-4o",      # any litellm model string
     extraction_type="text",     # "text" | "vision" | "hybrid"
     extraction_mode="single",   # "single" | "multi"
@@ -84,10 +84,28 @@ Invoice = load_template("invoice")  # built-in: invoice, contract, receipt
 
 | Parser | Use when | Speed | Install |
 |--------|----------|-------|---------|
-| `"pymupdf"` | Digital/native PDFs | Fast (~100ms) | `docflow[pdf]` |
+| `"pdfplumber"` | Digital/native PDFs | Fast (~100ms) | `docflow[pdf]` |
 | `"tesseract"` | Scanned documents | Slow (1-5s/page) | `docflow[ocr]` |
 | `"docling"` | Complex layouts, tables | Slow (4-5s/page) | `docflow[docling]` |
 | `"smart"` | Mixed docs (auto-detects per page) | Varies | `docflow[pdf,ocr]` |
+| `"azure-di"` | Cloud OCR, Azure Document Intelligence | API call | `docflow[azure]` |
+| `"textract"` | Cloud OCR, AWS Textract | API call/page | `docflow[aws,pdf]` |
+| `"google-docai"` | Cloud OCR, Google Document AI | API call | `docflow[gcp]` |
+
+### Cloud OCR configuration
+
+```python
+# Azure Document Intelligence — or env vars AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT / _KEY
+pipeline = DocumentPipeline(parser={"type": "azure-di", "model": "prebuilt-read"})
+
+# AWS Textract — credentials via standard boto3 chain; pages rendered locally, no S3 needed
+pipeline = DocumentPipeline(parser={"type": "textract", "region": "eu-west-1"})
+
+# Google Document AI — or env vars GOOGLE_DOCAI_PROJECT / _LOCATION / _PROCESSOR_ID
+pipeline = DocumentPipeline(parser={"type": "google-docai", "project": "p", "processor_id": "x"})
+```
+
+All parsers produce the same standardized `Document`: pages of **line-level blocks**, where OCR-based parsers also fill per-word `words` (text, bbox, confidence) and a line `confidence`. Native parsers (pdfplumber) leave confidence empty — downstream code treats that as "no OCR ran". Docling is hybrid: when its internal OCR fires (scanned pages), the OCR cell confidences are attached to the layout blocks; native Docling parses report no OCR confidence, by design.
 
 ## Extraction Types
 
@@ -96,6 +114,23 @@ Invoice = load_template("invoice")  # built-in: invoice, contract, receipt
 | `"text"` | Parse → Extract | Parser gives text, LLM reads text |
 | `"vision"` | ExtractVision (no parser) | Pages rendered as images → vision LLM |
 | `"hybrid"` | ExtractHybrid (no parser) | Vision + text agents parallel → vision decider |
+| `"auto"` | Parse (smart) → ExtractAuto | Text extraction; escalates to vision when OCR quality is poor |
+
+### Auto mode (vision escalation)
+
+```python
+pipeline = DocumentPipeline(
+    extraction_type="auto",
+    escalation={"min_ocr_score": 0.6, "max_low_confidence_ratio": 0.4, "escalate_to": "vision"},
+)
+result.escalated           # True if re-read by the vision LLM
+result.escalation_reason   # e.g. "OCR confidence 0.42 below threshold 0.6"
+```
+
+OCR fails *confidently* — bad scans return plausible garbage, not errors. Auto mode
+gates on the OCR confidence scores after parsing and re-reads the original file with
+the vision (or hybrid) engine when quality is below threshold. Escalation is suppressed
+when a PrivacyPolicy is configured (vision bypasses text anonymization).
 
 **Vision and hybrid require `parser=None`:**
 
@@ -126,6 +161,12 @@ result.fields["total"].evidence[0].text        # "1234.56"
 result.fields["total"].evidence[0].page_number # 0
 result.fields["total"].evidence[0].bbox        # BoundingBox(x0=72, y0=130, x1=200, y1=148)
 result.confidence                    # 0.85 (overall)
+result.usage                         # TokenUsage | None — aggregated LLM token usage
+result.usage.prompt_tokens           # summed across ALL calls (instances, decider,
+result.usage.completion_tokens       #   JSON-repair retries, LLM reviewers)
+result.usage.total_tokens
+result.usage.n_llm_calls             # how many LLM calls produced this result
+result.usage.cost_usd                # litellm-priced cost (None if model unknown)
 result.needs_review                  # True/False
 result.review_reasons                # ["Field 'total' confidence below 0.8"]
 result.review_verdicts               # [ReviewVerdict(reviewer="auditor", verdict="Approved")]
@@ -225,7 +266,7 @@ pipeline = DocumentPipeline(
 
 ```python
 pipeline = DocumentPipeline(
-    context="You work in pharmaceutical regulatory affairs. Drug names should use INN format.",
+    context="You work in motor insurance claims processing. Policy numbers follow the pattern POL-XXXXXXX.",
 )
 ```
 
@@ -242,6 +283,7 @@ report = process_batch(
 )
 report.total, report.succeeded, report.failed, report.needs_review
 report.average_confidence
+report.usage               # TokenUsage | None — tokens/cost summed over the whole batch
 report.top_review_reasons
 report.to_csv()            # CSV string
 report.to_dataframe()      # pandas DataFrame
@@ -262,15 +304,51 @@ for field, cells in comparison.fields.items():
     print(f"{field}: {'SAME' if diff.all_agree else 'DIFFERENT'} — {diff.summary}")
 ```
 
-## Search
+## Search & Text Location (Highlighting)
 
 ```python
 from docflow.search import search_document
 
-result = search_document(document, "Acme Corp")
+result = search_document(document, "Acme Corp")          # exact (normalized)
+result = search_document(document, "INV-001", fuzzy=True)  # tolerate OCR garble
 for hit in result.hits:
-    print(f"Page {hit.page_number}, bbox: {hit.bbox}, context: {hit.context}")
+    hit.bbox       # union rect (single-page matches)
+    hit.rects      # [PageRect] — one rect per (page, line) segment
+    hit.match_ratio  # 1.0 exact, <1.0 fuzzy
+    hit.context
 ```
+
+Lower-level: `locate_text()` finds any phrase at word-span precision —
+matches cross word, line and **page** boundaries:
+
+```python
+from docflow.documents.locate import locate_text
+
+spans = locate_text(document, "carried forward to the next page", find_all=True)
+span = spans[0]
+span.rects        # one PageRect per (page, line) — render like a PDF viewer selection
+span.bbox         # union bbox (None when the span crosses pages)
+span.confidence   # min OCR word confidence of the span (None without OCR)
+span.match_ratio  # 1.0 exact; fuzzy fallback for OCR-garbled text
+```
+
+### Coordinate convention
+
+All bboxes in a document share one coordinate space per page: **top-left
+origin, PDF points (72/inch)** — `Page.unit == "pt"`. OCR parsers convert
+their rendered-pixel coords via DPI; Azure DI converts inches. Providers
+with unknowable physical size (Google DocAI on pixels) keep `unit="px"`,
+still consistent with `Page.width/height`. To overlay a highlight on a page
+rendered at any DPI:
+
+```python
+rel = hit.bbox.to_relative(page.width, page.height)  # 0-1 coords
+# pixel rect = rel * rendered_image_size — works for every parser
+```
+
+Evidence carries the same precision: `field.evidence[0].bbox` covers exactly
+the matched words and `field.evidence[0].rects` handles multi-line spans.
+`field.ocr.bbox` / `field.ocr.rects` give the highlight for the OCR-scored span.
 
 ## Screenshots
 
@@ -366,11 +444,56 @@ except WorkflowError as e:
     print(e.result.trace.events)     # trace up to failure
 ```
 
+## Serve & Dockerize (HTTP Microservice)
+
+Wrap any workflow config as an HTTP API — useful when extraction is one step in a larger multi-language pipeline.
+
+```bash
+pip install docflow[serve]  # adds fastapi, uvicorn, python-multipart
+```
+
+### Local server
+
+```python
+from docflow.serve import create_app, run_server
+from docflow.workflow_config import load_workflow_config
+
+config = load_workflow_config("workflow.yaml")
+app = create_app(config)  # FastAPI app with /health, /schema, /extract
+run_server("workflow.yaml", port=8000)
+```
+
+### Docker deployment
+
+```python
+from docflow.dockerize import generate_deployment
+
+generate_deployment("workflow.yaml", "./deploy")              # stateless
+generate_deployment("workflow.yaml", "./deploy", with_storage=True)  # with /data volume
+```
+
+### Endpoints
+
+- `GET /health` — workflow name, version, model, parser
+- `GET /schema` — field definitions
+- `POST /extract` — upload file, returns structured data + quality_score + quality_ok
+
+### CLI
+
+```bash
+docflow serve workflow.yaml --port 8000
+docflow dockerize workflow.yaml --output ./deploy
+docflow dockerize workflow.yaml --output ./deploy --with-storage
+```
+
 ## CLI
 
 ```bash
 docflow extract file.pdf --schema invoice --output result.json
 docflow extract-folder ./invoices --schema invoice --output results.csv --parser smart
+docflow run workflow.yaml invoice.pdf --output result.json
+docflow serve workflow.yaml --port 8000
+docflow dockerize workflow.yaml --output ./deploy --with-storage
 docflow screenshot file.pdf -o ./pages --dpi 200
 docflow templates list
 docflow templates show invoice
@@ -385,7 +508,7 @@ from docflow import extract, DocumentPipeline, Pipeline, PrivacyPolicy
 from docflow import process_batch, compare_documents
 
 # Parsing
-from docflow.parsing.pymupdf import PyMuPDFParser
+from docflow.parsing.pdfplumber_parser import PdfplumberParser
 from docflow.parsing.tesseract_parser import TesseractParser
 from docflow.parsing.docling_parser import DoclingParser
 from docflow.parsing.smart_parser import SmartParser
@@ -484,6 +607,45 @@ pipeline = DocumentPipeline(scoring="quantitative")
 Single agent: no consensus score, trust based on source verification only.
 Multi agent: consensus percentage + source verification.
 
+## Confidence Scores (OCR + LLM Consensus)
+
+Confidence is split into two independent, optional axes. Neither ever breaks
+the pipeline — when a score is not applicable it is `None`.
+
+### OCR confidence (only when an OCR-based parser ran)
+
+```python
+result.ocr                       # OCRDocumentConfidence | None
+result.ocr.score                 # 0-1, mean word confidence across the document
+result.ocr.word_count
+result.ocr.low_confidence_ratio  # fraction of words below 0.6
+
+field = result.fields["total"]
+field.ocr                        # OCRFieldConfidence | None
+field.ocr.score                  # min word confidence of the matched span
+field.ocr.match_method           # "exact_block" | "fuzzy_block" | "page_text" | "unmatched"
+field.ocr.match_ratio            # 1.0 = exact, <1.0 = fuzzy match quality
+field.ocr.matched_text           # the OCR text the value was matched to
+```
+
+Field-level scores are computed by matching the extracted value **back** to the
+OCR words (evidence-hint text first, then the value itself; exact, then fuzzy
+via SequenceMatcher). `None` document-level = no OCR in the pipeline.
+`"unmatched"` field-level = OCR ran but the value couldn't be located (e.g.
+reformatted dates, anonymized values).
+
+### LLM consensus (only in multi-instance mode)
+
+```python
+field.consensus                  # FieldConsensus | None (None in single mode)
+field.consensus.agreement        # "4/5" — candidates agreeing with the FINAL value
+field.consensus.agreement_ratio  # 0.8
+field.consensus.majority_ratio   # largest candidate cluster; if > agreement_ratio,
+                                 # the decider overrode the majority
+field.consensus.n_instances      # instances launched
+field.consensus.n_succeeded      # instances that returned valid JSON
+```
+
 ## Eval Harness
 
 Measure extraction accuracy against ground truth (corrections = your gold set):
@@ -560,6 +722,8 @@ src/docflow/
   screenshots.py       # screenshot_pages
   quality.py           # quality_report (per-result quality assessment)
   workflow_config.py   # Portable YAML workflow config, run_workflow, export
+  serve.py             # FastAPI server (create_app, run_server)
+  dockerize.py         # Docker deployment generator
   eval.py              # EvalHarness (accuracy measurement)
   mcp_server.py        # MCP server (14 tools for AI agents)
   constants.py         # DEFAULT_DPI
@@ -567,7 +731,7 @@ src/docflow/
   documents/           # Document, Page, Block, Evidence, Table, Cell
   extraction/          # ExtractionEngine, VisionExtractionEngine, HybridExtractionEngine
     llm/               # LLMAdapter protocol, LiteLLMAdapter
-  parsing/             # Parser protocol, PyMuPDF, Tesseract, Docling, Smart
+  parsing/             # Parser protocol, pdfplumber, Tesseract, Docling, Smart
   ocr/                 # OCREngine protocol, TesseractOCR, preprocessing
   rendering/           # PDF page to image rendering
   templates/           # YAML template registry and loader
