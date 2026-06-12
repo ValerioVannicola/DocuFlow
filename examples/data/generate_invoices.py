@@ -1,9 +1,42 @@
-"""Generate realistic sample invoice PDFs for DocFlow notebooks."""
+"""Generate realistic sample invoice PDFs for DocFlow notebooks (reportlab)."""
 from __future__ import annotations
 
 from pathlib import Path
 
-import fitz  # PyMuPDF
+from reportlab.pdfgen import canvas as rl_canvas
+
+PAGE_W, PAGE_H = 612, 792
+
+BLACK = (0, 0, 0)
+GRAY = (0.4, 0.4, 0.4)
+DARK_BLUE = (0.1, 0.15, 0.35)
+LIGHT_GRAY = (0.93, 0.93, 0.93)
+HEADER_BG = (0.1, 0.15, 0.35)
+WHITE = (1, 1, 1)
+HEADER_ACCENT = (0.7, 0.75, 0.9)
+
+
+class _PageDraw:
+    """Top-left-origin drawing helper over a reportlab canvas, so layout
+    coordinates read like the page is drawn from the top down."""
+
+    def __init__(self, c: rl_canvas.Canvas, height: float = PAGE_H):
+        self.c = c
+        self.h = height
+
+    def text(self, x: float, y: float, s: str, size: float = 8, color=BLACK) -> None:
+        self.c.setFont("Helvetica", size)
+        self.c.setFillColorRGB(*color)
+        self.c.drawString(x, self.h - y, s)
+
+    def rect(self, x0: float, y0: float, x1: float, y1: float, fill) -> None:
+        self.c.setFillColorRGB(*fill)
+        self.c.rect(x0, self.h - y1, x1 - x0, y1 - y0, stroke=0, fill=1)
+
+    def line(self, x0: float, y0: float, x1: float, y1: float, color, width: float) -> None:
+        self.c.setStrokeColorRGB(*color)
+        self.c.setLineWidth(width)
+        self.c.line(x0, self.h - y0, x1, self.h - y1)
 
 
 def _draw_invoice(
@@ -21,37 +54,35 @@ def _draw_invoice(
     payment_terms: str,
     bank_details: dict,
 ) -> None:
-    doc = fitz.open()
+    c = rl_canvas.Canvas(str(path), pagesize=(PAGE_W, PAGE_H))
+    page = _PageDraw(c)
+
+    items_per_page = 12
+    remaining = line_items[items_per_page:]
+    total_pages = 2 if remaining else 1
 
     # --- Page 1 ---
-    page = doc.new_page(width=612, height=792)
-    black = (0, 0, 0)
-    gray = (0.4, 0.4, 0.4)
-    dark_blue = (0.1, 0.15, 0.35)
-    light_gray = (0.93, 0.93, 0.93)
-    header_bg = (0.1, 0.15, 0.35)
-    white = (1, 1, 1)
 
     # Header bar
-    page.draw_rect(fitz.Rect(0, 0, 612, 70), color=None, fill=header_bg)
-    page.insert_text((40, 45), supplier["name"], fontsize=20, color=white, fontname="helv")
-    page.insert_text((400, 30), "INVOICE", fontsize=24, color=white, fontname="helv")
-    page.insert_text((400, 50), f"#{inv_number}", fontsize=11, color=(0.7, 0.75, 0.9), fontname="helv")
+    page.rect(0, 0, 612, 70, HEADER_BG)
+    page.text(40, 45, supplier["name"], 20, WHITE)
+    page.text(400, 30, "INVOICE", 24, WHITE)
+    page.text(400, 50, f"#{inv_number}", 11, HEADER_ACCENT)
 
     # Supplier details (left column)
     y = 95
-    page.insert_text((40, y), "From:", fontsize=8, color=gray, fontname="helv")
+    page.text(40, y, "From:", 8, GRAY)
     y += 14
-    page.insert_text((40, y), supplier["name"], fontsize=9, color=black, fontname="helv")
+    page.text(40, y, supplier["name"], 9, BLACK)
     y += 12
     for line in supplier["address"]:
-        page.insert_text((40, y), line, fontsize=8, color=gray, fontname="helv")
+        page.text(40, y, line, 8, GRAY)
         y += 11
-    page.insert_text((40, y), f"Tax ID: {supplier['tax_id']}", fontsize=8, color=gray, fontname="helv")
+    page.text(40, y, f"Tax ID: {supplier['tax_id']}", 8, GRAY)
     y += 11
-    page.insert_text((40, y), f"Phone: {supplier['phone']}", fontsize=8, color=gray, fontname="helv")
+    page.text(40, y, f"Phone: {supplier['phone']}", 8, GRAY)
     y += 11
-    page.insert_text((40, y), f"Email: {supplier['email']}", fontsize=8, color=gray, fontname="helv")
+    page.text(40, y, f"Email: {supplier['email']}", 8, GRAY)
 
     # Invoice meta (right column)
     meta_x = 380
@@ -63,75 +94,77 @@ def _draw_invoice(
         ("Payment Terms:", payment_terms),
     ]
     for label, val in meta:
-        page.insert_text((meta_x, y), label, fontsize=8, color=gray, fontname="helv")
-        page.insert_text((meta_x + 85, y), val, fontsize=8, color=black, fontname="helv")
+        page.text(meta_x, y, label, 8, GRAY)
+        page.text(meta_x + 85, y, val, 8, BLACK)
         y += 14
 
     # Bill To / Ship To
     y = 185
-    page.draw_rect(fitz.Rect(40, y - 5, 290, y + 8), color=None, fill=light_gray)
-    page.insert_text((45, y + 5), "BILL TO", fontsize=8, color=dark_blue, fontname="helv")
-    page.draw_rect(fitz.Rect(320, y - 5, 570, y + 8), color=None, fill=light_gray)
-    page.insert_text((325, y + 5), "SHIP TO", fontsize=8, color=dark_blue, fontname="helv")
+    page.rect(40, y - 5, 290, y + 8, LIGHT_GRAY)
+    page.text(45, y + 5, "BILL TO", 8, DARK_BLUE)
+    page.rect(320, y - 5, 570, y + 8, LIGHT_GRAY)
+    page.text(325, y + 5, "SHIP TO", 8, DARK_BLUE)
 
     y += 20
-    page.insert_text((45, y), bill_to["company"], fontsize=9, color=black, fontname="helv")
-    page.insert_text((325, y), ship_to["company"], fontsize=9, color=black, fontname="helv")
+    page.text(45, y, bill_to["company"], 9, BLACK)
+    page.text(325, y, ship_to["company"], 9, BLACK)
     y += 12
-    page.insert_text((45, y), f"Attn: {bill_to['contact']}", fontsize=8, color=gray, fontname="helv")
-    page.insert_text((325, y), f"Attn: {ship_to['contact']}", fontsize=8, color=gray, fontname="helv")
+    page.text(45, y, f"Attn: {bill_to['contact']}", 8, GRAY)
+    page.text(325, y, f"Attn: {ship_to['contact']}", 8, GRAY)
     y += 11
-    for bl, sl in zip(bill_to["address"], ship_to["address"]):
-        page.insert_text((45, y), bl, fontsize=8, color=gray, fontname="helv")
-        page.insert_text((325, y), sl, fontsize=8, color=gray, fontname="helv")
+    for bl, sl in zip(bill_to["address"], ship_to["address"], strict=False):
+        page.text(45, y, bl, 8, GRAY)
+        page.text(325, y, sl, 8, GRAY)
         y += 11
 
     # Line items table header
-    y = 290
     col_x = [40, 55, 280, 340, 410, 480, 540]
     headers = ["#", "Description", "Qty", "Unit Price", "Tax", "Amount"]
-    page.draw_rect(fitz.Rect(35, y - 5, 577, y + 10), color=None, fill=dark_blue)
-    for i, (hx, hdr) in enumerate(zip(col_x, headers)):
-        page.insert_text((hx, y + 7), hdr, fontsize=8, color=white, fontname="helv")
 
-    # Line items
+    def draw_table_header(pg: _PageDraw, yy: float) -> None:
+        pg.rect(35, yy - 5, 577, yy + 10, DARK_BLUE)
+        for hx, hdr in zip(col_x, headers, strict=False):
+            pg.text(hx, yy + 7, hdr, 8, WHITE)
+
+    y = 290
+    draw_table_header(page, y)
+
     y += 18
-    items_per_page = 12
     subtotal = 0.0
     item_idx = 0
 
-    def draw_line_item(pg, yy, idx, item):
+    def draw_line_item(pg: _PageDraw, yy: float, idx: int, item: dict) -> float:
         nonlocal subtotal
         amount = item["qty"] * item["unit_price"]
         subtotal += amount
         if idx % 2 == 0:
-            pg.draw_rect(fitz.Rect(35, yy - 5, 577, yy + 10), color=None, fill=light_gray)
-        pg.insert_text((43, yy + 7), str(idx + 1), fontsize=8, color=gray, fontname="helv")
+            pg.rect(35, yy - 5, 577, yy + 10, LIGHT_GRAY)
+        pg.text(43, yy + 7, str(idx + 1), 8, GRAY)
         desc = item["description"]
         if len(desc) > 38:
             desc = desc[:38] + "..."
-        pg.insert_text((58, yy + 7), desc, fontsize=8, color=black, fontname="helv")
-        pg.insert_text((283, yy + 7), f"{item['qty']:.0f}", fontsize=8, color=black, fontname="helv")
-        pg.insert_text((345, yy + 7), f"${item['unit_price']:,.2f}", fontsize=8, color=black, fontname="helv")
-        pg.insert_text((415, yy + 7), f"{item['tax_rate']}%", fontsize=8, color=gray, fontname="helv")
-        pg.insert_text((485, yy + 7), f"${amount:,.2f}", fontsize=8, color=black, fontname="helv")
+        pg.text(58, yy + 7, desc, 8, BLACK)
+        pg.text(283, yy + 7, f"{item['qty']:.0f}", 8, BLACK)
+        pg.text(345, yy + 7, f"${item['unit_price']:,.2f}", 8, BLACK)
+        pg.text(415, yy + 7, f"{item['tax_rate']}%", 8, GRAY)
+        pg.text(485, yy + 7, f"${amount:,.2f}", 8, BLACK)
         return yy + 16
 
     for item in line_items[:items_per_page]:
         y = draw_line_item(page, y, item_idx, item)
         item_idx += 1
 
-    remaining = line_items[items_per_page:]
-
     # --- Page 2 (if needed for remaining items + totals) ---
     if remaining:
-        page = doc.new_page(width=612, height=792)
-        page.insert_text((40, 40), f"Invoice #{inv_number} — continued", fontsize=10, color=gray, fontname="helv")
+        # finish page 1 with its footer before moving on
+        page.line(40, 755, 572, 755, LIGHT_GRAY, 0.5)
+        page.text(520, 770, f"Page 1/{total_pages}", 7, GRAY)
+        c.showPage()
+        page = _PageDraw(c)
+        page.text(40, 40, f"Invoice #{inv_number} — continued", 10, GRAY)
 
         y = 65
-        page.draw_rect(fitz.Rect(35, y - 5, 577, y + 10), color=None, fill=dark_blue)
-        for hx, hdr in zip(col_x, headers):
-            page.insert_text((hx, y + 7), hdr, fontsize=8, color=white, fontname="helv")
+        draw_table_header(page, y)
         y += 18
         for item in remaining:
             y = draw_line_item(page, y, item_idx, item)
@@ -139,63 +172,56 @@ def _draw_invoice(
 
     # Totals section (on current page)
     y += 15
-    page.draw_line(fitz.Point(350, y), fitz.Point(577, y), color=gray, width=0.5)
+    page.line(350, y, 577, y, GRAY, 0.5)
     y += 15
 
-    page.insert_text((355, y), "Subtotal:", fontsize=9, color=gray, fontname="helv")
-    page.insert_text((485, y), f"${subtotal:,.2f}", fontsize=9, color=black, fontname="helv")
+    page.text(355, y, "Subtotal:", 9, GRAY)
+    page.text(485, y, f"${subtotal:,.2f}", 9, BLACK)
     y += 16
 
     total_tax = 0.0
     for tl in tax_lines:
         tax_amount = subtotal * tl["rate"] / 100
         total_tax += tax_amount
-        page.insert_text((355, y), f"{tl['label']} ({tl['rate']}%):", fontsize=8, color=gray, fontname="helv")
-        page.insert_text((485, y), f"${tax_amount:,.2f}", fontsize=8, color=black, fontname="helv")
+        page.text(355, y, f"{tl['label']} ({tl['rate']}%):", 8, GRAY)
+        page.text(485, y, f"${tax_amount:,.2f}", 8, BLACK)
         y += 14
 
-    if any(tl.get("discount") for tl in tax_lines):
-        pass
-
     y += 4
-    page.draw_line(fitz.Point(350, y), fitz.Point(577, y), color=dark_blue, width=1.0)
+    page.line(350, y, 577, y, DARK_BLUE, 1.0)
     y += 18
     grand_total = subtotal + total_tax
-    page.draw_rect(fitz.Rect(345, y - 10, 580, y + 8), color=None, fill=dark_blue)
-    page.insert_text((355, y + 4), "TOTAL DUE:", fontsize=11, color=white, fontname="helv")
-    page.insert_text((470, y + 4), f"${grand_total:,.2f}", fontsize=11, color=white, fontname="helv")
+    page.rect(345, y - 10, 580, y + 8, DARK_BLUE)
+    page.text(355, y + 4, "TOTAL DUE:", 11, WHITE)
+    page.text(470, y + 4, f"${grand_total:,.2f}", 11, WHITE)
 
     # Payment info
     y += 35
-    page.insert_text((40, y), "Payment Information", fontsize=10, color=dark_blue, fontname="helv")
+    page.text(40, y, "Payment Information", 10, DARK_BLUE)
     y += 16
     for label, val in bank_details.items():
-        page.insert_text((40, y), f"{label}:", fontsize=8, color=gray, fontname="helv")
-        page.insert_text((160, y), val, fontsize=8, color=black, fontname="helv")
+        page.text(40, y, f"{label}:", 8, GRAY)
+        page.text(160, y, val, 8, BLACK)
         y += 12
 
     # Notes
     y += 10
-    page.insert_text((40, y), "Notes & Terms", fontsize=10, color=dark_blue, fontname="helv")
+    page.text(40, y, "Notes & Terms", 10, DARK_BLUE)
     y += 16
     for note_line in notes.split("\n"):
-        page.insert_text((40, y), note_line, fontsize=8, color=gray, fontname="helv")
+        page.text(40, y, note_line, 8, GRAY)
         y += 11
 
-    # Footer
-    page.draw_line(fitz.Point(40, 755), fitz.Point(572, 755), color=light_gray, width=0.5)
-    page.insert_text((40, 770), f"Thank you for your business  |  {supplier['name']}  |  {supplier['email']}",
-                     fontsize=7, color=gray, fontname="helv")
-    page.insert_text((520, 770), f"Page {len(doc)}/{len(doc)}", fontsize=7, color=gray, fontname="helv")
+    # Footer (last page)
+    page.line(40, 755, 572, 755, LIGHT_GRAY, 0.5)
+    page.text(
+        40, 770,
+        f"Thank you for your business  |  {supplier['name']}  |  {supplier['email']}",
+        7, GRAY,
+    )
+    page.text(520, 770, f"Page {total_pages}/{total_pages}", 7, GRAY)
 
-    # Page number on page 1 if multi-page
-    if len(doc) > 1:
-        p1 = doc[0]
-        p1.draw_line(fitz.Point(40, 755), fitz.Point(572, 755), color=light_gray, width=0.5)
-        p1.insert_text((520, 770), f"Page 1/{len(doc)}", fontsize=7, color=gray, fontname="helv")
-
-    doc.save(str(path))
-    doc.close()
+    c.save()
 
 
 def generate_all(output_dir: Path | None = None) -> list[Path]:
