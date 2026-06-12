@@ -69,8 +69,44 @@ class TestTesseractOCR:
         assert result.text == "Hello World"
         assert result.word_count == 2
         assert result.confidence > 0
+        # Words on the same line are grouped into one line-level block
+        assert len(result.blocks) == 1
+        line = result.blocks[0]
+        assert line.text == "Hello World"
+        assert [w.text for w in line.words] == ["Hello", "World"]
+        assert line.words[0].confidence == pytest.approx(0.95)
+        assert line.confidence == pytest.approx(0.915)
+        assert line.bbox.x0 == 10.0
+        assert line.bbox.x1 == 160.0
+
+    async def test_ocr_groups_words_into_lines(self):
+        mock_data = {
+            "text": ["Invoice", "Total:", "100.00"],
+            "conf": [96.0, 91.0, 85.0],
+            "left": [10, 10, 80],
+            "top": [20, 60, 60],
+            "width": [70, 60, 60],
+            "height": [15, 15, 15],
+            "block_num": [1, 1, 1],
+            "par_num": [1, 1, 1],
+            "line_num": [1, 2, 2],
+        }
+        mock_pyt = _make_mock_pytesseract(mock_data, "Invoice\nTotal: 100.00")
+        mock_image = MagicMock()
+
+        with patch.dict(sys.modules, {"pytesseract": mock_pyt}):
+            if "docflow.ocr.tesseract" in sys.modules:
+                del sys.modules["docflow.ocr.tesseract"]
+            from docflow.ocr.tesseract import TesseractOCR
+
+            ocr = TesseractOCR(preprocess_steps=[])
+            result = await ocr.ocr(mock_image)
+
         assert len(result.blocks) == 2
-        assert result.blocks[0].text == "Hello"
+        assert result.blocks[0].text == "Invoice"
+        assert result.blocks[1].text == "Total: 100.00"
+        assert len(result.blocks[1].words) == 2
+        assert result.blocks[1].confidence == pytest.approx(0.88)
 
     async def test_ocr_confidence_calculation(self):
         mock_data = {

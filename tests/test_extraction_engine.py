@@ -153,6 +153,110 @@ class TestExtractionEngine:
             await engine.extract(doc, schema=Invoice)
 
 
+class TestConfidenceScores:
+    def _ocr_document(self) -> Document:
+        from docflow.documents.models import Word
+
+        def line(block_id, text, confs, y):
+            words = [
+                Word(
+                    text=t,
+                    bbox=BoundingBox(x0=72, y0=y, x1=300, y1=y + 18),
+                    confidence=c,
+                )
+                for t, c in zip(text.split(), confs, strict=True)
+            ]
+            return Block(
+                block_id=block_id,
+                block_type=BlockType.TEXT,
+                text=text,
+                bbox=BoundingBox(x0=72, y0=y, x1=300, y1=y + 18),
+                confidence=sum(confs) / len(confs),
+                words=words,
+            )
+
+        doc = _make_document()
+        doc.pages[0].blocks = [
+            line("b1", "Invoice from Acme Corp", [0.99, 0.97, 0.93, 0.9], 72),
+            line("b2", "Invoice #: INV-001", [0.98, 0.95, 0.85], 100),
+            line("b3", "Total: 1234.56", [0.97, 0.7], 130),
+        ]
+        return doc
+
+    def _llm_response(self) -> str:
+        return json.dumps({
+            "data": {
+                "supplier_name": "Acme Corp",
+                "invoice_number": "INV-001",
+                "total": 1234.56,
+            },
+            "evidence": {
+                "supplier_name": {"page": 0, "text": "Acme Corp"},
+                "invoice_number": {"page": 0, "text": "INV-001"},
+                "total": {"page": 0, "text": "1234.56"},
+            },
+        })
+
+    async def test_ocr_scores_populated_for_ocr_document(self):
+        mock_llm = AsyncMock()
+        mock_llm.complete = AsyncMock(
+            return_value=LLMResponse(content=self._llm_response(), model="gpt-4o")
+        )
+        engine = ExtractionEngine(llm=mock_llm)
+        result = await engine.extract(self._ocr_document(), schema=Invoice)
+
+        assert result.ocr is not None
+        assert result.ocr.word_count == 9
+        assert 0 < result.ocr.score <= 1
+
+        total = result.fields["total"]
+        assert total.ocr is not None
+        assert total.ocr.match_method == "exact_block"
+        assert total.ocr.score == 0.7
+
+        supplier = result.fields["supplier_name"]
+        assert supplier.ocr is not None
+        # min word confidence of the matched span "Acme Corp"
+        assert supplier.ocr.score == 0.9
+
+    async def test_ocr_scores_none_without_ocr(self):
+        mock_llm = AsyncMock()
+        mock_llm.complete = AsyncMock(
+            return_value=LLMResponse(content=self._llm_response(), model="gpt-4o")
+        )
+        engine = ExtractionEngine(llm=mock_llm)
+        result = await engine.extract(_make_document(), schema=Invoice)
+
+        assert result.ocr is None
+        assert all(f.ocr is None for f in result.fields.values())
+
+    async def test_consensus_none_for_single_instance(self):
+        mock_llm = AsyncMock()
+        mock_llm.complete = AsyncMock(
+            return_value=LLMResponse(content=self._llm_response(), model="gpt-4o")
+        )
+        engine = ExtractionEngine(llm=mock_llm)
+        result = await engine.extract(_make_document(), schema=Invoice)
+
+        assert all(f.consensus is None for f in result.fields.values())
+
+    async def test_consensus_populated_in_multi_mode(self):
+        mock_llm = AsyncMock()
+        mock_llm.complete = AsyncMock(
+            return_value=LLMResponse(content=self._llm_response(), model="gpt-4o")
+        )
+        engine = ExtractionEngine(llm=mock_llm)
+        result = await engine.extract(
+            _make_document(), schema=Invoice, mode="multi", n_instances=3,
+        )
+
+        total = result.fields["total"]
+        assert total.consensus is not None
+        assert total.consensus.n_instances == 3
+        assert total.consensus.agreement == "3/3"
+        assert total.consensus.agreement_ratio == 1.0
+
+
 class TestPrompts:
     def test_build_extraction_prompt(self):
         from docflow.extraction.prompts import build_extraction_prompt

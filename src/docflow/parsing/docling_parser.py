@@ -6,7 +6,7 @@ from functools import partial
 from pathlib import Path
 from typing import Any
 
-from docflow.documents.models import Block, BlockType, BoundingBox, Document, Page
+from docflow.documents.models import Block, BlockType, BoundingBox, Document, Page, Word
 from docflow.documents.tables import Cell, Table
 from docflow.errors import ParsingError
 
@@ -122,6 +122,109 @@ def _extract_table(item: Any, page_no: int, page_height: float) -> Table | None:
     )
 
 
+def _cell_to_word(cell: Any, page_height: float) -> Word | None:
+    """Convert a Docling page cell to a Word — only for cells produced by OCR.
+
+    Native PDF text cells carry no meaningful confidence (they come from the
+    text layer), so they are skipped: a native Docling parse keeps reporting
+    no OCR confidence. Tolerates both cell API generations (bbox/OcrCell and
+    rect/from_ocr).
+    """
+    from_ocr = getattr(cell, "from_ocr", None)
+    if from_ocr is None:
+        from_ocr = type(cell).__name__ == "OcrCell"
+    if not from_ocr:
+        return None
+
+    confidence = getattr(cell, "confidence", None)
+    if confidence is None:
+        return None
+
+    text = (getattr(cell, "text", "") or "").strip()
+    if not text:
+        return None
+
+    raw_bbox = getattr(cell, "bbox", None)
+    if raw_bbox is None:
+        rect = getattr(cell, "rect", None)
+        if rect is not None and hasattr(rect, "to_bounding_box"):
+            raw_bbox = rect.to_bounding_box()
+
+    bbox = None
+    if raw_bbox is not None:
+        try:
+            bbox = _convert_bbox(raw_bbox, page_height)
+        except Exception:
+            bbox = None
+
+    return Word(text=text, bbox=bbox, confidence=float(confidence))
+
+
+def _harvest_ocr_words(
+    result: Any,
+    page_numbers: list[int],
+    page_dimensions: dict[int, tuple[float, float]],
+) -> dict[int, list[Word]]:
+    """Collect OCR word confidences from ConversionResult.pages.
+
+    The document model (result.document) carries no confidences; they only
+    exist on the page model cells. Pages are matched positionally to the
+    document page numbers.
+    """
+    conv_pages = list(getattr(result, "pages", None) or [])
+    if len(conv_pages) != len(page_numbers):
+        return {}
+
+    words: dict[int, list[Word]] = {}
+    for page_no, conv_page in zip(page_numbers, conv_pages, strict=True):
+        cells = getattr(conv_page, "cells", None) or []
+        _w, h = page_dimensions.get(page_no, (595.0, 842.0))
+        page_words = [
+            word for c in cells if (word := _cell_to_word(c, h)) is not None
+        ]
+        if page_words:
+            words[page_no] = page_words
+    return words
+
+
+def _attach_words_to_blocks(blocks: list[Block], words: list[Word]) -> list[Block]:
+    """Assign OCR words to layout blocks by bbox-center containment."""
+    if not words:
+        return blocks
+
+    leftover = [w for w in words if w.bbox is not None]
+    out: list[Block] = []
+    for block in blocks:
+        if block.bbox is None or block.block_type == BlockType.IMAGE:
+            out.append(block)
+            continue
+
+        mine: list[Word] = []
+        rest: list[Word] = []
+        for word in leftover:
+            cx = (word.bbox.x0 + word.bbox.x1) / 2
+            cy = (word.bbox.y0 + word.bbox.y1) / 2
+            if block.bbox.x0 <= cx <= block.bbox.x1 and block.bbox.y0 <= cy <= block.bbox.y1:
+                mine.append(word)
+            else:
+                rest.append(word)
+        leftover = rest
+
+        if mine:
+            confs = [w.confidence for w in mine if w.confidence is not None]
+            out.append(
+                block.model_copy(
+                    update={
+                        "words": mine,
+                        "confidence": sum(confs) / len(confs) if confs else None,
+                    }
+                )
+            )
+        else:
+            out.append(block)
+    return out
+
+
 def _parse_with_docling(file_path: str) -> dict:
     try:
         from docling.document_converter import DocumentConverter
@@ -191,14 +294,22 @@ def _parse_with_docling(file_path: str) -> dict:
         page_blocks.setdefault(page_no, []).append(block)
         page_texts.setdefault(page_no, []).append(text.strip())
 
+    sorted_page_numbers = sorted(page_dimensions.keys())
+    try:
+        ocr_words = _harvest_ocr_words(result, sorted_page_numbers, page_dimensions)
+    except Exception:
+        ocr_words = {}
+
     pages: list[dict] = []
-    for page_no in sorted(page_dimensions.keys()):
+    for page_no in sorted_page_numbers:
         w, h = page_dimensions[page_no]
         pages.append({
             "page_number": page_no,
             "width": w,
             "height": h,
-            "blocks": page_blocks.get(page_no, []),
+            "blocks": _attach_words_to_blocks(
+                page_blocks.get(page_no, []), ocr_words.get(page_no, []),
+            ),
             "tables": page_tables.get(page_no, []),
             "text": "\n".join(page_texts.get(page_no, [])),
         })

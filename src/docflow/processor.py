@@ -82,6 +82,15 @@ class DocumentPipeline:
         if name == "smart":
             from docflow.parsing.smart_parser import SmartParser
             return SmartParser()
+        if name == "azure-di":
+            from docflow.parsing.azure_di import AzureDocumentIntelligenceParser
+            return AzureDocumentIntelligenceParser()
+        if name == "textract":
+            from docflow.parsing.textract import TextractParser
+            return TextractParser()
+        if name == "google-docai":
+            from docflow.parsing.google_docai import GoogleDocumentAIParser
+            return GoogleDocumentAIParser()
         raise ValueError(f"Unknown parser: {name!r}")
 
     def _resolve_parser_from_dict(self, cfg: dict) -> Any:
@@ -116,6 +125,37 @@ class DocumentPipeline:
             if "min_text_length" in cfg:
                 kwargs["min_text_length"] = cfg["min_text_length"]
             return SmartParser(**kwargs)
+
+        if parser_type == "azure-di":
+            from docflow.parsing.azure_di import AzureDocumentIntelligenceParser
+            kwargs = {}
+            if "endpoint" in cfg:
+                kwargs["endpoint"] = cfg["endpoint"]
+            if "key" in cfg:
+                kwargs["key"] = cfg["key"]
+            if "model" in cfg:
+                kwargs["model"] = cfg["model"]
+            return AzureDocumentIntelligenceParser(**kwargs)
+
+        if parser_type == "textract":
+            from docflow.parsing.textract import TextractParser
+            kwargs = {}
+            if "region" in cfg:
+                kwargs["region_name"] = cfg["region"]
+            if "dpi" in cfg:
+                kwargs["dpi"] = cfg["dpi"]
+            return TextractParser(**kwargs)
+
+        if parser_type == "google-docai":
+            from docflow.parsing.google_docai import GoogleDocumentAIParser
+            kwargs = {}
+            if "project" in cfg:
+                kwargs["project"] = cfg["project"]
+            if "location" in cfg:
+                kwargs["location"] = cfg["location"]
+            if "processor_id" in cfg:
+                kwargs["processor_id"] = cfg["processor_id"]
+            return GoogleDocumentAIParser(**kwargs)
 
         raise ValueError(f"Unknown parser type: {parser_type!r}")
 

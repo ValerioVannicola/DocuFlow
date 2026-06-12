@@ -64,6 +64,15 @@ class Parse:
         elif parser == "smart":
             from docflow.parsing.smart_parser import SmartParser
             parser = SmartParser()
+        elif parser == "azure-di":
+            from docflow.parsing.azure_di import AzureDocumentIntelligenceParser
+            parser = AzureDocumentIntelligenceParser()
+        elif parser == "textract":
+            from docflow.parsing.textract import TextractParser
+            parser = TextractParser()
+        elif parser == "google-docai":
+            from docflow.parsing.google_docai import GoogleDocumentAIParser
+            parser = GoogleDocumentAIParser()
 
         start = time.monotonic()
         state.document = await parser.parse(state.document)

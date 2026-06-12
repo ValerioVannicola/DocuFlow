@@ -19,6 +19,11 @@ from docflow.extraction.prompts import (
     build_extraction_prompt,
     build_vision_extraction_prompt,
 )
+from docflow.extraction.scoring import (
+    compute_document_ocr_confidence,
+    compute_field_consensus,
+    compute_field_ocr_confidence,
+)
 from docflow.observability.traces import Trace
 
 JSON_MODE = {"type": "json_object"}
@@ -152,6 +157,7 @@ def _build_result(
     trace: Trace | None,
     candidates: list[dict] | None = None,
     scoring: str = "qualitative",
+    n_instances: int = 1,
 ) -> ExtractionResult:
     raw_data = parsed.get("data", parsed)
     evidence_map = parsed.get("evidence", {})
@@ -164,10 +170,50 @@ def _build_result(
             f"LLM output does not match schema: {exc}"
         ) from exc
 
+    # Confidence scores must never break extraction: any failure degrades
+    # to None and a trace event.
+    try:
+        doc_ocr = compute_document_ocr_confidence(document)
+    except Exception as exc:
+        doc_ocr = None
+        if trace:
+            trace.add_event(
+                "ocr_confidence_error", step_name="extraction", error=str(exc),
+            )
+
     fields: dict[str, ExtractedField] = {}
     for field_name, value in data_dict.items():
         evidence_hints = evidence_map.get(field_name, {})
         evidences = attach_evidence(document, field_name, value, evidence_hints)
+
+        field_ocr = None
+        if doc_ocr is not None:
+            try:
+                field_ocr = compute_field_ocr_confidence(
+                    document,
+                    value,
+                    hint_text=evidence_hints.get("text", "") if evidence_hints else "",
+                    hint_page=evidence_hints.get("page") if evidence_hints else None,
+                )
+            except Exception as exc:
+                if trace:
+                    trace.add_event(
+                        "ocr_confidence_error", step_name="extraction",
+                        field=field_name, error=str(exc),
+                    )
+
+        field_consensus = None
+        if candidates is not None and len(candidates) > 1:
+            try:
+                field_consensus = compute_field_consensus(
+                    value, field_name, candidates, n_instances,
+                )
+            except Exception as exc:
+                if trace:
+                    trace.add_event(
+                        "consensus_error", step_name="extraction",
+                        field=field_name, error=str(exc),
+                    )
 
         found_in_source = _value_found_in_source(value, document)
         is_valid = True
@@ -224,6 +270,8 @@ def _build_result(
             value=value,
             confidence=confidence,
             trust=trust,
+            ocr=field_ocr,
+            consensus=field_consensus,
             evidence=evidences,
             validation_status="pending",
         )
@@ -238,6 +286,7 @@ def _build_result(
         data=data_dict,
         fields=fields,
         confidence=overall_conf,
+        ocr=doc_ocr,
         needs_review=False,
         trace_id=trace.trace_id if trace else str(uuid.uuid4()),
         model_name=model_name,
@@ -332,7 +381,7 @@ async def _run_multi(
     )
     return _build_result(
         document, schema, decider_parsed, decider_response.model, trace,
-        candidates=candidates, scoring=scoring,
+        candidates=candidates, scoring=scoring, n_instances=n_instances,
     )
 
 
@@ -685,5 +734,5 @@ class HybridExtractionEngine:
 
         return _build_result(
             document, schema, decider_parsed, decider_response.model, trace,
-            candidates=candidates, scoring=scoring,
+            candidates=candidates, scoring=scoring, n_instances=n_instances * 2,
         )

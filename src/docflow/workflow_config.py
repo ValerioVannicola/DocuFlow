@@ -338,6 +338,20 @@ def _export_parser(pipeline: Any) -> str | dict[str, Any]:
         return cfg if len(cfg) > 1 else "smart"
     if "Docling" in name:
         return "docling"
+    if "AzureDocumentIntelligence" in name:
+        cfg = {"type": "azure-di"}
+        if hasattr(parser, "model") and parser.model != "prebuilt-read":
+            cfg["model"] = parser.model
+        return cfg if len(cfg) > 1 else "azure-di"
+    if "Textract" in name:
+        cfg = {"type": "textract"}
+        if hasattr(parser, "region_name") and parser.region_name:
+            cfg["region"] = parser.region_name
+        if hasattr(parser, "dpi") and parser.dpi != 200:
+            cfg["dpi"] = parser.dpi
+        return cfg if len(cfg) > 1 else "textract"
+    if "GoogleDocumentAI" in name:
+        return "google-docai"
     return "pymupdf"
 
 

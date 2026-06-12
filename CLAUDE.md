@@ -88,6 +88,24 @@ Invoice = load_template("invoice")  # built-in: invoice, contract, receipt
 | `"tesseract"` | Scanned documents | Slow (1-5s/page) | `docflow[ocr]` |
 | `"docling"` | Complex layouts, tables | Slow (4-5s/page) | `docflow[docling]` |
 | `"smart"` | Mixed docs (auto-detects per page) | Varies | `docflow[pdf,ocr]` |
+| `"azure-di"` | Cloud OCR, Azure Document Intelligence | API call | `docflow[azure]` |
+| `"textract"` | Cloud OCR, AWS Textract | API call/page | `docflow[aws,pdf]` |
+| `"google-docai"` | Cloud OCR, Google Document AI | API call | `docflow[gcp]` |
+
+### Cloud OCR configuration
+
+```python
+# Azure Document Intelligence — or env vars AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT / _KEY
+pipeline = DocumentPipeline(parser={"type": "azure-di", "model": "prebuilt-read"})
+
+# AWS Textract — credentials via standard boto3 chain; pages rendered locally, no S3 needed
+pipeline = DocumentPipeline(parser={"type": "textract", "region": "eu-west-1"})
+
+# Google Document AI — or env vars GOOGLE_DOCAI_PROJECT / _LOCATION / _PROCESSOR_ID
+pipeline = DocumentPipeline(parser={"type": "google-docai", "project": "p", "processor_id": "x"})
+```
+
+All parsers produce the same standardized `Document`: pages of **line-level blocks**, where OCR-based parsers also fill per-word `words` (text, bbox, confidence) and a line `confidence`. Native parsers (PyMuPDF) leave confidence empty — downstream code treats that as "no OCR ran". Docling is hybrid: when its internal OCR fires (scanned pages), the OCR cell confidences are attached to the layout blocks; native Docling parses report no OCR confidence, by design.
 
 ## Extraction Types
 
@@ -528,6 +546,45 @@ pipeline = DocumentPipeline(scoring="quantitative")
 
 Single agent: no consensus score, trust based on source verification only.
 Multi agent: consensus percentage + source verification.
+
+## Confidence Scores (OCR + LLM Consensus)
+
+Confidence is split into two independent, optional axes. Neither ever breaks
+the pipeline — when a score is not applicable it is `None`.
+
+### OCR confidence (only when an OCR-based parser ran)
+
+```python
+result.ocr                       # OCRDocumentConfidence | None
+result.ocr.score                 # 0-1, mean word confidence across the document
+result.ocr.word_count
+result.ocr.low_confidence_ratio  # fraction of words below 0.6
+
+field = result.fields["total"]
+field.ocr                        # OCRFieldConfidence | None
+field.ocr.score                  # min word confidence of the matched span
+field.ocr.match_method           # "exact_block" | "fuzzy_block" | "page_text" | "unmatched"
+field.ocr.match_ratio            # 1.0 = exact, <1.0 = fuzzy match quality
+field.ocr.matched_text           # the OCR text the value was matched to
+```
+
+Field-level scores are computed by matching the extracted value **back** to the
+OCR words (evidence-hint text first, then the value itself; exact, then fuzzy
+via SequenceMatcher). `None` document-level = no OCR in the pipeline.
+`"unmatched"` field-level = OCR ran but the value couldn't be located (e.g.
+reformatted dates, anonymized values).
+
+### LLM consensus (only in multi-instance mode)
+
+```python
+field.consensus                  # FieldConsensus | None (None in single mode)
+field.consensus.agreement        # "4/5" — candidates agreeing with the FINAL value
+field.consensus.agreement_ratio  # 0.8
+field.consensus.majority_ratio   # largest candidate cluster; if > agreement_ratio,
+                                 # the decider overrode the majority
+field.consensus.n_instances      # instances launched
+field.consensus.n_succeeded      # instances that returned valid JSON
+```
 
 ## Eval Harness
 

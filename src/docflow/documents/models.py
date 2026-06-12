@@ -36,7 +36,22 @@ class BlockType(str, enum.Enum):
     PARAGRAPH = "paragraph"
 
 
+class Word(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    text: str
+    bbox: BoundingBox | None = None
+    confidence: float | None = None
+
+
 class Block(BaseModel):
+    """A line-level unit of text on a page.
+
+    OCR-based parsers populate `words` (one entry per recognized word, each
+    with its own confidence) and set `confidence` to the aggregate for the
+    line. Native parsers (PyMuPDF) leave `words` empty and `confidence` None.
+    """
+
     model_config = ConfigDict(frozen=True)
 
     block_id: str
@@ -44,6 +59,7 @@ class Block(BaseModel):
     text: str = ""
     bbox: BoundingBox | None = None
     confidence: float | None = None
+    words: list[Word] = Field(default_factory=list)
 
 
 class Page(BaseModel):

@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 from typing import TYPE_CHECKING
 
-from docflow.documents.models import Block, BlockType, BoundingBox
+from docflow.documents.models import Block, BlockType, BoundingBox, Word
 from docflow.errors import OCRError
 from docflow.ocr.base import OCRResult
 from docflow.ocr.preprocessing import preprocess
@@ -46,12 +46,18 @@ def _run_tesseract_sync(
 
     full_text = pytesseract.image_to_string(image, lang=language, config=config).strip()
 
-    blocks: list[Block] = []
     confidences: list[float] = []
     low_conf_count = 0
     word_count = 0
 
+    # Group word rows into lines using Tesseract's layout hierarchy.
+    # Rows for non-word levels carry conf == -1 and are skipped.
     n_items = len(data.get("text", []))
+    block_nums = data.get("block_num", [0] * n_items)
+    par_nums = data.get("par_num", [0] * n_items)
+    line_nums = data.get("line_num", [0] * n_items)
+
+    lines: dict[tuple[int, int, int], list[Word]] = {}
     for i in range(n_items):
         text = str(data["text"][i]).strip()
         conf = float(data["conf"][i])
@@ -71,13 +77,33 @@ def _run_tesseract_sync(
             y1=float(data["top"][i] + data["height"][i]),
         )
 
+        key = (int(block_nums[i]), int(par_nums[i]), int(line_nums[i]))
+        lines.setdefault(key, []).append(
+            Word(text=text, bbox=bbox, confidence=conf / 100.0)
+        )
+
+    blocks: list[Block] = []
+    for words in lines.values():
+        word_bboxes = [w.bbox for w in words if w.bbox is not None]
+        line_bbox = None
+        if word_bboxes:
+            line_bbox = BoundingBox(
+                x0=min(b.x0 for b in word_bboxes),
+                y0=min(b.y0 for b in word_bboxes),
+                x1=max(b.x1 for b in word_bboxes),
+                y1=max(b.y1 for b in word_bboxes),
+            )
+        word_confs = [w.confidence for w in words if w.confidence is not None]
+        line_conf = sum(word_confs) / len(word_confs) if word_confs else None
+
         blocks.append(
             Block(
                 block_id=str(uuid.uuid4()),
                 block_type=BlockType.TEXT,
-                text=text,
-                bbox=bbox,
-                confidence=conf / 100.0,
+                text=" ".join(w.text for w in words),
+                bbox=line_bbox,
+                confidence=line_conf,
+                words=words,
             )
         )
 

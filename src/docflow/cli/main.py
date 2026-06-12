@@ -60,7 +60,7 @@ def extract(
 @click.argument("folder_path")
 @click.option("--schema", "-s", required=True, help="Schema name or dotted Python path")
 @click.option("--model", "-m", default="openai/gpt-4o", help="LLM model to use")
-@click.option("--parser", "-p", default="pymupdf", help="Parser: pymupdf, tesseract, docling, smart")
+@click.option("--parser", "-p", default="pymupdf", help="Parser: pymupdf, tesseract, docling, smart, azure-di, textract, google-docai")
 @click.option("--output", "-o", default=None, help="Output CSV file path")
 @click.option("--pattern", default="**/*.pdf", help="File glob pattern")
 @click.option("--concurrency", "-c", default=5, help="Max concurrent extractions")

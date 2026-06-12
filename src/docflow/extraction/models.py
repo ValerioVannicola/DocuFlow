@@ -10,6 +10,42 @@ from docflow.documents.evidence import Evidence
 T = TypeVar("T")
 
 
+class OCRFieldConfidence(BaseModel):
+    """OCR confidence for one field, matched back from the extracted value.
+
+    `score` is the minimum word confidence in the matched span (a field read
+    is only as trustworthy as its worst word). None when the value could not
+    be matched back to any OCR text.
+    """
+
+    score: float | None = None
+    match_method: str = "unmatched"  # "exact_block" | "fuzzy_block" | "page_text" | "unmatched"
+    match_ratio: float = 0.0
+    matched_text: str = ""
+    page_number: int | None = None
+
+
+class OCRDocumentConfidence(BaseModel):
+    score: float = 0.0
+    word_count: int = 0
+    low_confidence_ratio: float = 0.0
+
+
+class FieldConsensus(BaseModel):
+    """Cross-instance agreement for one field (multi-instance extraction only).
+
+    `agreement_ratio` measures agreement with the final (decider-chosen)
+    value; `majority_ratio` measures the largest candidate cluster. When
+    agreement_ratio < majority_ratio the decider overrode the majority.
+    """
+
+    n_instances: int = 0
+    n_succeeded: int = 0
+    agreement: str = "0/0"
+    agreement_ratio: float = 0.0
+    majority_ratio: float = 0.0
+
+
 class FieldTrust(BaseModel):
     agreement: str = ""
     agreement_ratio: float = 0.0
@@ -28,6 +64,8 @@ class ExtractedField(BaseModel, Generic[T]):
     corrected: bool = False
     confidence: float = 0.0
     trust: FieldTrust | None = None
+    ocr: OCRFieldConfidence | None = None
+    consensus: FieldConsensus | None = None
     evidence: list[Evidence] = Field(default_factory=list)
     validation_status: str = "pending"
     errors: list[str] = Field(default_factory=list)
@@ -77,6 +115,7 @@ class ExtractionResult(BaseModel):
     data: dict = Field(default_factory=dict)
     fields: dict[str, ExtractedField] = Field(default_factory=dict)
     confidence: float = 0.0
+    ocr: OCRDocumentConfidence | None = None
     needs_review: bool = False
     review_status: str = "pending"
     reviewed_by: str = ""
