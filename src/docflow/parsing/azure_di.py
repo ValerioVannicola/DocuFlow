@@ -24,12 +24,17 @@ ENDPOINT_ENV = "AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT"
 KEY_ENV = "AZURE_DOCUMENT_INTELLIGENCE_KEY"
 
 
-def _polygon_to_bbox(polygon: list[float] | None) -> BoundingBox | None:
+def _polygon_to_bbox(
+    polygon: list[float] | None, scale: float = 1.0,
+) -> BoundingBox | None:
     if not polygon or len(polygon) < 4:
         return None
     xs = polygon[0::2]
     ys = polygon[1::2]
-    return BoundingBox(x0=min(xs), y0=min(ys), x1=max(xs), y1=max(ys))
+    return BoundingBox(
+        x0=min(xs) * scale, y0=min(ys) * scale,
+        x1=max(xs) * scale, y1=max(ys) * scale,
+    )
 
 
 def _span_offsets(spans: Any) -> list[tuple[int, int]]:
@@ -41,9 +46,17 @@ def map_analyze_result(result: Any) -> list[Page]:
 
     DI lines carry no confidence of their own; the line confidence is the
     mean of its word confidences, matched to lines via text spans.
+
+    Coordinates convert to the canonical space: DI reports PDFs in inches
+    (scaled x72 to points); image inputs report pixels, kept as-is with
+    unit="px" since the physical size is unknown.
     """
     pages: list[Page] = []
     for di_page in result.pages or []:
+        di_unit = str(getattr(di_page, "unit", "") or "inch")
+        scale = 72.0 if di_unit == "inch" else 1.0
+        unit = "pt" if di_unit == "inch" else "px"
+
         words = []
         for w in di_page.words or []:
             offset = w.span.offset if w.span else -1
@@ -52,7 +65,7 @@ def map_analyze_result(result: Any) -> list[Page]:
                     offset,
                     Word(
                         text=w.content,
-                        bbox=_polygon_to_bbox(getattr(w, "polygon", None)),
+                        bbox=_polygon_to_bbox(getattr(w, "polygon", None), scale),
                         confidence=getattr(w, "confidence", None),
                     ),
                 )
@@ -73,18 +86,21 @@ def map_analyze_result(result: Any) -> list[Page]:
                     block_id=str(uuid.uuid4()),
                     block_type=BlockType.TEXT,
                     text=line.content,
-                    bbox=_polygon_to_bbox(getattr(line, "polygon", None)),
+                    bbox=_polygon_to_bbox(getattr(line, "polygon", None), scale),
                     confidence=sum(confs) / len(confs) if confs else None,
                     words=line_words,
                 )
             )
             line_texts.append(line.content)
 
+        page_width = getattr(di_page, "width", None)
+        page_height = getattr(di_page, "height", None)
         pages.append(
             Page(
                 page_number=(di_page.page_number or 1) - 1,
-                width=getattr(di_page, "width", None),
-                height=getattr(di_page, "height", None),
+                width=page_width * scale if page_width is not None else None,
+                height=page_height * scale if page_height is not None else None,
+                unit=unit,
                 blocks=blocks,
                 text="\n".join(line_texts),
             )

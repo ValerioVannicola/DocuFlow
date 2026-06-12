@@ -23,6 +23,7 @@ class TesseractParser:
         if not Path(file_path).is_file():
             raise ParsingError(f"File not found: {file_path}")
 
+        from docflow.ocr.base import blocks_to_points
         from docflow.ocr.tesseract import TesseractOCR
         from docflow.rendering.renderer import render_all_pages
 
@@ -33,6 +34,7 @@ class TesseractParser:
             preprocess_steps=self.preprocess_steps,
         )
 
+        scale = 72.0 / self.dpi
         pages: list[Page] = []
         for i, image in enumerate(images):
             lang = "+".join(self.languages)
@@ -40,9 +42,9 @@ class TesseractParser:
             pages.append(
                 Page(
                     page_number=i,
-                    width=float(image.width),
-                    height=float(image.height),
-                    blocks=ocr_result.blocks,
+                    width=float(image.width) * scale,
+                    height=float(image.height) * scale,
+                    blocks=blocks_to_points(ocr_result.blocks, self.dpi),
                     text=ocr_result.text,
                 )
             )

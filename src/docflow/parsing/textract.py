@@ -138,6 +138,9 @@ class TextractParser:
         client = self._client()
         loop = asyncio.get_event_loop()
 
+        # Textract geometry is relative (0-1); project onto point-space page
+        # dims so all bboxes land in the canonical coordinate space.
+        scale = 72.0 / self.dpi
         pages: list[Page] = []
         for i, image in enumerate(images):
             buf = io.BytesIO()
@@ -147,7 +150,7 @@ class TextractParser:
             )
             pages.append(
                 map_textract_response(
-                    response, i, float(image.width), float(image.height),
+                    response, i, float(image.width) * scale, float(image.height) * scale,
                 )
             )
 

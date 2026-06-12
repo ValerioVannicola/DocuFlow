@@ -115,11 +115,13 @@ def map_docai_document(docai_doc: Any) -> list[Page]:
             )
             line_texts.append(text)
 
+        dim_unit = str(getattr(dimension, "unit", "") or "pixels").lower()
         pages.append(
             Page(
                 page_number=int(getattr(dp, "page_number", 0) or i + 1) - 1,
                 width=width or None,
                 height=height or None,
+                unit="pt" if "point" in dim_unit else "px",
                 blocks=blocks,
                 text="\n".join(line_texts),
             )

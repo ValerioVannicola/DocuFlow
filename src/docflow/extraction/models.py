@@ -6,6 +6,7 @@ from typing import Any, Generic, TypeVar
 from pydantic import BaseModel, ConfigDict, Field
 
 from docflow.documents.evidence import Evidence
+from docflow.documents.models import BoundingBox, PageRect
 
 T = TypeVar("T")
 
@@ -15,7 +16,9 @@ class OCRFieldConfidence(BaseModel):
 
     `score` is the minimum word confidence in the matched span (a field read
     is only as trustworthy as its worst word). None when the value could not
-    be matched back to any OCR text.
+    be matched back to any OCR text. `bbox` is the union highlight rect for
+    single-page matches; `rects` carries one rect per (page, line) segment
+    for spans crossing lines or pages.
     """
 
     score: float | None = None
@@ -23,6 +26,8 @@ class OCRFieldConfidence(BaseModel):
     match_ratio: float = 0.0
     matched_text: str = ""
     page_number: int | None = None
+    bbox: BoundingBox | None = None
+    rects: list[PageRect] = Field(default_factory=list)
 
 
 class OCRDocumentConfidence(BaseModel):

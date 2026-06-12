@@ -23,6 +23,34 @@ class BoundingBox(BaseModel):
     def height(self) -> float:
         return self.y1 - self.y0
 
+    def to_relative(self, page_width: float, page_height: float) -> BoundingBox:
+        """Normalize to 0-1 coordinates relative to the page dimensions.
+
+        Useful for overlaying highlights on a page rendered at any DPI:
+        multiply by the rendered image's pixel dimensions.
+        """
+        if page_width <= 0 or page_height <= 0:
+            return self
+        return BoundingBox(
+            x0=self.x0 / page_width,
+            y0=self.y0 / page_height,
+            x1=self.x1 / page_width,
+            y1=self.y1 / page_height,
+        )
+
+
+class PageRect(BaseModel):
+    """A highlight rectangle tied to a page — one segment of a text span.
+
+    A span matching text across lines or pages carries one PageRect per
+    (page, line) segment, the way PDF viewers draw multi-line selections.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    page_number: int
+    bbox: BoundingBox
+
 
 class BlockType(str, enum.Enum):
     TEXT = "text"
@@ -63,9 +91,20 @@ class Block(BaseModel):
 
 
 class Page(BaseModel):
+    """A parsed page. All bboxes share one coordinate space: top-left origin,
+    in `unit` units, consistent with `width`/`height`.
+
+    The canonical unit is PDF points ("pt", 72 per inch) — parsers convert
+    when they can (rendered-image pixels via DPI, Azure inches). "px" marks
+    providers whose physical page size is unknown (e.g. Google Document AI);
+    rects there are still consistent with width/height, so
+    `BoundingBox.to_relative()` works regardless.
+    """
+
     page_number: int
     width: float | None = None
     height: float | None = None
+    unit: str = "pt"
     blocks: list[Block] = Field(default_factory=list)
     tables: list = Field(default_factory=list)
     text: str = ""

@@ -280,15 +280,51 @@ for field, cells in comparison.fields.items():
     print(f"{field}: {'SAME' if diff.all_agree else 'DIFFERENT'} — {diff.summary}")
 ```
 
-## Search
+## Search & Text Location (Highlighting)
 
 ```python
 from docflow.search import search_document
 
-result = search_document(document, "Acme Corp")
+result = search_document(document, "Acme Corp")          # exact (normalized)
+result = search_document(document, "INV-001", fuzzy=True)  # tolerate OCR garble
 for hit in result.hits:
-    print(f"Page {hit.page_number}, bbox: {hit.bbox}, context: {hit.context}")
+    hit.bbox       # union rect (single-page matches)
+    hit.rects      # [PageRect] — one rect per (page, line) segment
+    hit.match_ratio  # 1.0 exact, <1.0 fuzzy
+    hit.context
 ```
+
+Lower-level: `locate_text()` finds any phrase at word-span precision —
+matches cross word, line and **page** boundaries:
+
+```python
+from docflow.documents.locate import locate_text
+
+spans = locate_text(document, "carried forward to the next page", find_all=True)
+span = spans[0]
+span.rects        # one PageRect per (page, line) — render like a PDF viewer selection
+span.bbox         # union bbox (None when the span crosses pages)
+span.confidence   # min OCR word confidence of the span (None without OCR)
+span.match_ratio  # 1.0 exact; fuzzy fallback for OCR-garbled text
+```
+
+### Coordinate convention
+
+All bboxes in a document share one coordinate space per page: **top-left
+origin, PDF points (72/inch)** — `Page.unit == "pt"`. OCR parsers convert
+their rendered-pixel coords via DPI; Azure DI converts inches. Providers
+with unknowable physical size (Google DocAI on pixels) keep `unit="px"`,
+still consistent with `Page.width/height`. To overlay a highlight on a page
+rendered at any DPI:
+
+```python
+rel = hit.bbox.to_relative(page.width, page.height)  # 0-1 coords
+# pixel rect = rel * rendered_image_size — works for every parser
+```
+
+Evidence carries the same precision: `field.evidence[0].bbox` covers exactly
+the matched words and `field.evidence[0].rects` handles multi-line spans.
+`field.ocr.bbox` / `field.ocr.rects` give the highlight for the OCR-scored span.
 
 ## Screenshots
 

@@ -37,7 +37,8 @@ class TestAzureDIMapping:
             ),
         ]
         page = SimpleNamespace(
-            page_number=1, width=8.5, height=11.0, words=words, lines=lines,
+            page_number=1, width=8.5, height=11.0, unit="inch",
+            words=words, lines=lines,
         )
         return SimpleNamespace(pages=[page])
 
@@ -52,8 +53,11 @@ class TestAzureDIMapping:
         assert [w.text for w in line.words] == ["Total:", "100.00"]
         assert line.words[1].confidence == pytest.approx(0.91)
         assert line.confidence == pytest.approx(0.945)
-        assert line.bbox.x0 == 1.0
-        assert line.bbox.x1 == 3.0
+        # DI inches convert to the canonical point space (x72)
+        assert page.unit == "pt"
+        assert page.width == pytest.approx(8.5 * 72)
+        assert line.bbox.x0 == pytest.approx(72.0)
+        assert line.bbox.x1 == pytest.approx(216.0)
 
     async def test_missing_credentials_raises(self, tmp_path):
         f = tmp_path / "doc.pdf"

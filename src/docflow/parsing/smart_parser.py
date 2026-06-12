@@ -62,6 +62,7 @@ class SmartParser:
         if not pages_needing_ocr:
             return document
 
+        from docflow.ocr.base import blocks_to_points
         from docflow.ocr.tesseract import TesseractOCR
         from docflow.rendering.renderer import render_page
 
@@ -70,6 +71,9 @@ class SmartParser:
             preprocess_steps=[],
         )
 
+        # OCR'd pages convert to points so they share the coordinate space
+        # of the native-parsed pages in the same document.
+        scale = 72.0 / self.dpi
         for page in pages_needing_ocr:
             image = await render_page(file_path, page.page_number, dpi=self.dpi)
             lang = "+".join(self.ocr_languages)
@@ -77,9 +81,9 @@ class SmartParser:
 
             ocr_page = Page(
                 page_number=page.page_number,
-                width=float(image.width),
-                height=float(image.height),
-                blocks=ocr_result.blocks,
+                width=float(image.width) * scale,
+                height=float(image.height) * scale,
+                blocks=blocks_to_points(ocr_result.blocks, self.dpi),
                 text=ocr_result.text,
             )
 

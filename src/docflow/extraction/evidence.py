@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from docflow.documents.evidence import Evidence
+from docflow.documents.locate import _normalize, locate_text
 from docflow.documents.models import Document
 
 
@@ -12,11 +13,12 @@ def attach_evidence(
 ) -> list[Evidence]:
     """Map LLM evidence hints to Evidence objects grounded in the document.
 
-    Searches ALL pages for the evidence text rather than trusting the
-    LLM-reported page number. Falls back to the LLM hint if no match found.
+    Locates the evidence text (hint quote first, extracted value second) at
+    word-span precision via the text locator: the bbox covers exactly the
+    matched words, and `rects` carries one rectangle per line — including
+    spans that cross line or page boundaries. Falls back to a page-level
+    match (no bbox), then to the LLM-reported page.
     """
-    evidences: list[Evidence] = []
-
     hint_page = evidence_hints.get("page", 0) if evidence_hints else 0
     text_snippet = evidence_hints.get("text", "") if evidence_hints else ""
 
@@ -24,43 +26,46 @@ def attach_evidence(
         text_snippet = str(extracted_value)
 
     if not text_snippet:
-        return evidences
+        return []
 
-    matched_page = None
-    matched_block_id = None
-    matched_bbox = None
-    confidence = None
+    targets = [text_snippet]
+    if extracted_value is not None and str(extracted_value) != text_snippet:
+        targets.append(str(extracted_value))
 
+    for target in targets:
+        spans = locate_text(document, target, hint_page=hint_page)
+        if spans:
+            span = spans[0]
+            return [
+                Evidence(
+                    document_id=document.id,
+                    page_number=span.page_number,
+                    text=text_snippet,
+                    bbox=span.bbox,
+                    rects=span.rects,
+                    block_id=span.block_ids[0] if span.block_ids else None,
+                    confidence=span.confidence,
+                )
+            ]
+
+    # Page-level fallback: text exists in the page text but not in any block
+    # (e.g. tables serialized to page text only).
+    normalized_snippet = _normalize(text_snippet)
     for page in document.pages:
-        for block in page.blocks:
-            if text_snippet in block.text:
-                matched_page = page.page_number
-                matched_block_id = block.block_id
-                matched_bbox = block.bbox
-                confidence = block.confidence
-                break
-        if matched_block_id is not None:
-            break
+        if normalized_snippet and normalized_snippet in _normalize(page.text):
+            return [
+                Evidence(
+                    document_id=document.id,
+                    page_number=page.page_number,
+                    text=text_snippet,
+                    confidence=0.7,
+                )
+            ]
 
-    if matched_block_id is None:
-        for page in document.pages:
-            if text_snippet in page.text:
-                matched_page = page.page_number
-                confidence = 0.7
-                break
-
-    if matched_page is None:
-        matched_page = hint_page
-
-    evidences.append(
+    return [
         Evidence(
             document_id=document.id,
-            page_number=matched_page,
+            page_number=hint_page,
             text=text_snippet,
-            bbox=matched_bbox,
-            block_id=matched_block_id,
-            confidence=confidence,
         )
-    )
-
-    return evidences
+    ]

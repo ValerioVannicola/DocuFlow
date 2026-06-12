@@ -464,21 +464,23 @@ class VisionExtractionEngine:
 
     @staticmethod
     async def _enrich_document_with_ocr(
-        document: Document, images: list,
+        document: Document, images: list, dpi: int = DEFAULT_DPI,
     ) -> None:
         from docflow.documents.models import Page
+        from docflow.ocr.base import blocks_to_points
         from docflow.ocr.tesseract import TesseractOCR
 
         ocr = TesseractOCR(preprocess_steps=[])
+        scale = 72.0 / dpi
         pages: list[Page] = []
         for i, image in enumerate(images):
             ocr_result = await ocr.ocr(image)
             pages.append(
                 Page(
                     page_number=i,
-                    width=float(image.width),
-                    height=float(image.height),
-                    blocks=ocr_result.blocks,
+                    width=float(image.width) * scale,
+                    height=float(image.height) * scale,
+                    blocks=blocks_to_points(ocr_result.blocks, dpi),
                     text=ocr_result.text,
                 )
             )
@@ -514,7 +516,7 @@ class VisionExtractionEngine:
             )
 
         ocr_start = time.monotonic()
-        await self._enrich_document_with_ocr(document, images)
+        await self._enrich_document_with_ocr(document, images, dpi=self.dpi)
         ocr_ms = (time.monotonic() - ocr_start) * 1000
         if trace:
             trace.add_event(
@@ -655,7 +657,7 @@ class HybridExtractionEngine:
             )
 
         ocr_start = time.monotonic()
-        await VisionExtractionEngine._enrich_document_with_ocr(document, images)
+        await VisionExtractionEngine._enrich_document_with_ocr(document, images, dpi=self.dpi)
         ocr_ms = (time.monotonic() - ocr_start) * 1000
         if trace:
             trace.add_event(

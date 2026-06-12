@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from difflib import SequenceMatcher
-
-from docflow.documents.models import Block, Document, Page
+from docflow.documents.locate import (
+    DEFAULT_FUZZY_THRESHOLD,
+    _normalize,
+    locate_text,
+)
+from docflow.documents.models import Document, Page
 from docflow.extraction.models import (
     FieldConsensus,
     OCRDocumentConfidence,
@@ -10,14 +13,6 @@ from docflow.extraction.models import (
 )
 
 _LOW_CONFIDENCE_THRESHOLD = 0.6
-DEFAULT_FUZZY_THRESHOLD = 0.8
-
-
-def _normalize(value: object) -> str:
-    s = str(value).strip().lower()
-    for ch in "$€£¥,":
-        s = s.replace(ch, "")
-    return " ".join(s.split())
 
 
 def compute_document_ocr_confidence(
@@ -49,57 +44,6 @@ def compute_document_ocr_confidence(
     )
 
 
-def _word_span_score(block: Block, target: str) -> tuple[float, float, str] | None:
-    """Best (match_ratio, score, matched_text) for target within a block.
-
-    Slides a window of consecutive words sized to the target's token count
-    (±1) and compares normalized text. The span score is the minimum word
-    confidence in the window.
-    """
-    if not block.words:
-        normalized_block = _normalize(block.text)
-        if not normalized_block:
-            return None
-        if target in normalized_block:
-            ratio = 1.0
-        else:
-            matcher = SequenceMatcher(None, target, normalized_block)
-            if matcher.quick_ratio() < 0.5:
-                return None
-            ratio = matcher.ratio()
-        score = block.confidence if block.confidence is not None else 0.0
-        return (ratio, score, block.text)
-
-    n_target = max(1, len(target.split()))
-    words = block.words
-    best: tuple[float, float, str] | None = None
-
-    for size in {max(1, n_target - 1), n_target, min(len(words), n_target + 1)}:
-        if size > len(words):
-            continue
-        for start in range(len(words) - size + 1):
-            span = words[start : start + size]
-            span_text = " ".join(w.text for w in span)
-            normalized_span = _normalize(span_text)
-            if not normalized_span:
-                continue
-
-            if normalized_span == target or target in normalized_span:
-                ratio = 1.0
-            else:
-                matcher = SequenceMatcher(None, target, normalized_span)
-                if matcher.quick_ratio() < 0.5:
-                    continue
-                ratio = matcher.ratio()
-
-            confs = [w.confidence for w in span if w.confidence is not None]
-            score = min(confs) if confs else 0.0
-            if best is None or ratio > best[0] or (ratio == best[0] and score > best[1]):
-                best = (ratio, score, span_text)
-
-    return best
-
-
 def _page_mean_confidence(page: Page) -> float | None:
     confs: list[float] = []
     for block in page.blocks:
@@ -119,10 +63,12 @@ def compute_field_ocr_confidence(
 ) -> OCRFieldConfidence | None:
     """Match an extracted value back to OCR text and score it.
 
-    Tries the LLM evidence hint first (it is a verbatim source quote, a
-    better anchor than the normalized extracted value), searching the hinted
-    page before the rest. Returns None when the document has no OCR
-    confidences at all; returns match_method="unmatched" when OCR exists but
+    Uses the text locator (word-span precision, cross-line and cross-page),
+    trying the LLM evidence hint first — it is a verbatim source quote, a
+    better anchor than the normalized extracted value. The field score is
+    the minimum word confidence of the matched span; `bbox`/`rects` carry
+    the exact highlight rectangles. Returns None when the document has no
+    OCR confidences at all; match_method="unmatched" when OCR exists but
     the value cannot be located.
     """
     has_ocr = any(
@@ -134,56 +80,42 @@ def compute_field_ocr_confidence(
     if not has_ocr:
         return None
 
-    targets = []
-    if hint_text:
-        normalized_hint = _normalize(hint_text)
-        if normalized_hint:
-            targets.append(normalized_hint)
-    if value is not None:
-        normalized_value = _normalize(value)
-        if normalized_value and normalized_value not in targets:
-            targets.append(normalized_value)
+    targets: list[str] = []
+    if hint_text and _normalize(hint_text):
+        targets.append(hint_text)
+    if value is not None and _normalize(value) and str(value) not in targets:
+        targets.append(str(value))
     if not targets:
         return OCRFieldConfidence()
 
-    pages = sorted(
-        document.pages,
-        key=lambda p: 0 if hint_page is not None and p.page_number == hint_page else 1,
-    )
-
-    best: OCRFieldConfidence | None = None
     for target in targets:
-        for page in pages:
-            for block in page.blocks:
-                span = _word_span_score(block, target)
-                if span is None:
-                    continue
-                ratio, score, matched_text = span
-                if ratio < fuzzy_threshold:
-                    continue
-                candidate = OCRFieldConfidence(
-                    score=round(score, 4),
-                    match_method="exact_block" if ratio == 1.0 else "fuzzy_block",
-                    match_ratio=round(ratio, 4),
-                    matched_text=matched_text,
-                    page_number=page.page_number,
-                )
-                if best is None or candidate.match_ratio > best.match_ratio:
-                    best = candidate
-            if best is not None and best.match_ratio == 1.0:
-                return best
-        if best is not None:
-            return best
+        spans = locate_text(
+            document, target,
+            hint_page=hint_page, fuzzy_threshold=fuzzy_threshold,
+        )
+        if not spans:
+            continue
+        span = spans[0]
+        return OCRFieldConfidence(
+            score=span.confidence if span.confidence is not None else 0.0,
+            match_method="exact_block" if span.method == "exact" else "fuzzy_block",
+            match_ratio=span.match_ratio,
+            matched_text=span.text,
+            page_number=span.page_number,
+            bbox=span.bbox,
+            rects=span.rects,
+        )
 
     for target in targets:
-        for page in pages:
-            if target in _normalize(page.text):
+        normalized = _normalize(target)
+        for page in document.pages:
+            if normalized in _normalize(page.text):
                 page_conf = _page_mean_confidence(page)
                 return OCRFieldConfidence(
                     score=round(page_conf, 4) if page_conf is not None else None,
                     match_method="page_text",
                     match_ratio=1.0,
-                    matched_text=target,
+                    matched_text=normalized,
                     page_number=page.page_number,
                 )
 
