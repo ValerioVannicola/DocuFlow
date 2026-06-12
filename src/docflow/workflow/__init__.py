@@ -3,6 +3,7 @@ from docflow.workflow.state import PipelineState
 from docflow.workflow.steps import (
     Anonymize,
     Extract,
+    ExtractAuto,
     ExtractHybrid,
     ExtractVision,
     Ingest,
@@ -16,6 +17,7 @@ from docflow.workflow.steps import (
 __all__ = [
     "Anonymize",
     "Extract",
+    "ExtractAuto",
     "ExtractHybrid",
     "ExtractVision",
     "Ingest",

@@ -26,6 +26,7 @@ class DocumentPipeline:
         vision_dpi: int = DEFAULT_DPI,
         context: str | None = None,
         scoring: str = "qualitative",
+        escalation: dict | None = None,
         llm_kwargs: dict | None = None,
     ):
         self._parser = parser
@@ -42,6 +43,7 @@ class DocumentPipeline:
         self._vision_dpi = vision_dpi
         self._context = context
         self._scoring = scoring
+        self._escalation = escalation
         self._llm_kwargs = llm_kwargs or {}
 
         parser_type = self._parser
@@ -201,6 +203,7 @@ class DocumentPipeline:
         from docflow.workflow.pipeline import Pipeline
         from docflow.workflow.steps import (
             Extract,
+            ExtractAuto,
             ExtractHybrid,
             ExtractVision,
             Ingest,
@@ -243,6 +246,40 @@ class DocumentPipeline:
                     dpi=self._vision_dpi,
                     context=self._context,
                     scoring=self._scoring,
+                )
+            )
+        elif self._extraction_type == "auto":
+            from docflow.extraction.escalation import EscalationPolicy
+
+            # Auto mode needs an OCR-capable parser to judge OCR quality;
+            # upgrade the bare default to the smart parser.
+            parser_cfg = self._parser
+            if parser_cfg in (None, "none", "pdfplumber"):
+                parser_cfg = "smart"
+            saved_parser = self._parser
+            self._parser = parser_cfg
+            try:
+                parser = self._resolve_parser()
+            finally:
+                self._parser = saved_parser
+            steps.append(Parse(parser=parser))
+            if self._privacy:
+                from docflow.workflow.steps import Anonymize
+
+                steps.append(Anonymize(policy=self._privacy))
+            steps.append(
+                ExtractAuto(
+                    schema=schema, llm=llm,
+                    mode=self._extraction_mode,
+                    n_instances=self._n_instances,
+                    temperatures=self._temperatures,
+                    dpi=self._vision_dpi,
+                    context=self._context,
+                    scoring=self._scoring,
+                    policy=EscalationPolicy(**(self._escalation or {})),
+                    # Vision sends raw page images to the LLM, bypassing
+                    # anonymization — never escalate when privacy is on.
+                    allow_escalation=self._privacy is None,
                 )
             )
         else:

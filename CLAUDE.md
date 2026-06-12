@@ -114,6 +114,23 @@ All parsers produce the same standardized `Document`: pages of **line-level bloc
 | `"text"` | Parse → Extract | Parser gives text, LLM reads text |
 | `"vision"` | ExtractVision (no parser) | Pages rendered as images → vision LLM |
 | `"hybrid"` | ExtractHybrid (no parser) | Vision + text agents parallel → vision decider |
+| `"auto"` | Parse (smart) → ExtractAuto | Text extraction; escalates to vision when OCR quality is poor |
+
+### Auto mode (vision escalation)
+
+```python
+pipeline = DocumentPipeline(
+    extraction_type="auto",
+    escalation={"min_ocr_score": 0.6, "max_low_confidence_ratio": 0.4, "escalate_to": "vision"},
+)
+result.escalated           # True if re-read by the vision LLM
+result.escalation_reason   # e.g. "OCR confidence 0.42 below threshold 0.6"
+```
+
+OCR fails *confidently* — bad scans return plausible garbage, not errors. Auto mode
+gates on the OCR confidence scores after parsing and re-reads the original file with
+the vision (or hybrid) engine when quality is below threshold. Escalation is suppressed
+when a PrivacyPolicy is configured (vision bypasses text anonymization).
 
 **Vision and hybrid require `parser=None`:**
 
@@ -249,7 +266,7 @@ pipeline = DocumentPipeline(
 
 ```python
 pipeline = DocumentPipeline(
-    context="You work in pharmaceutical regulatory affairs. Drug names should use INN format.",
+    context="You work in motor insurance claims processing. Policy numbers follow the pattern POL-XXXXXXX.",
 )
 ```
 

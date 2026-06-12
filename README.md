@@ -50,8 +50,12 @@ print(result.fields["total"].evidence[0])   # page 0, bbox, source text
 - **JSON reliability**: JSON mode, concrete examples, auto-retry on parse failure
 
 ### Evidence & Confidence
-- Every field links to source text, page number, and bounding box
-- Confidence from LLM self-assessment + OCR word confidence
+- Every field links to source text, page number, and word-precise bounding boxes (multi-line and cross-page highlights supported)
+- **Two independent confidence scores** — never the LLM's self-reported confidence:
+  - **OCR confidence** (from the parser): did we *read* the characters on the page correctly? Document-level and per-field, matched back from the extracted value to the OCR words
+  - **LLM consensus** (from multi-instance extraction): did independent LLM runs *interpret* the document the same way? The signal that matters when no parser is used (vision/hybrid)
+- Both are optional and never break the pipeline: no OCR → no OCR score; single instance → no consensus
+- **Token usage & cost**: every result reports prompt/completion tokens, call count, and litellm-priced cost
 - Full provenance chain: parser → model → evidence → validation → review → correction
 
 ### Review
@@ -134,4 +138,6 @@ docflow templates list
 
 ## Documentation
 
-See [CLAUDE.md](CLAUDE.md) for the complete API reference with code examples for every feature.
+See the [Complete User Guide](docs/guide.md) for in-depth documentation of every feature, with code examples.
+
+(`CLAUDE.md` is integration context for AI coding agents, not user documentation.)

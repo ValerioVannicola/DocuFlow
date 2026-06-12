@@ -176,6 +176,8 @@ class ExtractionResult(BaseModel):
     confidence: float = 0.0
     ocr: OCRDocumentConfidence | None = None
     usage: TokenUsage | None = None
+    escalated: bool = False
+    escalation_reason: str = ""
     needs_review: bool = False
     review_status: str = "pending"
     reviewed_by: str = ""

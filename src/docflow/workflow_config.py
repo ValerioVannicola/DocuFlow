@@ -28,6 +28,7 @@ class WorkflowConfig(BaseModel):
     model: str = "openai/gpt-4o"
     extraction_type: str = "text"
     extraction_mode: str = "single"
+    escalation: dict[str, Any] | None = None
     n_instances: int = 5
     temperatures: list[float] | None = None
     vision_dpi: int | None = None
@@ -159,6 +160,7 @@ class WorkflowConfig(BaseModel):
             "model": self.model,
             "extraction_type": self.extraction_type,
             "extraction_mode": self.extraction_mode,
+            "escalation": self.escalation,
             "n_instances": self.n_instances,
             "scoring": self.scoring,
             "validators": self.build_validators() or None,
@@ -374,6 +376,8 @@ def export_config(
     config["model"] = pipeline._model
     config["extraction_type"] = pipeline._extraction_type
     config["extraction_mode"] = pipeline._extraction_mode
+    if getattr(pipeline, "_escalation", None):
+        config["escalation"] = dict(pipeline._escalation)
     config["n_instances"] = pipeline._n_instances
     config["scoring"] = pipeline._scoring
 

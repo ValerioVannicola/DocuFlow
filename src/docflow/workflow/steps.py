@@ -283,6 +283,117 @@ class ExtractHybrid:
         return state
 
 
+class ExtractAuto:
+    """Text extraction with automatic vision escalation.
+
+    Expects a parsed document (use the smart parser). Evaluates OCR quality:
+    if the text is trustworthy, runs normal text extraction; if OCR produced
+    garbage or nothing (per the EscalationPolicy), re-reads the original file
+    with the vision (or hybrid) engine instead.
+
+    Escalation is disabled when `allow_escalation=False` — DocumentPipeline
+    sets this when a privacy policy is configured, because vision sends raw
+    page images to the LLM, bypassing anonymization.
+    """
+
+    name = "extract_auto"
+
+    def __init__(
+        self,
+        schema: type[BaseModel] | None = None,
+        llm: Any = None,
+        mode: str = "single",
+        n_instances: int = 5,
+        temperatures: list[float] | None = None,
+        dpi: int = DEFAULT_DPI,
+        context: str | None = None,
+        scoring: str = "qualitative",
+        policy: Any = None,
+        allow_escalation: bool = True,
+    ):
+        self._schema = schema
+        self.llm = llm
+        self.mode = mode
+        self.n_instances = n_instances
+        self.temperatures = temperatures
+        self.dpi = dpi
+        self.context = context
+        self.scoring = scoring
+        self.policy = policy
+        self.allow_escalation = allow_escalation
+
+    async def execute(self, state: PipelineState) -> PipelineState:
+        if state.document is None:
+            state.errors.append("No document to extract from")
+            state.status = "failed"
+            return state
+
+        schema = self._schema or state.metadata.get("schema")
+        if schema is None:
+            state.errors.append("No schema provided for extraction")
+            state.status = "failed"
+            return state
+
+        from docflow.extraction.escalation import evaluate_escalation
+
+        escalate, reason = evaluate_escalation(state.document, self.policy)
+
+        if escalate and not self.allow_escalation:
+            state.trace.add_event(
+                "vision_escalation_suppressed", step_name=self.name,
+                reason=reason, cause="privacy policy configured",
+            )
+            escalate = False
+
+        start = time.monotonic()
+        if escalate:
+            state.trace.add_event(
+                "vision_escalation", step_name=self.name, reason=reason,
+            )
+            escalate_to = getattr(self.policy, "escalate_to", "vision")
+            if escalate_to == "hybrid":
+                from docflow.extraction.engine import HybridExtractionEngine
+
+                engine = HybridExtractionEngine(
+                    llm=self.llm, dpi=self.dpi, context=self.context,
+                )
+                result = await engine.extract(
+                    state.document, schema, trace=state.trace,
+                    n_instances=self.n_instances,
+                    temperatures=self.temperatures, scoring=self.scoring,
+                )
+            else:
+                from docflow.extraction.engine import VisionExtractionEngine
+
+                engine = VisionExtractionEngine(
+                    llm=self.llm, dpi=self.dpi, context=self.context,
+                )
+                result = await engine.extract(
+                    state.document, schema, trace=state.trace,
+                    mode=self.mode, n_instances=self.n_instances,
+                    temperatures=self.temperatures, scoring=self.scoring,
+                )
+            result.escalated = True
+            result.escalation_reason = reason
+            state.extraction_result = result
+        else:
+            from docflow.extraction.engine import ExtractionEngine
+
+            engine = ExtractionEngine(llm=self.llm, context=self.context)
+            state.extraction_result = await engine.extract(
+                state.document, schema, trace=state.trace,
+                mode=self.mode, n_instances=self.n_instances,
+                temperatures=self.temperatures, scoring=self.scoring,
+            )
+
+        duration = (time.monotonic() - start) * 1000
+        state.trace.add_event(
+            "extract_auto", step_name=self.name, duration_ms=duration,
+            escalated=escalate,
+        )
+        return state
+
+
 class Review:
     name = "review"
 
