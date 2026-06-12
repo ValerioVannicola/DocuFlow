@@ -1,10 +1,10 @@
-"""Example: Extract invoice data from a PDF using docflow.
+"""Example: Extract invoice data from a PDF using docuflow.
 
 Usage:
     python examples/invoice_extraction.py path/to/invoice.pdf
 
 Requires:
-    pip install docflow[all]
+    pip install docuflow[all]
     Set OPENAI_API_KEY environment variable.
 """
 from __future__ import annotations
@@ -22,8 +22,8 @@ def main() -> None:
     pdf_path = sys.argv[1]
 
     # Option 1: One-liner with built-in template
-    from docflow import extract
-    from docflow.templates import load_template
+    from docuflow import extract
+    from docuflow.templates import load_template
 
     invoice_template = load_template("invoice")
     result = extract(pdf_path, schema=invoice_template)

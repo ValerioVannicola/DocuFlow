@@ -9,8 +9,8 @@ build/
 .venv/
 venv/
 .env
-.docflow_store/
-docflow_templates/
+.docuflow_store/
+docuflow_templates/
 *.so
 .pytest_cache/
 .ruff_cache/

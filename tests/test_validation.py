@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from docflow.documents.evidence import Evidence
-from docflow.extraction.models import ExtractedField, ExtractionResult
-from docflow.validation.base import ValidationError, Validator
-from docflow.validation.engine import validate
-from docflow.validation.validators import (
+from docuflow.documents.evidence import Evidence
+from docuflow.extraction.models import ExtractedField, ExtractionResult
+from docuflow.validation.base import ValidationError, Validator
+from docuflow.validation.engine import validate
+from docuflow.validation.validators import (
     CustomRule,
     EvidenceRequired,
     RequiredFields,

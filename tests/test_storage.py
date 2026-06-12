@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from docflow.documents.models import Document, DocumentMetadata
-from docflow.extraction.models import ExtractionResult
-from docflow.observability.traces import create_trace
-from docflow.storage.base import Storage
-from docflow.storage.local import LocalDocumentStore
+from docuflow.documents.models import Document, DocumentMetadata
+from docuflow.extraction.models import ExtractionResult
+from docuflow.observability.traces import create_trace
+from docuflow.storage.base import Storage
+from docuflow.storage.local import LocalDocumentStore
 
 
 class TestLocalDocumentStore:

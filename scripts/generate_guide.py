@@ -1,11 +1,12 @@
-"""Generate the DocFlow User Guide as a Word document."""
+"""Generate the DocuFlow User Guide as a Word document."""
 from __future__ import annotations
 
-from docx import Document
-from docx.shared import Pt, Inches, RGBColor
-from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.enum.style import WD_STYLE_TYPE
 import os
+
+from docx import Document
+from docx.enum.style import WD_STYLE_TYPE
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.shared import Inches, Pt, RGBColor
 
 doc = Document()
 
@@ -47,10 +48,10 @@ def add_param_table(params):
 # ============================================================
 # TITLE
 # ============================================================
-title = doc.add_heading('DocFlow User Guide', 0)
+title = doc.add_heading('DocuFlow User Guide', 0)
 title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-doc.add_paragraph('Complete Reference for the DocFlow Document Processing Library', style='Subtitle').alignment = WD_ALIGN_PARAGRAPH.CENTER
-doc.add_paragraph(f'Version 0.1.0')
+doc.add_paragraph('Complete Reference for the DocuFlow Document Processing Library', style='Subtitle').alignment = WD_ALIGN_PARAGRAPH.CENTER
+doc.add_paragraph('Version 0.1.0')
 doc.add_page_break()
 
 # ============================================================
@@ -85,7 +86,7 @@ doc.add_page_break()
 # ============================================================
 doc.add_heading('1. Introduction', level=1)
 doc.add_paragraph(
-    'DocFlow is a Python library for building production-grade document processing pipelines. '
+    'DocuFlow is a Python library for building production-grade document processing pipelines. '
     'It converts business documents (PDFs, scanned images) into validated, auditable structured '
     'data using AI-powered extraction with OCR and LLM support.'
 )
@@ -108,12 +109,12 @@ for cap in [
 # ============================================================
 doc.add_heading('2. Installation', level=1)
 doc.add_paragraph('Install the full library with all optional dependencies:')
-add_code('pip install docflow[all]')
+add_code('pip install docuflow[all]')
 doc.add_paragraph('Or install only what you need:')
-add_code('''pip install docflow[pdf]      # PDF parsing with PyMuPDF
-pip install docflow[ocr]      # OCR with Tesseract
-pip install docflow[llm]      # LLM extraction via litellm
-pip install docflow[privacy]  # Privacy/anonymization via Presidio''')
+add_code('''pip install docuflow[pdf]      # PDF parsing with PyMuPDF
+pip install docuflow[ocr]      # OCR with Tesseract
+pip install docuflow[llm]      # LLM extraction via litellm
+pip install docuflow[privacy]  # Privacy/anonymization via Presidio''')
 doc.add_paragraph('Requirements: Python >= 3.11')
 
 doc.add_heading('Optional Dependencies', level=2)
@@ -142,7 +143,7 @@ doc.add_heading('3. Quick Start', level=1)
 
 doc.add_heading('One-liner extraction', level=2)
 add_code('''from pydantic import BaseModel
-from docflow import extract
+from docuflow import extract
 
 class Invoice(BaseModel):
     supplier_name: str
@@ -154,14 +155,14 @@ print(result.data)
 print(result.fields["total"].evidence)''')
 
 doc.add_heading('Using a built-in template', level=2)
-add_code('''from docflow import extract
-from docflow.templates import load_template
+add_code('''from docuflow import extract
+from docuflow.templates import load_template
 
 Invoice = load_template("invoice")
 result = extract("invoice.pdf", schema=Invoice)''')
 
 doc.add_heading('Reusable pipeline', level=2)
-add_code('''from docflow import DocumentPipeline
+add_code('''from docuflow import DocumentPipeline
 
 pipeline = DocumentPipeline(
     parser="tesseract",
@@ -175,7 +176,7 @@ result = pipeline.run_sync("invoice.pdf", schema=Invoice)''')
 # ============================================================
 doc.add_heading('4. Architecture Overview', level=1)
 doc.add_paragraph(
-    'DocFlow processes documents through a configurable pipeline of steps. '
+    'DocuFlow processes documents through a configurable pipeline of steps. '
     'Each step receives a PipelineState, performs its work, and passes the '
     'updated state to the next step.'
 )
@@ -201,14 +202,14 @@ for etype, pipeline_str, desc in [
     row[1].text = pipeline_str
     row[2].text = desc
 
-doc.add_heading('Three Ways to Use DocFlow', level=2)
+doc.add_heading('Three Ways to Use DocuFlow', level=2)
 doc.add_paragraph('1. One-liner function - simplest, least control:')
 add_code('result = extract("file.pdf", schema=Invoice)')
 doc.add_paragraph('2. DocumentPipeline - configurable, reusable:')
 add_code('''pipeline = DocumentPipeline(parser="tesseract", model="openai/gpt-4o")
 result = pipeline.run_sync("file.pdf", schema=Invoice)''')
 doc.add_paragraph('3. Manual Pipeline - full control over step sequence:')
-add_code('''from docflow.workflow import Pipeline, Ingest, Parse, Extract, Store
+add_code('''from docuflow.workflow import Pipeline, Ingest, Parse, Extract, Store
 
 pipeline = Pipeline([
     Ingest(path="file.pdf"),
@@ -233,7 +234,7 @@ add_param_table([
     ('raw_text', 'str', '""'),
     ('status', 'str', '"ingested"'),
 ])
-add_code('''from docflow.documents.models import Document
+add_code('''from docuflow.documents.models import Document
 doc = await Document.from_file("invoice.pdf")
 doc = Document.from_file_sync("invoice.pdf")''')
 
@@ -350,10 +351,10 @@ add_code('''pipeline = DocumentPipeline(
 result = pipeline.run_sync("complex.pdf", schema=Invoice)''')
 
 doc.add_heading('Full-featured pipeline', level=3)
-add_code('''from docflow import DocumentPipeline, PrivacyPolicy
-from docflow.privacy import PresidioProvider
-from docflow.review import OverallConfidenceBelow, FieldMissing, LLMReviewer
-from docflow.validation import RequiredFields, EvidenceRequired
+add_code('''from docuflow import DocumentPipeline, PrivacyPolicy
+from docuflow.privacy import PresidioProvider
+from docuflow.review import OverallConfidenceBelow, FieldMissing, LLMReviewer
+from docuflow.validation import RequiredFields, EvidenceRequired
 
 pipeline = DocumentPipeline(
     parser="tesseract",
@@ -387,7 +388,7 @@ doc.add_paragraph(
     'Extracts embedded text from digital PDFs. Fast, no OCR needed. '
     'Does not work on scanned documents (returns empty text).'
 )
-add_code('''from docflow.parsing.pymupdf import PyMuPDFParser
+add_code('''from docuflow.parsing.pymupdf import PyMuPDFParser
 
 parser = PyMuPDFParser()
 document = await parser.parse(document)
@@ -404,7 +405,7 @@ add_param_table([
     ('dpi', 'int', '200'),
     ('preprocess_steps', 'list[str] | None', 'None'),
 ])
-add_code('''from docflow.parsing.tesseract_parser import TesseractParser
+add_code('''from docuflow.parsing.tesseract_parser import TesseractParser
 
 parser = TesseractParser(languages=["eng", "ita"], dpi=300)
 document = await parser.parse(document)
@@ -454,8 +455,8 @@ for mode, desc, calls in [
 
 doc.add_heading('ExtractionEngine (text-based)', level=2)
 doc.add_paragraph('Sends parsed document text to the LLM. Requires a Parse step before it.')
-add_code('''from docflow.extraction.engine import ExtractionEngine
-from docflow.extraction.llm.litellm_adapter import LiteLLMAdapter
+add_code('''from docuflow.extraction.engine import ExtractionEngine
+from docuflow.extraction.llm.litellm_adapter import LiteLLMAdapter
 
 llm = LiteLLMAdapter(model="openai/gpt-4o")
 engine = ExtractionEngine(llm=llm)
@@ -468,7 +469,7 @@ doc.add_paragraph(
     'Automatically runs Tesseract OCR on the images for evidence grounding '
     '(bounding boxes, block confidence). No Parse step needed.'
 )
-add_code('''from docflow.extraction.engine import VisionExtractionEngine
+add_code('''from docuflow.extraction.engine import VisionExtractionEngine
 
 engine = VisionExtractionEngine(llm=llm, dpi=200)
 result = await engine.extract(document, schema=Invoice, mode="single")''')
@@ -479,7 +480,7 @@ doc.add_paragraph(
     'N vision agents read page images, N text agents read OCR markdown. '
     'A vision decider reviews all candidates against the actual page images.'
 )
-add_code('''from docflow.extraction.engine import HybridExtractionEngine
+add_code('''from docuflow.extraction.engine import HybridExtractionEngine
 
 engine = HybridExtractionEngine(llm=llm, dpi=200)
 result = await engine.extract(document, schema=Invoice, n_instances=2)
@@ -521,7 +522,7 @@ for name, desc in [
     doc.add_paragraph(f'{name} - {desc}', style='List Bullet')
 
 doc.add_heading('Using Templates', level=2)
-add_code('''from docflow.templates import load_template, list_templates
+add_code('''from docuflow.templates import load_template, list_templates
 
 # List available templates
 for t in list_templates():
@@ -532,7 +533,7 @@ Invoice = load_template("invoice")
 result = extract("invoice.pdf", schema=Invoice)''')
 
 doc.add_heading('Creating Custom Templates', level=2)
-add_code('''# Save as ./docflow_templates/my_schema.yaml
+add_code('''# Save as ./docuflow_templates/my_schema.yaml
 name: my_schema
 version: "1.0"
 description: "My custom extraction schema"
@@ -548,7 +549,7 @@ fields:
     type: date
     required: false''')
 doc.add_paragraph(
-    'Template discovery order: ./docflow_templates/ > ~/.docflow/templates/ > built-in. '
+    'Template discovery order: ./docuflow_templates/ > ~/.docuflow/templates/ > built-in. '
     'First match wins.'
 )
 
@@ -577,7 +578,7 @@ for name, params, desc in [
     row[2].text = desc
 
 doc.add_heading('Example', level=2)
-add_code('''from docflow.validation import RequiredFields, EvidenceRequired
+add_code('''from docuflow.validation import RequiredFields, EvidenceRequired
 
 pipeline = DocumentPipeline(
     validators=[
@@ -621,8 +622,8 @@ doc.add_paragraph(
     'Each reviewer has a name, a custom prompt, and returns a structured '
     'ReviewVerdict with "Approved" or "Not Approved" and reasoning.'
 )
-add_code('''from docflow.review import LLMReviewer, OverallConfidenceBelow
-from docflow.extraction.llm.litellm_adapter import LiteLLMAdapter
+add_code('''from docuflow.review import LLMReviewer, OverallConfidenceBelow
+from docuflow.extraction.llm.litellm_adapter import LiteLLMAdapter
 
 llm = LiteLLMAdapter(model="openai/gpt-4o")
 
@@ -709,8 +710,8 @@ for mode, example, use in [
     row[2].text = use
 
 doc.add_heading('Basic Usage', level=2)
-add_code('''from docflow import DocumentPipeline, PrivacyPolicy
-from docflow.privacy import PresidioProvider
+add_code('''from docuflow import DocumentPipeline, PrivacyPolicy
+from docuflow.privacy import PresidioProvider
 
 pipeline = DocumentPipeline(
     parser="tesseract",
@@ -738,8 +739,8 @@ add_param_table([
 ])
 
 doc.add_heading('Reversible Pseudonymization', level=2)
-add_code('''from docflow.privacy import Anonymizer, PresidioProvider
-from docflow.privacy.mapping_store import LocalMappingStore
+add_code('''from docuflow.privacy import Anonymizer, PresidioProvider
+from docuflow.privacy.mapping_store import LocalMappingStore
 
 anonymizer = Anonymizer(PrivacyPolicy(
     provider=PresidioProvider(),
@@ -755,14 +756,14 @@ restored = await anonymizer.restore_text(anon.text, anon.mapping_id)
 print(restored)    # "John Doe sent email john@example.com"''')
 
 doc.add_heading('Image Redaction', level=2)
-add_code('''from docflow.privacy.image_redaction import ImageRedactor
+add_code('''from docuflow.privacy.image_redaction import ImageRedactor
 
 redactor = ImageRedactor(provider=PresidioProvider())
 redacted_image, findings = await redactor.redact_page_image(page_image)
 # Black rectangles drawn over PII regions using OCR bounding boxes''')
 
 doc.add_heading('Trace Scrubbing', level=2)
-add_code('''from docflow.privacy.scrubber import TraceScrubber
+add_code('''from docuflow.privacy.scrubber import TraceScrubber
 
 scrubber = TraceScrubber(provider=PresidioProvider())
 clean_trace = await scrubber.scrub_trace(result.trace)
@@ -775,9 +776,9 @@ doc.add_heading('13. Storage', level=1)
 doc.add_paragraph('Storage persists documents, extraction results, and traces to disk.')
 
 doc.add_heading('LocalDocumentStore', level=2)
-add_code('''from docflow.storage.local import LocalDocumentStore
+add_code('''from docuflow.storage.local import LocalDocumentStore
 
-store = LocalDocumentStore("./docflow_output")
+store = LocalDocumentStore("./docuflow_output")
 
 # Save
 await store.save_document(document)
@@ -821,35 +822,35 @@ for event in result.trace.events:
 # 15. CLI
 # ============================================================
 doc.add_heading('15. CLI', level=1)
-doc.add_paragraph('DocFlow includes a command-line interface for common tasks.')
+doc.add_paragraph('DocuFlow includes a command-line interface for common tasks.')
 
 add_code('''# Extract data from a document
-docflow extract invoice.pdf --schema invoice --model openai/gpt-4o
+docuflow extract invoice.pdf --schema invoice --model openai/gpt-4o
 
 # Save output to file
-docflow extract invoice.pdf --schema invoice --output result.json
+docuflow extract invoice.pdf --schema invoice --output result.json
 
 # List available templates
-docflow templates list
+docuflow templates list
 
 # Show a template definition
-docflow templates show invoice
+docuflow templates show invoice
 
 # Copy a template for customization
-docflow templates init invoice --dir ./my_templates''')
+docuflow templates init invoice --dir ./my_templates''')
 
 # ============================================================
 # 16. ERROR HANDLING
 # ============================================================
 doc.add_heading('16. Error Handling', level=1)
-doc.add_paragraph('All errors inherit from DocflowError for easy catching.')
+doc.add_paragraph('All errors inherit from DocuflowError for easy catching.')
 table = doc.add_table(rows=1, cols=2)
 table.style = 'Light List Accent 1'
 hdr = table.rows[0].cells
 hdr[0].text = 'Exception'
 hdr[1].text = 'When raised'
 for exc, when in [
-    ('DocflowError', 'Base class for all docflow errors'),
+    ('DocuflowError', 'Base class for all docuflow errors'),
     ('UnsupportedFileTypeError', 'Unknown file extension'),
     ('ParsingError', 'PDF parsing or file access failure'),
     ('OCRError', 'Tesseract OCR failure'),
@@ -865,7 +866,7 @@ for exc, when in [
     row[1].text = when
 
 doc.add_heading('Handling Pipeline Failures', level=2)
-add_code('''from docflow.errors import WorkflowError
+add_code('''from docuflow.errors import WorkflowError
 
 try:
     result = pipeline.run_sync("invoice.pdf", schema=Invoice)
@@ -882,20 +883,20 @@ except WorkflowError as e:
 doc.add_heading('17. API Reference Summary', level=1)
 
 doc.add_heading('Top-level imports', level=2)
-add_code('''from docflow import extract, DocumentPipeline, Pipeline, PrivacyPolicy
+add_code('''from docuflow import extract, DocumentPipeline, Pipeline, PrivacyPolicy
 
-from docflow.templates import load_template, list_templates
-from docflow.validation import RequiredFields, EvidenceRequired
-from docflow.review import (
+from docuflow.templates import load_template, list_templates
+from docuflow.validation import RequiredFields, EvidenceRequired
+from docuflow.review import (
     OverallConfidenceBelow, FieldConfidenceBelow, AnyFieldConfidenceBelow,
     HasValidationErrors, FieldMissing, NoEvidence, LLMReviewer,
 )
-from docflow.privacy import PrivacyPolicy, Anonymizer, PresidioProvider
-from docflow.storage.local import LocalDocumentStore
-from docflow.extraction.llm.litellm_adapter import LiteLLMAdapter
-from docflow.parsing.pymupdf import PyMuPDFParser
-from docflow.parsing.tesseract_parser import TesseractParser
-from docflow.workflow import (
+from docuflow.privacy import PrivacyPolicy, Anonymizer, PresidioProvider
+from docuflow.storage.local import LocalDocumentStore
+from docuflow.extraction.llm.litellm_adapter import LiteLLMAdapter
+from docuflow.parsing.pymupdf import PyMuPDFParser
+from docuflow.parsing.tesseract_parser import TesseractParser
+from docuflow.workflow import (
     Pipeline, Ingest, Parse, Extract, ExtractVision, ExtractHybrid,
     Anonymize, Validate, Review, Store,
 )''')
@@ -903,6 +904,6 @@ from docflow.workflow import (
 # ============================================================
 # SAVE
 # ============================================================
-output_path = os.path.expanduser(r"C:\Users\vvannicola\Downloads\DocFlow_User_Guide.docx")
+output_path = os.path.expanduser(r"C:\Users\vvannicola\Downloads\DocuFlow_User_Guide.docx")
 doc.save(output_path)
 print(f"Guide saved to {output_path}")

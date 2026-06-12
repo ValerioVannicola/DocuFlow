@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import yaml
 
-from docflow.processor import DocumentPipeline
-from docflow.review import (
+from docuflow.processor import DocumentPipeline
+from docuflow.review import (
     AnyFieldConfidenceBelow,
     FieldConfidenceBelow,
     FieldMissing,
@@ -11,8 +11,8 @@ from docflow.review import (
     NoEvidence,
     OverallConfidenceBelow,
 )
-from docflow.validation import EvidenceRequired, RequiredFields
-from docflow.workflow_config import (
+from docuflow.validation import EvidenceRequired, RequiredFields
+from docuflow.workflow_config import (
     export_config,
     export_yaml,
     load_workflow_config,
@@ -471,7 +471,7 @@ class TestRoundtrip:
 
 
 # ---------------------------------------------------------------------------
-# CLI — docflow run
+# CLI — docuflow run
 # ---------------------------------------------------------------------------
 
 
@@ -479,7 +479,7 @@ class TestCLI:
     def test_run_command_exists(self):
         from click.testing import CliRunner
 
-        from docflow.cli.main import main
+        from docuflow.cli.main import main
 
         runner = CliRunner()
         result = runner.invoke(main, ["run", "--help"])
@@ -489,7 +489,7 @@ class TestCLI:
     def test_run_missing_config(self):
         from click.testing import CliRunner
 
-        from docflow.cli.main import main
+        from docuflow.cli.main import main
 
         runner = CliRunner()
         result = runner.invoke(main, ["run", "nonexistent.yaml", "doc.pdf"])
@@ -518,7 +518,7 @@ class TestParserDictConfig:
 
         pipeline = cfg.build_pipeline()
         parser = pipeline._resolve_parser()
-        from docflow.parsing.tesseract_parser import TesseractParser
+        from docuflow.parsing.tesseract_parser import TesseractParser
         assert isinstance(parser, TesseractParser)
         assert parser.languages == ["eng", "fra"]
         assert parser.dpi == 300
@@ -536,7 +536,7 @@ class TestParserDictConfig:
         })
         pipeline = cfg.build_pipeline()
         parser = pipeline._resolve_parser()
-        from docflow.parsing.smart_parser import SmartParser
+        from docuflow.parsing.smart_parser import SmartParser
         assert isinstance(parser, SmartParser)
         assert parser.ocr_languages == ["eng", "deu"]
         assert parser.dpi == 250
@@ -549,7 +549,7 @@ class TestParserDictConfig:
         })
         pipeline = cfg.build_pipeline()
         parser = pipeline._resolve_parser()
-        from docflow.parsing.pdfplumber_parser import PdfplumberParser
+        from docuflow.parsing.pdfplumber_parser import PdfplumberParser
         assert isinstance(parser, PdfplumberParser)
 
     def test_parser_dict_defaults_to_pdfplumber(self):
@@ -566,7 +566,7 @@ class TestParserDictConfig:
         })
         pipeline = cfg.build_pipeline()
         parser = pipeline._resolve_parser()
-        from docflow.parsing.tesseract_parser import TesseractParser
+        from docuflow.parsing.tesseract_parser import TesseractParser
         assert isinstance(parser, TesseractParser)
         assert parser.languages == ["eng"]
 
@@ -593,7 +593,7 @@ class TestPrivacyDictConfig:
             },
         })
         policy = cfg.build_privacy()
-        from docflow.privacy.policy import PrivacyPolicy
+        from docuflow.privacy.policy import PrivacyPolicy
         assert isinstance(policy, PrivacyPolicy)
         assert policy.mode.value == "pseudonymize"
         assert policy.reversible is True
@@ -629,7 +629,7 @@ class TestPrivacyDictConfig:
             },
         })
         policy = cfg.build_privacy()
-        from docflow.privacy.mapping_store import LocalMappingStore
+        from docuflow.privacy.mapping_store import LocalMappingStore
         assert isinstance(policy.mapping_store, LocalMappingStore)
         assert str(policy.mapping_store.base_path) == store_dir
 
@@ -646,7 +646,7 @@ class TestPrivacyDictConfig:
             },
         })
         policy = cfg.build_privacy()
-        from docflow.privacy.mapping_store import LocalMappingStore
+        from docuflow.privacy.mapping_store import LocalMappingStore
         assert isinstance(policy.mapping_store, LocalMappingStore)
 
     def test_privacy_minimal_still_works(self):
@@ -679,7 +679,7 @@ class TestStorageDictConfig:
         })
         pipeline = cfg.build_pipeline()
         storage = pipeline._resolve_storage()
-        from docflow.storage.local import LocalDocumentStore
+        from docuflow.storage.local import LocalDocumentStore
         assert isinstance(storage, LocalDocumentStore)
         assert str(storage.base_path) == store_dir
 
@@ -690,7 +690,7 @@ class TestStorageDictConfig:
         })
         pipeline = cfg.build_pipeline()
         storage = pipeline._resolve_storage()
-        from docflow.storage.local import LocalDocumentStore
+        from docuflow.storage.local import LocalDocumentStore
         assert isinstance(storage, LocalDocumentStore)
 
     def test_storage_none_default(self):
@@ -740,7 +740,7 @@ class TestLLMDictConfig:
 
 class TestExportExtended:
     def test_export_parser_dict_roundtrip(self):
-        from docflow.parsing.tesseract_parser import TesseractParser
+        from docuflow.parsing.tesseract_parser import TesseractParser
 
         parser = TesseractParser(languages=["eng", "spa"], dpi=400)
         pipeline = DocumentPipeline(parser=parser, model="openai/gpt-4o")

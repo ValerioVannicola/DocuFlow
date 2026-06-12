@@ -13,7 +13,7 @@ class TestScreenshots:
         pdf_path = tmp_path / "test.pdf"
         make_test_pdf(pdf_path, pages=2)
 
-        from docflow.screenshots import screenshot_pages
+        from docuflow.screenshots import screenshot_pages
 
         output_dir = tmp_path / "screenshots"
         results = await screenshot_pages(str(pdf_path), output_dir=str(output_dir))
@@ -31,7 +31,7 @@ class TestScreenshots:
         pdf_path = tmp_path / "test.pdf"
         make_test_pdf(pdf_path, pages=5)
 
-        from docflow.screenshots import screenshot_pages
+        from docuflow.screenshots import screenshot_pages
 
         output_dir = tmp_path / "screenshots"
         results = await screenshot_pages(
@@ -54,7 +54,7 @@ class TestScreenshotCLI:
 
         from click.testing import CliRunner
 
-        from docflow.cli.main import main
+        from docuflow.cli.main import main
 
         output_dir = tmp_path / "output"
         runner = CliRunner()
@@ -70,7 +70,7 @@ class TestBatchCLI:
     def test_extract_folder_help(self):
         from click.testing import CliRunner
 
-        from docflow.cli.main import main
+        from docuflow.cli.main import main
 
         runner = CliRunner()
         result = runner.invoke(main, ["extract-folder", "--help"])
@@ -83,7 +83,7 @@ class TestBatchCLI:
     def test_extract_folder_nonexistent_dir(self):
         from click.testing import CliRunner
 
-        from docflow.cli.main import main
+        from docuflow.cli.main import main
 
         runner = CliRunner()
         result = runner.invoke(main, [

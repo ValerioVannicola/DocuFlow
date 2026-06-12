@@ -5,21 +5,21 @@ from unittest.mock import AsyncMock, patch
 
 from pydantic import BaseModel
 
-from docflow.documents.models import (
+from docuflow.documents.models import (
     BoundingBox,
     Document,
     DocumentMetadata,
     Page,
 )
-from docflow.extraction.llm.base import LLMResponse
-from docflow.extraction.models import (
+from docuflow.extraction.llm.base import LLMResponse
+from docuflow.extraction.models import (
     ExtractedField,
     ExtractionResult,
     FieldConsensus,
     OCRFieldConfidence,
     TokenUsage,
 )
-from docflow.extraction.verify import (
+from docuflow.extraction.verify import (
     VerificationPolicy,
     _crop_region,
     _trigger_reason,
@@ -136,7 +136,7 @@ class TestVerifyResult:
         llm = _llm("1,234.56")  # normalizes equal
 
         with patch(
-            "docflow.rendering.renderer.render_page",
+            "docuflow.rendering.renderer.render_page",
             new=AsyncMock(return_value=_fake_image()),
         ):
             n = await verify_result(_doc(), result, Invoice, llm)
@@ -156,7 +156,7 @@ class TestVerifyResult:
         llm = _llm("7234.56")  # the zoom read a 7, not a 1
 
         with patch(
-            "docflow.rendering.renderer.render_page",
+            "docuflow.rendering.renderer.render_page",
             new=AsyncMock(return_value=_fake_image()),
         ):
             await verify_result(_doc(), result, Invoice, llm)
@@ -174,7 +174,7 @@ class TestVerifyResult:
         llm = _llm("not-a-number")
 
         with patch(
-            "docflow.rendering.renderer.render_page",
+            "docuflow.rendering.renderer.render_page",
             new=AsyncMock(return_value=_fake_image()),
         ):
             await verify_result(_doc(), result, Invoice, llm)
@@ -189,7 +189,7 @@ class TestVerifyResult:
         llm = _llm("7234.56")
 
         with patch(
-            "docflow.rendering.renderer.render_page",
+            "docuflow.rendering.renderer.render_page",
             new=AsyncMock(return_value=_fake_image()),
         ):
             await verify_result(
@@ -209,7 +209,7 @@ class TestVerifyResult:
         llm = _llm(None, readable=False)
 
         with patch(
-            "docflow.rendering.renderer.render_page",
+            "docuflow.rendering.renderer.render_page",
             new=AsyncMock(return_value=_fake_image()),
         ):
             await verify_result(_doc(), result, Invoice, llm)
@@ -230,7 +230,7 @@ class TestVerifyResult:
         llm = _llm("anything")
 
         with patch(
-            "docflow.rendering.renderer.render_page",
+            "docuflow.rendering.renderer.render_page",
             new=AsyncMock(return_value=_fake_image()),
         ):
             await verify_result(
@@ -252,7 +252,7 @@ class TestVerifyResult:
         })
 
         with patch(
-            "docflow.rendering.renderer.render_page",
+            "docuflow.rendering.renderer.render_page",
             new=AsyncMock(return_value=_fake_image()),
         ):
             await verify_result(_doc(), result, Invoice, llm)
@@ -272,7 +272,7 @@ class TestVerifyResult:
 
 class TestPipelineWiring:
     def test_pipeline_accepts_verification(self):
-        from docflow.processor import DocumentPipeline
+        from docuflow.processor import DocumentPipeline
 
         pipeline = DocumentPipeline(
             verification={"trigger_ocr_below": 0.7, "max_fields": 3},
@@ -280,7 +280,7 @@ class TestPipelineWiring:
         assert pipeline._verification["max_fields"] == 3
 
     def test_workflow_config_accepts_verification(self):
-        from docflow.workflow_config import load_workflow_config
+        from docuflow.workflow_config import load_workflow_config
 
         cfg = load_workflow_config({
             "name": "claims",
@@ -291,8 +291,8 @@ class TestPipelineWiring:
         assert pipeline._verification == {"trigger_consensus_below": 0.8}
 
     async def test_verify_step_in_pipeline_state(self):
-        from docflow.workflow.state import PipelineState
-        from docflow.workflow.steps import VerifyFields
+        from docuflow.workflow.state import PipelineState
+        from docuflow.workflow.steps import VerifyFields
 
         state = PipelineState()
         state.document = _doc()
@@ -305,7 +305,7 @@ class TestPipelineWiring:
         step = VerifyFields(llm=llm, policy=VerificationPolicy())
 
         with patch(
-            "docflow.rendering.renderer.render_page",
+            "docuflow.rendering.renderer.render_page",
             new=AsyncMock(return_value=_fake_image()),
         ):
             state = await step.execute(state)

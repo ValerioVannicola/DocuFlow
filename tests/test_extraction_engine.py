@@ -6,10 +6,17 @@ from unittest.mock import AsyncMock
 import pytest
 from pydantic import BaseModel
 
-from docflow.documents.models import Block, BlockType, BoundingBox, Document, DocumentMetadata, Page
-from docflow.extraction.engine import ExtractionEngine
-from docflow.extraction.llm.base import LLMResponse
-from docflow.extraction.models import ExtractionResult
+from docuflow.documents.models import (
+    Block,
+    BlockType,
+    BoundingBox,
+    Document,
+    DocumentMetadata,
+    Page,
+)
+from docuflow.extraction.engine import ExtractionEngine
+from docuflow.extraction.llm.base import LLMResponse
+from docuflow.extraction.models import ExtractionResult
 
 
 class Invoice(BaseModel):
@@ -122,7 +129,7 @@ class TestExtractionEngine:
         assert supplier_evidence[0].text == "Acme Corp"
 
     async def test_extract_invalid_json(self):
-        from docflow.errors import SchemaExtractionError
+        from docuflow.errors import SchemaExtractionError
 
         mock_llm = AsyncMock()
         mock_llm.complete = AsyncMock(
@@ -136,7 +143,7 @@ class TestExtractionEngine:
             await engine.extract(doc, schema=Invoice)
 
     async def test_extract_schema_mismatch(self):
-        from docflow.errors import SchemaExtractionError
+        from docuflow.errors import SchemaExtractionError
 
         mock_llm = AsyncMock()
         mock_llm.complete = AsyncMock(
@@ -155,7 +162,7 @@ class TestExtractionEngine:
 
 class TestConfidenceScores:
     def _ocr_document(self) -> Document:
-        from docflow.documents.models import Word
+        from docuflow.documents.models import Word
 
         def line(block_id, text, confs, y):
             words = [
@@ -259,7 +266,7 @@ class TestConfidenceScores:
 
 class TestPrompts:
     def test_build_extraction_prompt(self):
-        from docflow.extraction.prompts import build_extraction_prompt
+        from docuflow.extraction.prompts import build_extraction_prompt
 
         messages = build_extraction_prompt(Invoice, "Test document text")
         assert len(messages) == 2
@@ -269,7 +276,7 @@ class TestPrompts:
         assert "Test document text" in messages[1]["content"]
 
     def test_prompt_with_pages(self):
-        from docflow.extraction.prompts import build_extraction_prompt
+        from docuflow.extraction.prompts import build_extraction_prompt
 
         messages = build_extraction_prompt(
             Invoice, "full text", page_texts=["Page 0 text", "Page 1 text"]

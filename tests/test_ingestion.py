@@ -4,10 +4,10 @@ from pathlib import Path
 
 import pytest
 
-from docflow.documents.models import Document
-from docflow.errors import UnsupportedFileTypeError
-from docflow.ingestion.local import ingest_file, ingest_file_sync, ingest_folder
-from docflow.ingestion.mime import MIME_TYPES, detect_mime_type
+from docuflow.documents.models import Document
+from docuflow.errors import UnsupportedFileTypeError
+from docuflow.ingestion.local import ingest_file, ingest_file_sync, ingest_folder
+from docuflow.ingestion.mime import MIME_TYPES, detect_mime_type
 
 
 class TestMimeDetection:

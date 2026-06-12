@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import pytest
 
-from docflow.documents.models import Document, DocumentMetadata
-from docflow.parsing.base import Parser
-from docflow.parsing.docling_parser import DoclingParser
+from docuflow.documents.models import Document, DocumentMetadata
+from docuflow.parsing.base import Parser
+from docuflow.parsing.docling_parser import DoclingParser
 
 
 class TestDoclingParser:
@@ -42,7 +42,7 @@ class TestDoclingParser:
         assert len(result.pages[0].blocks) > 0
 
     async def test_parse_nonexistent_file(self):
-        from docflow.errors import ParsingError
+        from docuflow.errors import ParsingError
 
         document = Document(
             id="doc-1",
@@ -86,7 +86,7 @@ class TestDoclingOCRConfidence:
         )
 
     def test_ocr_cells_become_words(self):
-        from docflow.parsing.docling_parser import _cell_to_word
+        from docuflow.parsing.docling_parser import _cell_to_word
 
         word = _cell_to_word(self._ocr_cell("Total", 0.91, 10, 10, 60, 25), 842.0)
         assert word is not None
@@ -95,12 +95,12 @@ class TestDoclingOCRConfidence:
         assert word.bbox.x0 == 10
 
     def test_native_cells_skipped(self):
-        from docflow.parsing.docling_parser import _cell_to_word
+        from docuflow.parsing.docling_parser import _cell_to_word
 
         assert _cell_to_word(self._native_cell("Total", 10, 10, 60, 25), 842.0) is None
 
     def test_old_api_ocr_cell_detected_by_class_name(self):
-        from docflow.parsing.docling_parser import _cell_to_word
+        from docuflow.parsing.docling_parser import _cell_to_word
 
         ocr_cell_cls = type("OcrCell", (), {})
         cell = ocr_cell_cls()
@@ -113,8 +113,8 @@ class TestDoclingOCRConfidence:
         assert word.confidence == 0.88
 
     def test_words_attached_to_blocks_by_bbox(self):
-        from docflow.documents.models import Block, BlockType, BoundingBox
-        from docflow.parsing.docling_parser import (
+        from docuflow.documents.models import Block, BlockType, BoundingBox
+        from docuflow.parsing.docling_parser import (
             _attach_words_to_blocks,
             _cell_to_word,
         )
@@ -146,7 +146,7 @@ class TestDoclingOCRConfidence:
     def test_harvest_requires_matching_page_count(self):
         from types import SimpleNamespace
 
-        from docflow.parsing.docling_parser import _harvest_ocr_words
+        from docuflow.parsing.docling_parser import _harvest_ocr_words
 
         result = SimpleNamespace(
             pages=[SimpleNamespace(cells=[self._ocr_cell("x", 0.9, 0, 0, 10, 10)])]
@@ -157,7 +157,7 @@ class TestDoclingOCRConfidence:
     def test_harvest_collects_words_per_page(self):
         from types import SimpleNamespace
 
-        from docflow.parsing.docling_parser import _harvest_ocr_words
+        from docuflow.parsing.docling_parser import _harvest_ocr_words
 
         result = SimpleNamespace(
             pages=[
@@ -176,14 +176,14 @@ class TestDoclingOCRConfidence:
 
 class TestParseStepDocling:
     def test_processor_resolves_docling(self):
-        from docflow.processor import DocumentPipeline
+        from docuflow.processor import DocumentPipeline
 
         pipeline = DocumentPipeline(parser="docling")
         resolved = pipeline._resolve_parser()
         assert isinstance(resolved, DoclingParser)
 
     async def test_parse_step_resolves_docling_string(self):
-        from docflow.workflow.steps import Parse
+        from docuflow.workflow.steps import Parse
 
         step = Parse(parser="docling")
         assert step.parser == "docling"

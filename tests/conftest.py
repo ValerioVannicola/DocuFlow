@@ -4,8 +4,8 @@ import uuid
 
 import pytest
 
-from docflow.documents.evidence import Evidence
-from docflow.documents.models import (
+from docuflow.documents.evidence import Evidence
+from docuflow.documents.models import (
     Block,
     BlockType,
     BoundingBox,
@@ -13,7 +13,7 @@ from docflow.documents.models import (
     DocumentMetadata,
     Page,
 )
-from docflow.extraction.models import ExtractedField, ExtractionResult
+from docuflow.extraction.models import ExtractedField, ExtractionResult
 
 _PAGE_SIZE = (595, 842)
 

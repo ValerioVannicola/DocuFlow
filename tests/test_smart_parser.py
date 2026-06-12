@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from docflow.documents.models import Block, BlockType, BoundingBox, Page
-from docflow.parsing.base import Parser
-from docflow.parsing.smart_parser import SmartParser, _page_needs_ocr
+from docuflow.documents.models import Block, BlockType, BoundingBox, Page
+from docuflow.parsing.base import Parser
+from docuflow.parsing.smart_parser import SmartParser, _page_needs_ocr
 
 
 class TestPageNeedsOCR:
@@ -60,14 +60,14 @@ class TestSmartParser:
 
 class TestSmartParserResolution:
     def test_processor_resolves_smart(self):
-        from docflow.processor import DocumentPipeline
+        from docuflow.processor import DocumentPipeline
 
         pipeline = DocumentPipeline(parser="smart")
         resolved = pipeline._resolve_parser()
         assert isinstance(resolved, SmartParser)
 
     async def test_parse_step_resolves_smart(self):
-        from docflow.workflow.steps import Parse
+        from docuflow.workflow.steps import Parse
 
         step = Parse(parser="smart")
         assert step.parser == "smart"

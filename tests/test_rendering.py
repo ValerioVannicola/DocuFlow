@@ -8,7 +8,7 @@ import pytest
 class TestRendering:
     @pytest.mark.integration
     async def test_render_page(self, tmp_path):
-        from docflow.rendering.renderer import render_page
+        from docuflow.rendering.renderer import render_page
 
         pdf_path = tmp_path / "test.pdf"
         _create_test_pdf(pdf_path)
@@ -19,7 +19,7 @@ class TestRendering:
 
     @pytest.mark.integration
     async def test_render_all_pages(self, tmp_path):
-        from docflow.rendering.renderer import render_all_pages
+        from docuflow.rendering.renderer import render_all_pages
 
         pdf_path = tmp_path / "test.pdf"
         _create_test_pdf(pdf_path)
@@ -30,8 +30,8 @@ class TestRendering:
 
     @pytest.mark.integration
     async def test_render_invalid_page(self, tmp_path):
-        from docflow.errors import ParsingError
-        from docflow.rendering.renderer import render_page
+        from docuflow.errors import ParsingError
+        from docuflow.rendering.renderer import render_page
 
         pdf_path = tmp_path / "test.pdf"
         _create_test_pdf(pdf_path)

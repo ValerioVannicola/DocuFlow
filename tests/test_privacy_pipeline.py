@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock
 
-from docflow.privacy.policy import PrivacyPolicy
-from docflow.workflow.state import PipelineState
-from docflow.workflow.steps import Anonymize, PipelineStep
+from docuflow.privacy.policy import PrivacyPolicy
+from docuflow.workflow.state import PipelineState
+from docuflow.workflow.steps import Anonymize, PipelineStep
 
 
 class MockProvider:
@@ -33,7 +33,7 @@ class TestAnonymizeStep:
         assert result.status == "failed"
 
     async def test_anonymize_step_success(self):
-        from docflow.documents.models import Document, DocumentMetadata, Page
+        from docuflow.documents.models import Document, DocumentMetadata, Page
 
         policy = PrivacyPolicy(provider=MockProvider())
         step = Anonymize(policy=policy)
@@ -56,7 +56,7 @@ class TestAnonymizeStep:
         policy = PrivacyPolicy(provider=failing_provider, fail_closed=True)
         step = Anonymize(policy=policy)
 
-        from docflow.documents.models import Document, DocumentMetadata, Page
+        from docuflow.documents.models import Document, DocumentMetadata, Page
 
         state = PipelineState()
         state.document = Document(
@@ -77,7 +77,7 @@ class TestAnonymizeStep:
         policy = PrivacyPolicy(provider=failing_provider, fail_closed=False)
         step = Anonymize(policy=policy)
 
-        from docflow.documents.models import Document, DocumentMetadata, Page
+        from docuflow.documents.models import Document, DocumentMetadata, Page
 
         state = PipelineState()
         state.document = Document(
@@ -97,13 +97,13 @@ class TestAnonymizeStep:
 
 class TestDocumentPipelinePrivacy:
     def test_pipeline_without_privacy_unchanged(self):
-        from docflow.processor import DocumentPipeline
+        from docuflow.processor import DocumentPipeline
 
         pipeline = DocumentPipeline()
         assert pipeline._privacy is None
 
     def test_pipeline_with_privacy(self):
-        from docflow.processor import DocumentPipeline
+        from docuflow.processor import DocumentPipeline
 
         policy = PrivacyPolicy(provider=MockProvider())
         pipeline = DocumentPipeline(privacy=policy)

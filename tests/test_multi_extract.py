@@ -6,10 +6,10 @@ from unittest.mock import AsyncMock
 import pytest
 from pydantic import BaseModel
 
-from docflow.documents.models import Document, DocumentMetadata, Page
-from docflow.extraction.engine import ExtractionEngine, _generate_temperatures
-from docflow.extraction.llm.base import LLMResponse
-from docflow.extraction.models import ExtractionResult
+from docuflow.documents.models import Document, DocumentMetadata, Page
+from docuflow.extraction.engine import ExtractionEngine, _generate_temperatures
+from docuflow.extraction.llm.base import LLMResponse
+from docuflow.extraction.models import ExtractionResult
 
 
 class Invoice(BaseModel):
@@ -190,7 +190,7 @@ class TestMultiExtract:
         mock_llm.complete = AsyncMock(side_effect=RuntimeError("all fail"))
 
         engine = ExtractionEngine(llm=mock_llm)
-        from docflow.errors import SchemaExtractionError
+        from docuflow.errors import SchemaExtractionError
 
         with pytest.raises(SchemaExtractionError, match="All 3 extraction instances failed"):
             await engine.extract(

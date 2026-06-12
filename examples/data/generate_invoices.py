@@ -1,4 +1,4 @@
-"""Generate realistic sample invoice PDFs for DocFlow notebooks (reportlab)."""
+"""Generate realistic sample invoice PDFs for DocuFlow notebooks (reportlab)."""
 from __future__ import annotations
 
 from pathlib import Path

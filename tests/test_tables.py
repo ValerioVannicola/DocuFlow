@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import json
 
-from docflow.documents.models import BoundingBox
-from docflow.documents.tables import Cell, Table
+from docuflow.documents.models import BoundingBox
+from docuflow.documents.tables import Cell, Table
 
 
 class TestCell:
@@ -180,13 +180,13 @@ class TestTable:
 
 class TestPageTables:
     def test_page_has_tables(self):
-        from docflow.documents.models import Page
+        from docuflow.documents.models import Page
 
         page = Page(page_number=0, tables=[Table(num_rows=2, num_cols=2)])
         assert page.table_count == 1
 
     def test_page_tables_default_empty(self):
-        from docflow.documents.models import Page
+        from docuflow.documents.models import Page
 
         page = Page(page_number=0)
         assert page.table_count == 0

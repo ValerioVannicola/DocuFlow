@@ -4,9 +4,9 @@ from pathlib import Path
 
 import pytest
 
-from docflow.documents.models import Document, DocumentMetadata
-from docflow.errors import ParsingError
-from docflow.parsing.base import Parser
+from docuflow.documents.models import Document, DocumentMetadata
+from docuflow.errors import ParsingError
+from docuflow.parsing.base import Parser
 
 
 class TestParserProtocol:
@@ -21,7 +21,7 @@ class TestParserProtocol:
 class TestPdfplumberParser:
     @pytest.mark.integration
     async def test_parse_real_pdf(self, tmp_path):
-        from docflow.parsing.pdfplumber_parser import PdfplumberParser
+        from docuflow.parsing.pdfplumber_parser import PdfplumberParser
 
         pdf_path = tmp_path / "test.pdf"
         _create_test_pdf(pdf_path)
@@ -48,7 +48,7 @@ class TestPdfplumberParser:
 
     @pytest.mark.integration
     async def test_parse_nonexistent_file(self):
-        from docflow.parsing.pdfplumber_parser import PdfplumberParser
+        from docuflow.parsing.pdfplumber_parser import PdfplumberParser
 
         doc = Document(
             id="test-doc",

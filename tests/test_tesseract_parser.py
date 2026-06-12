@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import pytest
 
-from docflow.documents.models import Document, DocumentMetadata
-from docflow.parsing.base import Parser
-from docflow.parsing.tesseract_parser import TesseractParser
+from docuflow.documents.models import Document, DocumentMetadata
+from docuflow.parsing.base import Parser
+from docuflow.parsing.tesseract_parser import TesseractParser
 
 
 class TestTesseractParser:
@@ -56,28 +56,28 @@ class TestTesseractParserExecution:
 
 class TestParseStepResolution:
     async def test_parse_step_resolves_tesseract_string(self):
-        from docflow.workflow.steps import Parse
+        from docuflow.workflow.steps import Parse
 
         step = Parse(parser="tesseract")
         assert step.parser == "tesseract"
 
     def test_processor_resolves_tesseract(self):
-        from docflow.processor import DocumentPipeline
+        from docuflow.processor import DocumentPipeline
 
         pipeline = DocumentPipeline(parser="tesseract")
         resolved = pipeline._resolve_parser()
         assert isinstance(resolved, TesseractParser)
 
     def test_processor_resolves_pdfplumber(self):
-        from docflow.parsing.pdfplumber_parser import PdfplumberParser
-        from docflow.processor import DocumentPipeline
+        from docuflow.parsing.pdfplumber_parser import PdfplumberParser
+        from docuflow.processor import DocumentPipeline
 
         pipeline = DocumentPipeline(parser="pdfplumber")
         resolved = pipeline._resolve_parser()
         assert isinstance(resolved, PdfplumberParser)
 
     def test_processor_unknown_raises(self):
-        from docflow.processor import DocumentPipeline
+        from docuflow.processor import DocumentPipeline
 
         pipeline = DocumentPipeline(parser="unknown")
         with pytest.raises(ValueError, match="Unknown parser"):

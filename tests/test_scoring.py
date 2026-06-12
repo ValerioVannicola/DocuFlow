@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from docflow.documents.models import (
+from docuflow.documents.models import (
     Block,
     BlockType,
     BoundingBox,
@@ -11,7 +11,7 @@ from docflow.documents.models import (
     Page,
     Word,
 )
-from docflow.extraction.scoring import (
+from docuflow.extraction.scoring import (
     compute_document_ocr_confidence,
     compute_field_consensus,
     compute_field_ocr_confidence,

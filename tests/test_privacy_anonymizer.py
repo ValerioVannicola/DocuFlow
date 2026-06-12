@@ -4,16 +4,16 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from docflow.documents.models import Document, DocumentMetadata, Page
-from docflow.errors import AnonymizationError
-from docflow.privacy.anonymizer import Anonymizer
-from docflow.privacy.mapping_store import LocalMappingStore
-from docflow.privacy.models import (
+from docuflow.documents.models import Document, DocumentMetadata, Page
+from docuflow.errors import AnonymizationError
+from docuflow.privacy.anonymizer import Anonymizer
+from docuflow.privacy.mapping_store import LocalMappingStore
+from docuflow.privacy.models import (
     AnonymizationMode,
     AnonymizationResult,
     PrivacyFinding,
 )
-from docflow.privacy.policy import PrivacyPolicy
+from docuflow.privacy.policy import PrivacyPolicy
 
 
 class MockProvider:

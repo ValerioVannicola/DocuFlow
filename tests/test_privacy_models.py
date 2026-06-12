@@ -3,15 +3,15 @@ from __future__ import annotations
 import pydantic
 import pytest
 
-from docflow.errors import AnonymizationError, DocflowError, PrivacyError
-from docflow.privacy.models import (
+from docuflow.errors import AnonymizationError, DocuflowError, PrivacyError
+from docuflow.privacy.models import (
     AnonymizationMode,
     AnonymizationResult,
     AnonymizedText,
     PrivacyFinding,
     TokenMapping,
 )
-from docflow.privacy.policy import PrivacyPolicy
+from docuflow.privacy.policy import PrivacyPolicy
 
 
 class TestAnonymizationMode:
@@ -114,7 +114,7 @@ class TestPrivacyPolicy:
 
 class TestPrivacyErrors:
     def test_privacy_error_hierarchy(self):
-        assert issubclass(PrivacyError, DocflowError)
+        assert issubclass(PrivacyError, DocuflowError)
         assert issubclass(AnonymizationError, PrivacyError)
 
     def test_can_raise(self):

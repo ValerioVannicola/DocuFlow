@@ -5,8 +5,8 @@ import pytest
 import yaml
 from pydantic import BaseModel
 
-from docflow.templates.loader import yaml_to_pydantic
-from docflow.templates.registry import TemplateRegistry, list_templates, load_template
+from docuflow.templates.loader import yaml_to_pydantic
+from docuflow.templates.registry import TemplateRegistry, list_templates, load_template
 
 
 class TestYamlToPydantic:

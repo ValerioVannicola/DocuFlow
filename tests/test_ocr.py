@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from docflow.ocr.base import OCREngine, OCRResult
+from docuflow.ocr.base import OCREngine, OCRResult
 
 
 class TestOCRProtocol:
@@ -59,9 +59,9 @@ class TestTesseractOCR:
 
         with patch.dict(sys.modules, {"pytesseract": mock_pyt}):
             # Force re-import of the module so it picks up the mocked pytesseract
-            if "docflow.ocr.tesseract" in sys.modules:
-                del sys.modules["docflow.ocr.tesseract"]
-            from docflow.ocr.tesseract import TesseractOCR
+            if "docuflow.ocr.tesseract" in sys.modules:
+                del sys.modules["docuflow.ocr.tesseract"]
+            from docuflow.ocr.tesseract import TesseractOCR
 
             ocr = TesseractOCR(preprocess_steps=[])
             result = await ocr.ocr(mock_image)
@@ -95,9 +95,9 @@ class TestTesseractOCR:
         mock_image = MagicMock()
 
         with patch.dict(sys.modules, {"pytesseract": mock_pyt}):
-            if "docflow.ocr.tesseract" in sys.modules:
-                del sys.modules["docflow.ocr.tesseract"]
-            from docflow.ocr.tesseract import TesseractOCR
+            if "docuflow.ocr.tesseract" in sys.modules:
+                del sys.modules["docuflow.ocr.tesseract"]
+            from docuflow.ocr.tesseract import TesseractOCR
 
             ocr = TesseractOCR(preprocess_steps=[])
             result = await ocr.ocr(mock_image)
@@ -121,9 +121,9 @@ class TestTesseractOCR:
         mock_image = MagicMock()
 
         with patch.dict(sys.modules, {"pytesseract": mock_pyt}):
-            if "docflow.ocr.tesseract" in sys.modules:
-                del sys.modules["docflow.ocr.tesseract"]
-            from docflow.ocr.tesseract import TesseractOCR
+            if "docuflow.ocr.tesseract" in sys.modules:
+                del sys.modules["docuflow.ocr.tesseract"]
+            from docuflow.ocr.tesseract import TesseractOCR
 
             ocr = TesseractOCR(preprocess_steps=[])
             result = await ocr.ocr(mock_image)
@@ -136,7 +136,7 @@ class TestPreprocessing:
     def test_to_grayscale(self):
         from PIL import Image
 
-        from docflow.ocr.preprocessing import to_grayscale
+        from docuflow.ocr.preprocessing import to_grayscale
 
         img = Image.new("RGB", (100, 100), color="red")
         gray = to_grayscale(img)
@@ -145,7 +145,7 @@ class TestPreprocessing:
     def test_threshold(self):
         from PIL import Image
 
-        from docflow.ocr.preprocessing import threshold
+        from docuflow.ocr.preprocessing import threshold
 
         img = Image.new("L", (100, 100), color=128)
         result = threshold(img, thresh=100)
@@ -154,7 +154,7 @@ class TestPreprocessing:
     def test_denoise(self):
         from PIL import Image
 
-        from docflow.ocr.preprocessing import denoise
+        from docuflow.ocr.preprocessing import denoise
 
         img = Image.new("RGB", (100, 100))
         result = denoise(img)
@@ -163,7 +163,7 @@ class TestPreprocessing:
     def test_preprocess_chain(self):
         from PIL import Image
 
-        from docflow.ocr.preprocessing import preprocess
+        from docuflow.ocr.preprocessing import preprocess
 
         img = Image.new("RGB", (100, 100))
         result = preprocess(img, steps=["grayscale", "denoise"])
@@ -172,7 +172,7 @@ class TestPreprocessing:
     def test_preprocess_unknown_step_ignored(self):
         from PIL import Image
 
-        from docflow.ocr.preprocessing import preprocess
+        from docuflow.ocr.preprocessing import preprocess
 
         img = Image.new("RGB", (100, 100))
         result = preprocess(img, steps=["grayscale", "nonexistent"])

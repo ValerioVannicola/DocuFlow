@@ -5,8 +5,8 @@ import io
 import json
 from unittest.mock import AsyncMock
 
-from docflow.batch import BatchReport, process_batch
-from docflow.extraction.models import ExtractedField, ExtractionResult
+from docuflow.batch import BatchReport, process_batch
+from docuflow.extraction.models import ExtractedField, ExtractionResult
 
 
 def _make_result(

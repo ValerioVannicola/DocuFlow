@@ -6,13 +6,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from pydantic import BaseModel
 
-from docflow.documents.models import Document, DocumentMetadata, Page
-from docflow.extraction.engine import HybridExtractionEngine
-from docflow.extraction.llm.base import LLMResponse
-from docflow.extraction.models import ExtractionResult
-from docflow.ocr.base import OCRResult
-from docflow.workflow.state import PipelineState
-from docflow.workflow.steps import ExtractHybrid, PipelineStep
+from docuflow.documents.models import Document, DocumentMetadata, Page
+from docuflow.extraction.engine import HybridExtractionEngine
+from docuflow.extraction.llm.base import LLMResponse
+from docuflow.extraction.models import ExtractionResult
+from docuflow.ocr.base import OCRResult
+from docuflow.workflow.state import PipelineState
+from docuflow.workflow.steps import ExtractHybrid, PipelineStep
 
 
 class Invoice(BaseModel):
@@ -64,11 +64,11 @@ def _mock_img():
 def _patch_rendering_and_ocr(mock_img):
     return (
         patch(
-            "docflow.rendering.renderer.render_all_pages",
+            "docuflow.rendering.renderer.render_all_pages",
             new_callable=AsyncMock, return_value=[mock_img],
         ),
         patch(
-            "docflow.ocr.tesseract.TesseractOCR",
+            "docuflow.ocr.tesseract.TesseractOCR",
             return_value=MagicMock(
                 ocr=AsyncMock(return_value=OCRResult(text="Acme Corp 1234.56", blocks=[])),
             ),
@@ -115,13 +115,13 @@ class TestExtractHybridStep:
 
 class TestDocumentPipelineHybrid:
     def test_hybrid_with_parser_raises(self):
-        from docflow.processor import DocumentPipeline
+        from docuflow.processor import DocumentPipeline
 
         with pytest.raises(ValueError, match="cannot be used with a parser"):
             DocumentPipeline(parser="pdfplumber", extraction_type="hybrid")
 
     def test_hybrid_with_parser_none_ok(self):
-        from docflow.processor import DocumentPipeline
+        from docuflow.processor import DocumentPipeline
 
         pipeline = DocumentPipeline(parser=None, extraction_type="hybrid")
         assert pipeline._extraction_type == "hybrid"
@@ -182,7 +182,7 @@ class TestHybridExtractionEngine:
         mock_llm.complete = AsyncMock(side_effect=RuntimeError("all fail"))
         img = _mock_img()
 
-        from docflow.errors import SchemaExtractionError
+        from docuflow.errors import SchemaExtractionError
 
         p_render, p_ocr = _patch_rendering_and_ocr(img)
         with p_render, p_ocr:
@@ -215,7 +215,7 @@ class TestHybridExtractionEngine:
 
 class TestHybridDeciderPrompt:
     def test_build_hybrid_decider_prompt(self):
-        from docflow.extraction.engine import _build_hybrid_decider_prompt
+        from docuflow.extraction.engine import _build_hybrid_decider_prompt
 
         candidates = [
             {"data": {"supplier_name": "Acme"}, "evidence": {}},

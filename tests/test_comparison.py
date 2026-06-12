@@ -3,14 +3,14 @@ from __future__ import annotations
 import json
 from unittest.mock import AsyncMock
 
-from docflow.comparison import (
+from docuflow.comparison import (
     ComparisonCell,
     ComparisonResult,
     _compute_difference,
     compare_documents,
 )
-from docflow.documents.evidence import Evidence
-from docflow.extraction.models import ExtractedField, ExtractionResult
+from docuflow.documents.evidence import Evidence
+from docuflow.extraction.models import ExtractedField, ExtractionResult
 
 
 def _make_result(

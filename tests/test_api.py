@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from pydantic import BaseModel
 
-from docflow.processor import DocumentPipeline
+from docuflow.processor import DocumentPipeline
 
 
 class SimpleSchema(BaseModel):
@@ -28,7 +28,7 @@ class TestDocumentPipeline:
     def test_resolve_parser_pdfplumber(self):
         pipeline = DocumentPipeline(parser="pdfplumber")
         parser = pipeline._resolve_parser()
-        from docflow.parsing.pdfplumber_parser import PdfplumberParser
+        from docuflow.parsing.pdfplumber_parser import PdfplumberParser
 
         assert isinstance(parser, PdfplumberParser)
 
@@ -44,7 +44,7 @@ class TestDocumentPipeline:
     def test_resolve_storage_local(self):
         pipeline = DocumentPipeline(storage="local")
         storage = pipeline._resolve_storage()
-        from docflow.storage.local import LocalDocumentStore
+        from docuflow.storage.local import LocalDocumentStore
 
         assert isinstance(storage, LocalDocumentStore)
 

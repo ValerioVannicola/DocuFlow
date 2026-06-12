@@ -1,4 +1,4 @@
-"""Tests for the DocFlow serve module."""
+"""Tests for the DocuFlow serve module."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from docflow.serve import create_app
-from docflow.workflow_config import WorkflowConfig
+from docuflow.serve import create_app
+from docuflow.workflow_config import WorkflowConfig
 
 
 @pytest.fixture()
@@ -57,7 +57,7 @@ class TestSchema:
 
 
 class TestExtract:
-    @patch("docflow.serve.quality_report")
+    @patch("docuflow.serve.quality_report")
     @patch.object(WorkflowConfig, "build_schema")
     @patch.object(WorkflowConfig, "build_pipeline")
     def test_extract_returns_result(self, mock_bp, mock_bs, mock_qr, config):

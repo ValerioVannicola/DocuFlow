@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock
 
-from docflow.observability.traces import create_trace
-from docflow.privacy.models import PrivacyFinding
-from docflow.privacy.scrubber import TraceScrubber
+from docuflow.observability.traces import create_trace
+from docuflow.privacy.models import PrivacyFinding
+from docuflow.privacy.scrubber import TraceScrubber
 
 
 def _make_mock_provider(findings=None):

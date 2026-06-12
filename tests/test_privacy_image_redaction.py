@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock
 
-from docflow.documents.models import BoundingBox
-from docflow.ocr.base import OCRResult
-from docflow.privacy.image_redaction import ImageRedactor
-from docflow.privacy.models import PrivacyFinding
+from docuflow.documents.models import BoundingBox
+from docuflow.ocr.base import OCRResult
+from docuflow.privacy.image_redaction import ImageRedactor
+from docuflow.privacy.models import PrivacyFinding
 
 
 def _make_mock_provider(findings: list[PrivacyFinding] | None = None):
@@ -15,7 +15,7 @@ def _make_mock_provider(findings: list[PrivacyFinding] | None = None):
 
 
 def _make_mock_ocr(blocks=None):
-    from docflow.documents.models import Block, BlockType
+    from docuflow.documents.models import Block, BlockType
 
     if blocks is None:
         blocks = [

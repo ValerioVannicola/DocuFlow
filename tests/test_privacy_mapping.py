@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from docflow.privacy.mapping_store import LocalMappingStore, MappingStore
-from docflow.privacy.models import TokenMapping
+from docuflow.privacy.mapping_store import LocalMappingStore, MappingStore
+from docuflow.privacy.models import TokenMapping
 
 
 class TestLocalMappingStore:

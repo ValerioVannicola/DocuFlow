@@ -1,4 +1,4 @@
-# DocFlow — Complete User Guide
+# DocuFlow — Complete User Guide
 
 > Extract structured data from documents using LLMs — with evidence, validation, review, and full audit trail.
 
@@ -37,9 +37,9 @@
 
 ## 1. Introduction
 
-### What DocFlow Does
+### What DocuFlow Does
 
-DocFlow is a Python library that extracts structured data from business documents — invoices, contracts, receipts, claims, KYC forms — using LLMs. You define what fields you want (as a Pydantic model), point it at a PDF, and get back:
+DocuFlow is a Python library that extracts structured data from business documents — invoices, contracts, receipts, claims, KYC forms — using LLMs. You define what fields you want (as a Pydantic model), point it at a PDF, and get back:
 
 - **Extracted values** matching your schema
 - **Evidence** linking each value to its source text, page number, and bounding box
@@ -48,9 +48,9 @@ DocFlow is a Python library that extracts structured data from business document
 - **Review verdicts** from configurable rules and LLM-powered reviewers
 - **Full audit trail** of corrections, approvals, and processing history
 
-### What Makes DocFlow Different
+### What Makes DocuFlow Different
 
-Most extraction tools stop at "here's your JSON." DocFlow covers what happens after extraction:
+Most extraction tools stop at "here's your JSON." DocuFlow covers what happens after extraction:
 
 - **Evidence grounding**: every field traces to a specific location in the source document
 - **Multi-agent consensus**: run multiple LLMs in parallel and let a decider pick the best answer
@@ -59,14 +59,14 @@ Most extraction tools stop at "here's your JSON." DocFlow covers what happens af
 - **Production tooling**: batch processing, document comparison, CSV export, token/cost accounting
 - **Self-containerizing**: any workflow exports to YAML and deploys itself as a Docker microservice
 
-### Three Ways to Use DocFlow
+### Three Ways to Use DocuFlow
 
 Pick the level of ceremony that fits the job — they all run the same pipeline underneath:
 
 **1. The one-liner** — for scripts, notebooks, and trying things out:
 
 ```python
-from docflow import extract
+from docuflow import extract
 
 result = extract("invoice.pdf", schema=Invoice, model="openai/gpt-4o")
 ```
@@ -76,7 +76,7 @@ result = extract("invoice.pdf", schema=Invoice, model="openai/gpt-4o")
 part of a larger Python application:
 
 ```python
-from docflow import DocumentPipeline
+from docuflow import DocumentPipeline
 
 pipeline = DocumentPipeline(parser="smart", extraction_mode="multi", n_instances=3)
 result = pipeline.run_sync("claim_form.pdf", schema=InsuranceClaim)
@@ -89,16 +89,16 @@ artifact, which means workflows can be versioned, reviewed, and shared without t
 Python:
 
 ```bash
-docflow run claims.yaml claim_form.pdf --output result.json
-docflow serve claims.yaml --port 8000
-docflow dockerize claims.yaml --output ./deploy
+docuflow run claims.yaml claim_form.pdf --output result.json
+docuflow serve claims.yaml --port 8000
+docuflow dockerize claims.yaml --output ./deploy
 ```
 
 See [Workflow Config](#18b-workflow-config) and [Serve & Dockerize](#18c-serve--dockerize-deployment).
 
 ### Architecture Overview — How the Backend Works
 
-DocFlow processes documents through a configurable pipeline of steps:
+DocuFlow processes documents through a configurable pipeline of steps:
 
 ```
 Ingest → Parse → [Anonymize] → Extract → [Validate] → [Review] → [Store]
@@ -250,7 +250,7 @@ Each step receives the state, does its work, and returns the updated state. The 
 ### Full Installation
 
 ```bash
-pip install docflow[all]
+pip install docuflow[all]
 ```
 
 This installs everything: all parsers (pdfplumber, Tesseract, Docling, and the Azure/AWS/Google cloud OCR SDKs), LLM support, serving, privacy/anonymization, and all dependencies. This is the heaviest option (~500MB+ due to PyTorch from Docling).
@@ -260,10 +260,10 @@ This installs everything: all parsers (pdfplumber, Tesseract, Docling, and the A
 Install only what you need:
 
 ```bash
-pip install docflow[pdf,llm]        # pdfplumber parser + LLM (lightweight)
-pip install docflow[ocr,llm]        # Tesseract OCR + LLM
-pip install docflow[docling,llm]    # Docling parser + LLM (best quality)
-pip install docflow[privacy]        # Presidio anonymization
+pip install docuflow[pdf,llm]        # pdfplumber parser + LLM (lightweight)
+pip install docuflow[ocr,llm]        # Tesseract OCR + LLM
+pip install docuflow[docling,llm]    # Docling parser + LLM (best quality)
+pip install docuflow[privacy]        # Presidio anonymization
 ```
 
 ### Optional Dependency Groups
@@ -285,22 +285,22 @@ pip install docflow[privacy]        # Presidio anonymization
 
 ### Installation Size
 
-DocFlow itself is ~3 MB. The dependencies vary significantly by what you install:
+DocuFlow itself is ~3 MB. The dependencies vary significantly by what you install:
 
 | Installation | Disk space | What you get |
 |-------------|-----------|-------------|
-| `docflow` (core only) | ~15 MB | Pydantic, YAML, aiofiles, click — no parsing or LLM |
-| `docflow[pdf]` | ~70 MB | + pdfplumber (~50 MB) — digital PDF parsing |
-| `docflow[ocr]` | ~30 MB | + pytesseract + Pillow (~15 MB) — OCR (requires Tesseract binary) |
-| `docflow[llm]` | ~80 MB | + litellm (~55 MB) + OpenAI/HTTP clients |
-| `docflow[pdf,llm]` | ~140 MB | pdfplumber + LLM — the lightweight production setup |
-| `docflow[ocr,llm]` | ~110 MB | Tesseract + LLM — for scanned documents |
-| `docflow[privacy]` | ~50 MB | + Presidio analyzer + anonymizer + spaCy model |
-| `docflow[docling]` | ~800 MB | + Docling + PyTorch (~470 MB) + transformers — best parsing quality |
-| `docflow[mcp]` | ~30 MB | + MCP SDK + uvicorn — AI agent integration |
-| `docflow[all]` | ~1.3 GB | Everything including Docling/PyTorch |
+| `docuflow` (core only) | ~15 MB | Pydantic, YAML, aiofiles, click — no parsing or LLM |
+| `docuflow[pdf]` | ~70 MB | + pdfplumber (~50 MB) — digital PDF parsing |
+| `docuflow[ocr]` | ~30 MB | + pytesseract + Pillow (~15 MB) — OCR (requires Tesseract binary) |
+| `docuflow[llm]` | ~80 MB | + litellm (~55 MB) + OpenAI/HTTP clients |
+| `docuflow[pdf,llm]` | ~140 MB | pdfplumber + LLM — the lightweight production setup |
+| `docuflow[ocr,llm]` | ~110 MB | Tesseract + LLM — for scanned documents |
+| `docuflow[privacy]` | ~50 MB | + Presidio analyzer + anonymizer + spaCy model |
+| `docuflow[docling]` | ~800 MB | + Docling + PyTorch (~470 MB) + transformers — best parsing quality |
+| `docuflow[mcp]` | ~30 MB | + MCP SDK + uvicorn — AI agent integration |
+| `docuflow[all]` | ~1.3 GB | Everything including Docling/PyTorch |
 
-**Recommendation:** Start with `docflow[pdf,llm]` (~140 MB) for digital PDFs. Add `[ocr]` if you have scanned documents. Only add `[docling]` if you need advanced table extraction — it pulls in PyTorch which is the bulk of the size.
+**Recommendation:** Start with `docuflow[pdf,llm]` (~140 MB) for digital PDFs. Add `[ocr]` if you have scanned documents. Only add `[docling]` if you need advanced table extraction — it pulls in PyTorch which is the bulk of the size.
 
 ### Requirements
 
@@ -316,7 +316,7 @@ DocFlow itself is ~3 MB. The dependencies vary significantly by what you install
 
 ```python
 from pydantic import BaseModel
-from docflow import extract
+from docuflow import extract
 
 class Invoice(BaseModel):
     supplier_name: str
@@ -335,8 +335,8 @@ print(result.data)
 ### Using a Built-in Template
 
 ```python
-from docflow import extract
-from docflow.templates import load_template
+from docuflow import extract
+from docuflow.templates import load_template
 
 Invoice = load_template("invoice")
 result = extract("invoice.pdf", schema=Invoice)
@@ -345,7 +345,7 @@ result = extract("invoice.pdf", schema=Invoice)
 ### Reusable Pipeline
 
 ```python
-from docflow import DocumentPipeline
+from docuflow import DocumentPipeline
 
 pipeline = DocumentPipeline(
     parser="tesseract",
@@ -406,7 +406,7 @@ if result.usage:
 A `Document` represents a file and all derived content. After ingestion, it has metadata (file name, path, size, hash, MIME type). After parsing, it gets populated with pages, blocks, and text.
 
 ```python
-from docflow.documents.models import Document
+from docuflow.documents.models import Document
 
 doc = Document.from_file_sync("invoice.pdf")
 print(doc.id)                    # UUID
@@ -525,10 +525,10 @@ class Invoice(BaseModel):
 
 ### YAML Templates
 
-DocFlow ships with 3 built-in templates and supports user-defined YAML templates.
+DocuFlow ships with 3 built-in templates and supports user-defined YAML templates.
 
 ```python
-from docflow.templates import load_template, list_templates
+from docuflow.templates import load_template, list_templates
 
 # See what's available
 for t in list_templates():
@@ -547,10 +547,10 @@ Built-in templates:
 
 ### Custom YAML Templates
 
-Create a YAML file in `./docflow_templates/` or `~/.docflow/templates/`:
+Create a YAML file in `./docuflow_templates/` or `~/.docuflow/templates/`:
 
 ```yaml
-# ./docflow_templates/purchase_order.yaml
+# ./docuflow_templates/purchase_order.yaml
 name: purchase_order
 version: "1.0"
 description: "Purchase order extraction schema"
@@ -589,15 +589,15 @@ fields:
 
 Supported types: `str`, `int`, `float`, `bool`, `date`, `datetime`, `list` (with `item_fields` or `item_type`).
 
-Template discovery order: `./docflow_templates/` > `~/.docflow/templates/` > built-in. First match wins, so placing a file with the same name as a built-in template overrides it.
+Template discovery order: `./docuflow_templates/` > `~/.docuflow/templates/` > built-in. First match wins, so placing a file with the same name as a built-in template overrides it.
 
 ### Initializing Templates
 
 Copy a built-in template to your project for customization:
 
 ```bash
-docflow templates init invoice
-# Creates ./docflow_templates/invoice.yaml
+docuflow templates init invoice
+# Creates ./docuflow_templates/invoice.yaml
 ```
 
 ### Auto-Discovering Schemas
@@ -605,7 +605,7 @@ docflow templates init invoice
 Don't know what fields are in your document? Let the LLM figure it out:
 
 ```python
-from docflow import discover_schema
+from docuflow import discover_schema
 
 # LLM reads the document and suggests a schema
 discovery = discover_schema("invoice.pdf")
@@ -626,7 +626,7 @@ The result gives you three things:
 Invoice = discovery.schema_class
 
 # Use it immediately for extraction
-from docflow import extract
+from docuflow import extract
 result = extract("invoice.pdf", schema=Invoice)
 ```
 
@@ -646,7 +646,7 @@ print(discovery.yaml_template)
 #     description: "Total amount"
 
 # Save for reuse
-with open("docflow_templates/my_invoice.yaml", "w") as f:
+with open("docuflow_templates/my_invoice.yaml", "w") as f:
     f.write(discovery.yaml_template)
 ```
 
@@ -667,7 +667,7 @@ This is useful when you have a new document type and want a quick starting point
 
 ## 6. Parsers
 
-Parsers convert raw PDF files into structured `Document` objects with pages, blocks, bounding boxes, and text. DocFlow includes 4 local parsers and 3 cloud OCR parsers — all producing the same standardized output, so everything downstream (evidence, confidence, search) works identically regardless of which one you pick.
+Parsers convert raw PDF files into structured `Document` objects with pages, blocks, bounding boxes, and text. DocuFlow includes 4 local parsers and 3 cloud OCR parsers — all producing the same standardized output, so everything downstream (evidence, confidence, search) works identically regardless of which one you pick.
 
 ### PdfplumberParser (`"pdfplumber"`)
 
@@ -681,7 +681,7 @@ pipeline = DocumentPipeline(parser="pdfplumber")
 - **Best for**: digitally-created PDFs, contracts, reports
 - **Produces**: text blocks with bounding boxes, no confidence scores
 - **Fails on**: scanned documents, image-only PDFs
-- **Install**: `pip install docflow[pdf]`
+- **Install**: `pip install docuflow[pdf]`
 
 ### TesseractParser (`"tesseract"`)
 
@@ -691,7 +691,7 @@ Renders PDF pages to images, then runs Tesseract OCR to extract text. Works on s
 pipeline = DocumentPipeline(parser="tesseract")
 
 # With custom config
-from docflow.parsing.tesseract_parser import TesseractParser
+from docuflow.parsing.tesseract_parser import TesseractParser
 parser = TesseractParser(languages=["eng", "ita"], dpi=300, preprocess_steps=["denoise"])
 pipeline = DocumentPipeline(parser=parser)
 ```
@@ -705,7 +705,7 @@ Parameters:
 - **Best for**: scanned documents, image-heavy PDFs
 - **Produces**: word-level blocks with bounding boxes AND confidence scores (0-1)
 - **Requires**: Tesseract binary installed on the system
-- **Install**: `pip install docflow[ocr]`
+- **Install**: `pip install docuflow[ocr]`
 
 ### DoclingParser (`"docling"`)
 
@@ -720,7 +720,7 @@ pipeline = DocumentPipeline(parser="docling")
 - **Produces**: semantic blocks (title, paragraph, table, formula, etc.) with bounding boxes
 - **Formats**: PDF, DOCX, PPTX, XLSX, HTML, images
 - **Table extraction**: 97.9% accuracy on complex tables — far better than pdfplumber/Tesseract
-- **Install**: `pip install docflow[docling]` (heavy — includes PyTorch)
+- **Install**: `pip install docuflow[docling]` (heavy — includes PyTorch)
 
 ### SmartParser (`"smart"`)
 
@@ -730,7 +730,7 @@ Automatically picks the best approach per page. First tries native text extracti
 pipeline = DocumentPipeline(parser="smart")
 
 # Custom config
-from docflow.parsing.smart_parser import SmartParser
+from docuflow.parsing.smart_parser import SmartParser
 parser = SmartParser(ocr_languages=["eng", "fra"], dpi=300)
 pipeline = DocumentPipeline(parser=parser)
 ```
@@ -748,7 +748,7 @@ A page triggers OCR if:
 
 - **Speed**: fast for digital pages, slow only for pages that need OCR
 - **Best for**: mixed documents where some pages are digital and some are scanned
-- **Install**: `pip install docflow[pdf,ocr]`
+- **Install**: `pip install docuflow[pdf,ocr]`
 
 ### Cloud OCR Parsers
 
@@ -764,7 +764,7 @@ pipeline = DocumentPipeline(parser={"type": "azure-di", "model": "prebuilt-read"
 Sends the file natively (PDF, images, Office formats) — no local rendering. Credentials
 via `endpoint`/`key` config keys or the `AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT` /
 `AZURE_DOCUMENT_INTELLIGENCE_KEY` environment variables.
-**Install**: `pip install docflow[azure]`
+**Install**: `pip install docuflow[azure]`
 
 #### AWS Textract (`"textract"`)
 
@@ -774,7 +774,7 @@ pipeline = DocumentPipeline(parser={"type": "textract", "region": "eu-west-1"})
 
 Renders pages locally and calls the synchronous DetectDocumentText API per page —
 **no S3 bucket required**. Credentials via the standard boto3 chain (env vars, profile,
-IAM role). **Install**: `pip install docflow[aws,pdf]`
+IAM role). **Install**: `pip install docuflow[aws,pdf]`
 
 #### Google Document AI (`"google-docai"`)
 
@@ -787,7 +787,7 @@ pipeline = DocumentPipeline(
 Sends the file natively to a Document AI OCR processor. Configuration via config keys
 or `GOOGLE_DOCAI_PROJECT` / `GOOGLE_DOCAI_LOCATION` / `GOOGLE_DOCAI_PROCESSOR_ID`;
 authentication via Google application default credentials.
-**Install**: `pip install docflow[gcp]`
+**Install**: `pip install docuflow[gcp]`
 
 ### Comparison Table
 
@@ -823,8 +823,8 @@ rel = bbox.to_relative(page.width, page.height)   # 0-1 coords
 Any object implementing the `Parser` protocol works:
 
 ```python
-from docflow.parsing.base import Parser
-from docflow.documents.models import Document
+from docuflow.parsing.base import Parser
+from docuflow.documents.models import Document
 
 class MyParser:
     async def parse(self, document: Document) -> Document:
@@ -846,7 +846,7 @@ When using the Docling parser, tables are extracted as first-class structured ob
 ### The Table and Cell Models
 
 ```python
-from docflow.documents.tables import Table, Cell
+from docuflow.documents.tables import Table, Cell
 
 # After parsing with Docling
 pipeline = DocumentPipeline(parser="docling")
@@ -926,7 +926,7 @@ After parsing, the extraction engine sends the document content to an LLM and ge
 
 ### Extraction Types
 
-DocFlow has 3 extraction types, each using a different approach to read the document.
+DocuFlow has 3 extraction types, each using a different approach to read the document.
 
 #### Text Extraction (`extraction_type="text"`)
 
@@ -965,7 +965,7 @@ Internally, the vision engine:
 
 This means vision extraction produces the same rich evidence (bboxes, block IDs, OCR confidence) as text extraction — even though the LLM read images, not text.
 
-**Important**: `parser` must be `None` when using vision. If you set a parser, DocFlow raises a `ValueError` at pipeline construction.
+**Important**: `parser` must be `None` when using vision. If you set a parser, DocuFlow raises a `ValueError` at pipeline construction.
 
 #### Hybrid Extraction (`extraction_type="hybrid"`)
 
@@ -1145,7 +1145,7 @@ are computed identically either way; a `decider_skipped` trace event records it.
 
 ### Confidence Scores — Two Independent Signals
 
-DocFlow does NOT use the LLM's self-reported confidence. Models can't reliably know when
+DocuFlow does NOT use the LLM's self-reported confidence. Models can't reliably know when
 they're wrong — they'll report high confidence on hallucinations. Instead, every extraction
 carries **two separate, independently-computed scores**, each answering a different question:
 
@@ -1292,7 +1292,7 @@ The `/extract` HTTP endpoint and the CLI JSON output include it automatically.
 
 ### LLM Providers
 
-DocFlow uses litellm under the hood, which supports 100+ LLM providers. The `model` parameter uses litellm's format:
+DocuFlow uses litellm under the hood, which supports 100+ LLM providers. The `model` parameter uses litellm's format:
 
 ```python
 # OpenAI
@@ -1315,7 +1315,7 @@ pipeline = DocumentPipeline(model="ollama/llama3")
 Set your API key via environment variable (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, etc.) or pass it directly:
 
 ```python
-from docflow.extraction.llm.litellm_adapter import LiteLLMAdapter
+from docuflow.extraction.llm.litellm_adapter import LiteLLMAdapter
 llm = LiteLLMAdapter(model="openai/gpt-4o", api_key="sk-...")
 pipeline = DocumentPipeline(parser="pdfplumber")
 # Use manual Pipeline with Extract(llm=llm) for custom LLM instances
@@ -1330,7 +1330,7 @@ pipeline = DocumentPipeline(parser="pdfplumber")
 #### 1. `extract()` — One-liner
 
 ```python
-from docflow import extract
+from docuflow import extract
 
 result = extract(
     "invoice.pdf",
@@ -1347,7 +1347,7 @@ Creates a `DocumentPipeline` internally, runs it once, returns the result.
 #### 2. `DocumentPipeline` — Configurable, Reusable
 
 ```python
-from docflow import DocumentPipeline
+from docuflow import DocumentPipeline
 
 pipeline = DocumentPipeline(
     parser="smart",
@@ -1391,12 +1391,12 @@ All parameters:
 Build your own step sequence:
 
 ```python
-from docflow.workflow import (
+from docuflow.workflow import (
     Pipeline, Ingest, Parse, Extract, ExtractVision, ExtractHybrid,
     Anonymize, Validate, Review, Store,
 )
-from docflow.extraction.llm.litellm_adapter import LiteLLMAdapter
-from docflow.storage.local import LocalDocumentStore
+from docuflow.extraction.llm.litellm_adapter import LiteLLMAdapter
+from docuflow.storage.local import LocalDocumentStore
 
 llm = LiteLLMAdapter(model="openai/gpt-4o")
 
@@ -1438,7 +1438,7 @@ When a step fails:
 4. `DocumentPipeline` raises `WorkflowError` with the full result attached
 
 ```python
-from docflow.errors import WorkflowError
+from docuflow.errors import WorkflowError
 
 try:
     result = pipeline.run_sync("bad_file.pdf", schema=Invoice)
@@ -1458,7 +1458,7 @@ Validation checks extraction results against rules and updates field statuses.
 ### Built-in Validators
 
 ```python
-from docflow.validation import RequiredFields, EvidenceRequired, TypeValidation, CustomRule
+from docuflow.validation import RequiredFields, EvidenceRequired, TypeValidation, CustomRule
 
 pipeline = DocumentPipeline(
     validators=[
@@ -1479,7 +1479,7 @@ pipeline = DocumentPipeline(
 ### Custom Validation Rules
 
 ```python
-from docflow.validation import CustomRule, ValidationError
+from docuflow.validation import CustomRule, ValidationError
 
 def check_total_positive(result):
     errors = []
@@ -1521,7 +1521,7 @@ The Review step checks extraction results against configurable rules and LLM-pow
 ### Review Rules
 
 ```python
-from docflow.review import (
+from docuflow.review import (
     OverallConfidenceBelow,
     FieldConfidenceBelow,
     AnyFieldConfidenceBelow,
@@ -1554,8 +1554,8 @@ pipeline = DocumentPipeline(
 Create prompt-driven reviewers that use an LLM to inspect the extraction:
 
 ```python
-from docflow.review import LLMReviewer
-from docflow.extraction.llm.litellm_adapter import LiteLLMAdapter
+from docuflow.review import LLMReviewer
+from docuflow.extraction.llm.litellm_adapter import LiteLLMAdapter
 
 llm = LiteLLMAdapter(model="openai/gpt-4o")
 
@@ -1662,7 +1662,7 @@ if result.needs_review:
     result.approve(approved_by="john")
 
 # Save the final state (including corrections and approval)
-from docflow.storage.local import LocalDocumentStore
+from docuflow.storage.local import LocalDocumentStore
 store = LocalDocumentStore("./output")
 import asyncio
 asyncio.run(store.save_result(result))
@@ -1710,8 +1710,8 @@ The privacy module detects and anonymizes PII before document content reaches th
 ### Basic Usage
 
 ```python
-from docflow import DocumentPipeline, PrivacyPolicy
-from docflow.privacy import PresidioProvider
+from docuflow import DocumentPipeline, PrivacyPolicy
+from docuflow.privacy import PresidioProvider
 
 pipeline = DocumentPipeline(
     parser="tesseract",
@@ -1755,8 +1755,8 @@ Default entities: `PERSON`, `EMAIL_ADDRESS`, `PHONE_NUMBER`, `IBAN_CODE`, `CREDI
 When `reversible=True`, the same entity gets the same token within a document scope. Tokens can be restored after extraction.
 
 ```python
-from docflow.privacy import Anonymizer, PresidioProvider
-from docflow.privacy.mapping_store import LocalMappingStore
+from docuflow.privacy import Anonymizer, PresidioProvider
+from docuflow.privacy.mapping_store import LocalMappingStore
 
 anonymizer = Anonymizer(PrivacyPolicy(
     provider=PresidioProvider(),
@@ -1784,7 +1784,7 @@ When `fail_closed=True` (default), if anonymization fails before an LLM call, th
 For vision extraction, PII can be redacted from page images:
 
 ```python
-from docflow.privacy.image_redaction import ImageRedactor
+from docuflow.privacy.image_redaction import ImageRedactor
 
 redactor = ImageRedactor(provider=PresidioProvider())
 redacted_image, findings = await redactor.redact_page_image(page_image)
@@ -1796,7 +1796,7 @@ redacted_image, findings = await redactor.redact_page_image(page_image)
 Remove PII from processing traces:
 
 ```python
-from docflow.privacy.scrubber import TraceScrubber
+from docuflow.privacy.scrubber import TraceScrubber
 
 scrubber = TraceScrubber(provider=PresidioProvider())
 clean_trace = await scrubber.scrub_trace(result_trace)
@@ -1810,7 +1810,7 @@ clean_trace = await scrubber.scrub_trace(result_trace)
 Process multiple documents and get a summary report.
 
 ```python
-from docflow import DocumentPipeline, process_batch
+from docuflow import DocumentPipeline, process_batch
 
 pipeline = DocumentPipeline(parser="smart", model="openai/gpt-4o")
 
@@ -1865,7 +1865,7 @@ df.to_excel("results.xlsx")
 Compare extracted fields across multiple documents.
 
 ```python
-from docflow import DocumentPipeline, compare_documents
+from docuflow import DocumentPipeline, compare_documents
 
 pipeline = DocumentPipeline(parser="tesseract", model="openai/gpt-4o")
 
@@ -1895,7 +1895,7 @@ Each cell carries the full evidence (page, bbox, text) for highlighting where th
 Search for text across a parsed document and get word-precise highlight rectangles.
 
 ```python
-from docflow.search import search_document
+from docuflow.search import search_document
 
 result = search_document(document, "Acme Corp")
 print(f"Found {result.total_hits} matches")
@@ -1925,7 +1925,7 @@ multi-line selection.
 highlight-oriented work:
 
 ```python
-from docflow.documents.locate import locate_text
+from docuflow.documents.locate import locate_text
 
 spans = locate_text(document, "total amount due", find_all=True)
 span = spans[0]
@@ -1958,7 +1958,7 @@ y0_px = rel.y0 * image.height
 Render document pages as PNG images for review UIs or visual inspection.
 
 ```python
-from docflow.screenshots import screenshot_pages_sync
+from docuflow.screenshots import screenshot_pages_sync
 
 # All pages
 shots = screenshot_pages_sync("document.pdf", output_dir="./pages")
@@ -1982,7 +1982,7 @@ Bounding boxes live in the page's canonical point space, not screenshot pixels �
 `quality_report()` is a stateless function that assesses how well the model did on a single extraction (or a batch). No baseline needed — it reads the signals already in your `ExtractionResult`.
 
 ```python
-from docflow import quality_report
+from docuflow import quality_report
 
 report = quality_report(result)
 ```
@@ -2048,7 +2048,7 @@ report.ok  # True only if score >= 0.9
 Record quality over time with `QualityLog` — an append-only JSONL file of timestamped snapshots. Each snapshot captures the report's metrics plus freeform tags for slicing (by schema, model, data source, etc.).
 
 ```python
-from docflow.quality import QualityLog
+from docuflow.quality import QualityLog
 
 log = QualityLog("./quality.jsonl")
 
@@ -2070,7 +2070,7 @@ Each snapshot contains: `snapshot_id`, `timestamp`, `tags`, `score`, `completene
 You can also build a snapshot manually:
 
 ```python
-from docflow.quality import QualitySnapshot
+from docuflow.quality import QualitySnapshot
 
 snap = QualitySnapshot.from_report(report, tags={"schema": "Invoice"})
 snap.snapshot_id   # unique UUID
@@ -2126,7 +2126,7 @@ context: "You are processing motor insurance claim invoices."
 ### Running a workflow
 
 ```python
-from docflow import run_workflow
+from docuflow import run_workflow
 
 result = run_workflow("invoice.yaml", "invoice.pdf")
 result.data       # {"supplier_name": "Acme", "total": 1234.56, ...}
@@ -2136,7 +2136,7 @@ result.confidence # 0.88
 Or from the CLI:
 
 ```bash
-docflow run invoice.yaml invoice.pdf --output result.json
+docuflow run invoice.yaml invoice.pdf --output result.json
 ```
 
 ### Configuration reference
@@ -2190,7 +2190,7 @@ review:
 If you already have a Python pipeline, export it:
 
 ```python
-from docflow import DocumentPipeline
+from docuflow import DocumentPipeline
 
 pipeline = DocumentPipeline(
     parser="smart", model="openai/gpt-4o", extraction_mode="multi",
@@ -2211,7 +2211,7 @@ with open("invoice.yaml", "w") as f:
 ### Loading programmatically
 
 ```python
-from docflow.workflow_config import load_workflow_config
+from docuflow.workflow_config import load_workflow_config
 
 cfg = load_workflow_config("invoice.yaml")  # or a dict
 pipeline = cfg.build_pipeline()
@@ -2223,25 +2223,25 @@ schema = cfg.build_schema()
 ## 18c. Serve & Dockerize (Deployment)
 
 Document extraction is rarely a whole application — usually it's one step inside a larger
-system written in several languages. DocFlow ships with a deployment story for exactly
+system written in several languages. DocuFlow ships with a deployment story for exactly
 that: **any workflow YAML can serve itself as an HTTP microservice, and can generate its
 own Docker deployment.** No web code, no Dockerfile authoring.
 
 ```bash
-pip install docflow[serve]   # adds FastAPI, uvicorn, python-multipart
+pip install docuflow[serve]   # adds FastAPI, uvicorn, python-multipart
 ```
 
 ### Serving a workflow as an HTTP API
 
 ```bash
-docflow serve claims.yaml --port 8000
+docuflow serve claims.yaml --port 8000
 ```
 
 or programmatically:
 
 ```python
-from docflow.serve import create_app, run_server
-from docflow.workflow_config import load_workflow_config
+from docuflow.serve import create_app, run_server
+from docuflow.workflow_config import load_workflow_config
 
 config = load_workflow_config("claims.yaml")
 app = create_app(config)      # a FastAPI app — mount it, test it, extend it
@@ -2267,17 +2267,17 @@ consensus scores, usage) plus `quality_score` and `quality_ok`.
 
 ### Self-containerization
 
-DocFlow generates a complete, ready-to-build Docker deployment from a workflow file:
+DocuFlow generates a complete, ready-to-build Docker deployment from a workflow file:
 
 ```bash
-docflow dockerize claims.yaml --output ./deploy
+docuflow dockerize claims.yaml --output ./deploy
 cd deploy && docker compose up --build
 ```
 
 or:
 
 ```python
-from docflow.dockerize import generate_deployment
+from docuflow.dockerize import generate_deployment
 
 generate_deployment("claims.yaml", "./deploy")                     # stateless service
 generate_deployment("claims.yaml", "./deploy", with_storage=True)  # adds a /data volume
@@ -2290,7 +2290,7 @@ and a pinned requirements file — everything needed to build and run the servic
 The deployment flow end to end:
 
 ```
-write claims.yaml  →  docflow dockerize claims.yaml -o deploy  →  docker compose up
+write claims.yaml  →  docuflow dockerize claims.yaml -o deploy  →  docker compose up
        ↑                                                              ↓
   (or export from an existing pipeline:                    POST /extract from any
    pipeline.export_yaml(schema))                           language in your stack
@@ -2309,7 +2309,7 @@ Storage persists documents, extraction results, and traces to disk.
 
 ```python
 pipeline = DocumentPipeline(storage="local")
-# Saves to ./.docflow_store/{document_id}/
+# Saves to ./.docuflow_store/{document_id}/
 ```
 
 Files saved per document:
@@ -2323,7 +2323,7 @@ Files saved per document:
 When the pipeline fails with storage configured, partial state is automatically saved. This means you can inspect what happened:
 
 ```python
-# After a failure, check .docflow_store/{document_id}/
+# After a failure, check .docuflow_store/{document_id}/
 # document.json — exists if ingestion/parsing succeeded
 # trace.json — exists with events up to the failure point
 ```
@@ -2331,9 +2331,9 @@ When the pipeline fails with storage configured, partial state is automatically 
 ### Loading Results
 
 ```python
-from docflow.storage.local import LocalDocumentStore
+from docuflow.storage.local import LocalDocumentStore
 
-store = LocalDocumentStore("./.docflow_store")
+store = LocalDocumentStore("./.docuflow_store")
 result = await store.load_result("document-uuid")
 document = await store.load_document("document-uuid")
 ```
@@ -2343,7 +2343,7 @@ document = await store.load_document("document-uuid")
 Implement the `Storage` protocol:
 
 ```python
-from docflow.storage.base import Storage
+from docuflow.storage.base import Storage
 
 class MyStorage:
     async def save_document(self, document: Document) -> str: ...
@@ -2381,11 +2381,11 @@ Event types include: `ingest`, `parse`, `anonymize`, `llm_call`, `vision_render`
 
 ## 21. Error Handling
 
-All DocFlow errors inherit from `DocflowError`:
+All DocuFlow errors inherit from `DocuflowError`:
 
 ```python
-from docflow.errors import (
-    DocflowError,            # base class
+from docuflow.errors import (
+    DocuflowError,            # base class
     UnsupportedFileTypeError,# unknown file extension
     ParsingError,            # PDF parsing or file access failure
     OCRError,                # Tesseract OCR failure
@@ -2402,7 +2402,7 @@ from docflow.errors import (
 ### Handling Pipeline Failures
 
 ```python
-from docflow.errors import WorkflowError
+from docuflow.errors import WorkflowError
 
 try:
     result = pipeline.run_sync("file.pdf", schema=Invoice)
@@ -2423,26 +2423,26 @@ The `WorkflowError.result` contains the full `PipelineResult` with partial state
 ### Run a YAML Workflow
 
 ```bash
-docflow run claims.yaml claim_form.pdf --output result.json
+docuflow run claims.yaml claim_form.pdf --output result.json
 ```
 
 ### Serve a Workflow as an HTTP API
 
 ```bash
-docflow serve claims.yaml --port 8000
+docuflow serve claims.yaml --port 8000
 ```
 
 ### Generate a Docker Deployment
 
 ```bash
-docflow dockerize claims.yaml --output ./deploy
-docflow dockerize claims.yaml --output ./deploy --with-storage
+docuflow dockerize claims.yaml --output ./deploy
+docuflow dockerize claims.yaml --output ./deploy --with-storage
 ```
 
 ### Extract a Single Document
 
 ```bash
-docflow extract invoice.pdf --schema invoice --model openai/gpt-4o --output result.json
+docuflow extract invoice.pdf --schema invoice --model openai/gpt-4o --output result.json
 ```
 
 Options:
@@ -2454,7 +2454,7 @@ Options:
 ### Extract a Folder
 
 ```bash
-docflow extract-folder ./invoices --schema invoice --output results.csv --parser smart --concurrency 10
+docuflow extract-folder ./invoices --schema invoice --output results.csv --parser smart --concurrency 10
 ```
 
 Options:
@@ -2468,8 +2468,8 @@ Options:
 ### Take Screenshots
 
 ```bash
-docflow screenshot document.pdf -o ./pages --dpi 300
-docflow screenshot document.pdf -o ./pages --pages 0,2,5
+docuflow screenshot document.pdf -o ./pages --dpi 300
+docuflow screenshot document.pdf -o ./pages --pages 0,2,5
 ```
 
 Options:
@@ -2480,9 +2480,9 @@ Options:
 ### Manage Templates
 
 ```bash
-docflow templates list
-docflow templates show invoice
-docflow templates init invoice --dir ./my_templates
+docuflow templates list
+docuflow templates show invoice
+docuflow templates init invoice --dir ./my_templates
 ```
 
 ---
@@ -2493,56 +2493,56 @@ docflow templates init invoice --dir ./my_templates
 
 ```python
 # Core
-from docflow import extract, DocumentPipeline, Pipeline, PrivacyPolicy
-from docflow import process_batch, compare_documents
+from docuflow import extract, DocumentPipeline, Pipeline, PrivacyPolicy
+from docuflow import process_batch, compare_documents
 
 # Parsers
-from docflow.parsing.pdfplumber_parser import PdfplumberParser
-from docflow.parsing.tesseract_parser import TesseractParser
-from docflow.parsing.docling_parser import DoclingParser
-from docflow.parsing.smart_parser import SmartParser
+from docuflow.parsing.pdfplumber_parser import PdfplumberParser
+from docuflow.parsing.tesseract_parser import TesseractParser
+from docuflow.parsing.docling_parser import DoclingParser
+from docuflow.parsing.smart_parser import SmartParser
 
 # Templates
-from docflow.templates import load_template, list_templates
+from docuflow.templates import load_template, list_templates
 
 # Validation
-from docflow.validation import RequiredFields, EvidenceRequired, TypeValidation, CustomRule
+from docuflow.validation import RequiredFields, EvidenceRequired, TypeValidation, CustomRule
 
 # Review
-from docflow.review import (
+from docuflow.review import (
     OverallConfidenceBelow, FieldConfidenceBelow, AnyFieldConfidenceBelow,
     HasValidationErrors, FieldMissing, NoEvidence, LLMReviewer,
 )
 
 # Privacy
-from docflow.privacy import PrivacyPolicy, Anonymizer, PresidioProvider
-from docflow.privacy.mapping_store import LocalMappingStore
-from docflow.privacy.image_redaction import ImageRedactor
-from docflow.privacy.scrubber import TraceScrubber
+from docuflow.privacy import PrivacyPolicy, Anonymizer, PresidioProvider
+from docuflow.privacy.mapping_store import LocalMappingStore
+from docuflow.privacy.image_redaction import ImageRedactor
+from docuflow.privacy.scrubber import TraceScrubber
 
 # Storage
-from docflow.storage.local import LocalDocumentStore
+from docuflow.storage.local import LocalDocumentStore
 
 # LLM
-from docflow.extraction.llm.litellm_adapter import LiteLLMAdapter
+from docuflow.extraction.llm.litellm_adapter import LiteLLMAdapter
 
 # Pipeline Steps
-from docflow.workflow import (
+from docuflow.workflow import (
     Pipeline, Ingest, Parse, Extract, ExtractVision, ExtractHybrid,
     Anonymize, Validate, Review, Store,
 )
 
 # Utilities
-from docflow.search import search_document
-from docflow.screenshots import screenshot_pages_sync
-from docflow.quality import quality_report, QualityReport
-from docflow.batch import process_batch, BatchReport
-from docflow.comparison import compare_documents, ComparisonResult
+from docuflow.search import search_document
+from docuflow.screenshots import screenshot_pages_sync
+from docuflow.quality import quality_report, QualityReport
+from docuflow.batch import process_batch, BatchReport
+from docuflow.comparison import compare_documents, ComparisonResult
 
 # Models
-from docflow.documents.models import Document, Page, Block, BoundingBox, BlockType
-from docflow.documents.evidence import Evidence
-from docflow.extraction.models import (
+from docuflow.documents.models import Document, Page, Block, BoundingBox, BlockType
+from docuflow.documents.evidence import Evidence
+from docuflow.extraction.models import (
     ExtractionResult, ExtractedField, FieldCorrection,
     ReviewVerdict, FieldProvenance,
 )

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import json
 
-from docflow.documents.evidence import Evidence
-from docflow.documents.models import BoundingBox
-from docflow.extraction.models import (
+from docuflow.documents.evidence import Evidence
+from docuflow.documents.models import BoundingBox
+from docuflow.extraction.models import (
     ExtractedField,
     ExtractionResult,
     FieldProvenance,

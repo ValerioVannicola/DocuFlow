@@ -1,4 +1,4 @@
-"""Tests for the DocFlow dockerize module."""
+"""Tests for the DocuFlow dockerize module."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from docflow.dockerize import generate_deployment
+from docuflow.dockerize import generate_deployment
 
 
 @pytest.fixture()
@@ -46,11 +46,11 @@ class TestGenerateDeployment:
             assert "python:3.11-slim" in content
             assert "uvicorn" in content
 
-    def test_server_imports_docflow(self, workflow_yaml):
+    def test_server_imports_docuflow(self, workflow_yaml):
         with tempfile.TemporaryDirectory() as out:
             result = generate_deployment(workflow_yaml, out)
             content = (result / "server.py").read_text()
-            assert "from docflow.serve import create_app" in content
+            assert "from docuflow.serve import create_app" in content
             assert "workflow.yaml" in content
 
     def test_requirements_has_deps(self, workflow_yaml):
@@ -58,7 +58,7 @@ class TestGenerateDeployment:
             result = generate_deployment(workflow_yaml, out)
             content = (result / "requirements.txt").read_text()
             # fastapi/uvicorn come via the serve extra
-            assert "docflow[" in content
+            assert "docuflow[" in content
             assert "serve" in content
             assert "llm" in content
 
@@ -85,13 +85,13 @@ class TestGenerateDeployment:
         with tempfile.TemporaryDirectory() as out:
             result = generate_deployment(workflow_yaml, out, with_storage=False)
             content = (result / "docker-compose.yml").read_text()
-            assert "docflow_data" not in content
+            assert "docuflow_data" not in content
 
     def test_compose_with_storage(self, workflow_yaml):
         with tempfile.TemporaryDirectory() as out:
             result = generate_deployment(workflow_yaml, out, with_storage=True)
             content = (result / "docker-compose.yml").read_text()
-            assert "docflow_data:/data" in content
+            assert "docuflow_data:/data" in content
             assert "volumes:" in content
 
     def test_missing_config_raises(self):
@@ -110,7 +110,7 @@ class TestCLI:
     def test_dockerize_command(self, workflow_yaml):
         from click.testing import CliRunner
 
-        from docflow.cli.main import dockerize
+        from docuflow.cli.main import dockerize
 
         runner = CliRunner()
         with tempfile.TemporaryDirectory() as out:
@@ -122,7 +122,7 @@ class TestCLI:
     def test_dockerize_missing_config(self):
         from click.testing import CliRunner
 
-        from docflow.cli.main import dockerize
+        from docuflow.cli.main import dockerize
 
         runner = CliRunner()
         result = runner.invoke(dockerize, ["/nonexistent.yaml"])

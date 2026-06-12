@@ -3,8 +3,8 @@ from __future__ import annotations
 import pydantic
 import pytest
 
-from docflow.documents.evidence import Evidence
-from docflow.documents.models import (
+from docuflow.documents.evidence import Evidence
+from docuflow.documents.models import (
     Block,
     BlockType,
     BoundingBox,
@@ -12,8 +12,8 @@ from docflow.documents.models import (
     DocumentMetadata,
     Page,
 )
-from docflow.extraction.models import ExtractedField, ExtractionResult
-from docflow.observability.traces import TraceEvent, create_trace
+from docuflow.extraction.models import ExtractedField, ExtractionResult
+from docuflow.observability.traces import TraceEvent, create_trace
 
 
 class TestBoundingBox:

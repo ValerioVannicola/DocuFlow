@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from docflow.documents.models import (
+from docuflow.documents.models import (
     Block,
     BlockType,
     BoundingBox,
@@ -18,19 +18,19 @@ from docflow.documents.models import (
 
 class TestVisionPrivacyGuard:
     def test_vision_with_privacy_raises(self):
-        from docflow.processor import DocumentPipeline
+        from docuflow.processor import DocumentPipeline
 
         with pytest.raises(ValueError, match="bypassing"):
             DocumentPipeline(parser=None, extraction_type="vision", privacy=object())
 
     def test_hybrid_with_privacy_raises(self):
-        from docflow.processor import DocumentPipeline
+        from docuflow.processor import DocumentPipeline
 
         with pytest.raises(ValueError, match="bypassing"):
             DocumentPipeline(parser=None, extraction_type="hybrid", privacy=object())
 
     def test_text_and_auto_with_privacy_ok(self):
-        from docflow.processor import DocumentPipeline
+        from docuflow.processor import DocumentPipeline
 
         DocumentPipeline(extraction_type="text", privacy=object())
         DocumentPipeline(extraction_type="auto", privacy=object())
@@ -38,7 +38,7 @@ class TestVisionPrivacyGuard:
 
 class TestPdfplumberColumnSplit:
     def test_wide_gap_splits_blocks(self):
-        from docflow.parsing.pdfplumber_parser import _group_words_into_lines
+        from docuflow.parsing.pdfplumber_parser import _group_words_into_lines
 
         # two columns on the same visual line, 200pt apart
         words = [
@@ -53,7 +53,7 @@ class TestPdfplumberColumnSplit:
         assert [w["text"] for w in lines[1]] == ["Right", "column"]
 
     def test_normal_spacing_stays_together(self):
-        from docflow.parsing.pdfplumber_parser import _group_words_into_lines
+        from docuflow.parsing.pdfplumber_parser import _group_words_into_lines
 
         words = [
             {"text": "Total:", "x0": 40, "x1": 75, "top": 100, "bottom": 112},
@@ -67,7 +67,7 @@ class TestMixedDocumentScoring:
     def test_native_page_span_scores_none_not_zero(self):
         """In a smart-parsed doc mixing OCR and native pages, a field matched
         on a native page must not report score 0.0 (looks like terrible OCR)."""
-        from docflow.extraction.scoring import compute_field_ocr_confidence
+        from docuflow.extraction.scoring import compute_field_ocr_confidence
 
         ocr_word = Word(
             text="scanned", bbox=BoundingBox(x0=0, y0=0, x1=50, y1=12),
@@ -98,7 +98,7 @@ class TestMixedDocumentScoring:
 
 class TestExactPreferredOverFuzzy:
     def test_exact_value_match_beats_fuzzy_hint_match(self):
-        from docflow.extraction.scoring import compute_field_ocr_confidence
+        from docuflow.extraction.scoring import compute_field_ocr_confidence
 
         def line(block_id, text, confs):
             words = [
@@ -130,7 +130,7 @@ class TestExactPreferredOverFuzzy:
 
 class TestDockerizeDependencies:
     def _generate(self, config_yaml: str) -> tuple[str, str]:
-        from docflow.dockerize import generate_deployment
+        from docuflow.dockerize import generate_deployment
 
         with tempfile.TemporaryDirectory() as tmp:
             cfg = Path(tmp) / "workflow.yaml"
@@ -174,9 +174,9 @@ class TestWordPreciseRedaction:
     async def test_redacts_only_matching_words(self):
         from unittest.mock import AsyncMock
 
-        from docflow.ocr.base import OCRResult
-        from docflow.privacy.image_redaction import ImageRedactor
-        from docflow.privacy.models import PrivacyFinding
+        from docuflow.ocr.base import OCRResult
+        from docuflow.privacy.image_redaction import ImageRedactor
+        from docuflow.privacy.models import PrivacyFinding
 
         words = [
             Word(text="Contact", bbox=BoundingBox(x0=10, y0=20, x1=60, y1=32)),

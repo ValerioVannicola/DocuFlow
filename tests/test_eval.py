@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import json
 
-from docflow.eval import EvalHarness, _fuzzy_match, _normalize
-from docflow.extraction.models import ExtractedField, ExtractionResult, FieldTrust
+from docuflow.eval import EvalHarness, _fuzzy_match, _normalize
+from docuflow.extraction.models import ExtractedField, ExtractionResult, FieldTrust
 
 
 def _make_result(

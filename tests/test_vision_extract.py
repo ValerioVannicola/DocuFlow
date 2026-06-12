@@ -6,12 +6,12 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from pydantic import BaseModel
 
-from docflow.documents.models import Document, DocumentMetadata, Page
-from docflow.extraction.engine import VisionExtractionEngine
-from docflow.extraction.llm.base import LLMResponse
-from docflow.extraction.models import ExtractionResult
-from docflow.workflow.state import PipelineState
-from docflow.workflow.steps import ExtractVision, PipelineStep
+from docuflow.documents.models import Document, DocumentMetadata, Page
+from docuflow.extraction.engine import VisionExtractionEngine
+from docuflow.extraction.llm.base import LLMResponse
+from docuflow.extraction.models import ExtractionResult
+from docuflow.workflow.state import PipelineState
+from docuflow.workflow.steps import ExtractVision, PipelineStep
 
 
 class Invoice(BaseModel):
@@ -94,7 +94,7 @@ class TestExtractVisionStep:
 
 class TestDocumentPipelineVision:
     def test_vision_with_parser_raises(self):
-        from docflow.processor import DocumentPipeline
+        from docuflow.processor import DocumentPipeline
 
         with pytest.raises(ValueError, match="cannot be used with a parser"):
             DocumentPipeline(
@@ -103,7 +103,7 @@ class TestDocumentPipelineVision:
             )
 
     def test_vision_with_parser_none_ok(self):
-        from docflow.processor import DocumentPipeline
+        from docuflow.processor import DocumentPipeline
 
         pipeline = DocumentPipeline(
             parser=None,
@@ -113,7 +113,7 @@ class TestDocumentPipelineVision:
         assert pipeline._extraction_type == "vision"
 
     def test_vision_with_parser_none_string_ok(self):
-        from docflow.processor import DocumentPipeline
+        from docuflow.processor import DocumentPipeline
 
         pipeline = DocumentPipeline(
             parser="none",
@@ -122,7 +122,7 @@ class TestDocumentPipelineVision:
         assert pipeline._extraction_type == "vision"
 
     def test_text_with_parser_ok(self):
-        from docflow.processor import DocumentPipeline
+        from docuflow.processor import DocumentPipeline
 
         pipeline = DocumentPipeline(
             parser="pdfplumber",
@@ -138,7 +138,7 @@ class TestVisionExtractionEngine:
 
         engine = VisionExtractionEngine(llm=mock_llm, dpi=100)
 
-        from docflow.errors import ParsingError
+        from docuflow.errors import ParsingError
 
         with pytest.raises(ParsingError):
             await engine.extract(_make_doc(), schema=Invoice)
@@ -212,8 +212,8 @@ class TestVisionExtractionEngine:
         engine._render_pages = AsyncMock(return_value=[mock_img])
         engine._encode_images = MagicMock(return_value=["base64data"])
 
-        from docflow.documents.models import Block, BlockType, BoundingBox
-        from docflow.ocr.base import OCRResult
+        from docuflow.documents.models import Block, BlockType, BoundingBox
+        from docuflow.ocr.base import OCRResult
 
         mock_ocr_result = OCRResult(
             text="Acme Corp Invoice 1234.56",
@@ -229,7 +229,7 @@ class TestVisionExtractionEngine:
         )
 
         with patch(
-            "docflow.ocr.tesseract.TesseractOCR"
+            "docuflow.ocr.tesseract.TesseractOCR"
         ) as mock_ocr_cls:
             mock_ocr_instance = AsyncMock()
             mock_ocr_instance.ocr = AsyncMock(return_value=mock_ocr_result)
@@ -247,7 +247,7 @@ class TestVisionExtractionEngine:
 
 class TestVisionPrompt:
     def test_build_vision_prompt(self):
-        from docflow.extraction.prompts import build_vision_extraction_prompt
+        from docuflow.extraction.prompts import build_vision_extraction_prompt
 
         messages = build_vision_extraction_prompt(Invoice, ["base64img1", "base64img2"])
 

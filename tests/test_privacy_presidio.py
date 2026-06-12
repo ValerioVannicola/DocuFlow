@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from docflow.privacy.models import AnonymizationMode, PrivacyFinding, TokenMapping
+from docuflow.privacy.models import AnonymizationMode, PrivacyFinding, TokenMapping
 
 
 def _make_mock_presidio():
@@ -36,9 +36,9 @@ class TestPresidioProvider:
             "presidio_analyzer": mock_analyzer,
             "presidio_anonymizer": mock_anonymizer,
         }):
-            if "docflow.privacy.presidio_provider" in sys.modules:
-                del sys.modules["docflow.privacy.presidio_provider"]
-            from docflow.privacy.presidio_provider import PresidioProvider
+            if "docuflow.privacy.presidio_provider" in sys.modules:
+                del sys.modules["docuflow.privacy.presidio_provider"]
+            from docuflow.privacy.presidio_provider import PresidioProvider
 
             provider = PresidioProvider()
             findings = await provider.adetect_text("John Doe sent an email")
@@ -50,7 +50,7 @@ class TestPresidioProvider:
         assert findings[0].score == 0.95
 
     async def test_anonymize_redact(self):
-        from docflow.privacy.presidio_provider import PresidioProvider
+        from docuflow.privacy.presidio_provider import PresidioProvider
 
         provider = PresidioProvider.__new__(PresidioProvider)
         provider.language = "en"
@@ -70,7 +70,7 @@ class TestPresidioProvider:
         assert mappings == []
 
     async def test_anonymize_pseudonymize_with_token_map(self):
-        from docflow.privacy.presidio_provider import PresidioProvider
+        from docuflow.privacy.presidio_provider import PresidioProvider
 
         provider = PresidioProvider.__new__(PresidioProvider)
         provider.language = "en"
@@ -94,7 +94,7 @@ class TestPresidioProvider:
         assert mappings[0].token == "PERSON_001"
 
     async def test_anonymize_no_findings(self):
-        from docflow.privacy.presidio_provider import PresidioProvider
+        from docuflow.privacy.presidio_provider import PresidioProvider
 
         provider = PresidioProvider.__new__(PresidioProvider)
         provider.language = "en"
@@ -109,7 +109,7 @@ class TestPresidioProvider:
         assert mappings == []
 
     async def test_restore_text(self):
-        from docflow.privacy.presidio_provider import PresidioProvider
+        from docuflow.privacy.presidio_provider import PresidioProvider
 
         provider = PresidioProvider.__new__(PresidioProvider)
         provider.language = "en"
@@ -130,9 +130,9 @@ class TestPresidioProvider:
             "presidio_analyzer": None,
             "presidio_anonymizer": None,
         }):
-            if "docflow.privacy.presidio_provider" in sys.modules:
-                del sys.modules["docflow.privacy.presidio_provider"]
-            from docflow.privacy.presidio_provider import _ensure_presidio
+            if "docuflow.privacy.presidio_provider" in sys.modules:
+                del sys.modules["docuflow.privacy.presidio_provider"]
+            from docuflow.privacy.presidio_provider import _ensure_presidio
 
             with pytest.raises(ImportError, match="presidio-analyzer"):
                 _ensure_presidio()

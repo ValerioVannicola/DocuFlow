@@ -4,13 +4,13 @@ from types import SimpleNamespace
 
 import pytest
 
-from docflow.errors import ParsingError
-from docflow.parsing.azure_di import (
+from docuflow.errors import ParsingError
+from docuflow.parsing.azure_di import (
     AzureDocumentIntelligenceParser,
     map_analyze_result,
 )
-from docflow.parsing.google_docai import GoogleDocumentAIParser, map_docai_document
-from docflow.parsing.textract import TextractParser, map_textract_response
+from docuflow.parsing.google_docai import GoogleDocumentAIParser, map_docai_document
+from docuflow.parsing.textract import TextractParser, map_textract_response
 
 
 class TestAzureDIMapping:
@@ -62,7 +62,7 @@ class TestAzureDIMapping:
     async def test_missing_credentials_raises(self, tmp_path):
         f = tmp_path / "doc.pdf"
         f.write_bytes(b"%PDF")
-        from docflow.documents.models import Document, DocumentMetadata
+        from docuflow.documents.models import Document, DocumentMetadata
 
         doc = Document(
             id="d1",
@@ -181,7 +181,7 @@ class TestGoogleDocAIMapping:
     async def test_missing_config_raises(self, tmp_path):
         f = tmp_path / "doc.pdf"
         f.write_bytes(b"%PDF")
-        from docflow.documents.models import Document, DocumentMetadata
+        from docuflow.documents.models import Document, DocumentMetadata
 
         doc = Document(
             id="d1",
@@ -194,7 +194,7 @@ class TestGoogleDocAIMapping:
 
 class TestParserResolution:
     def test_pipeline_resolves_new_parser_names(self):
-        from docflow.processor import DocumentPipeline
+        from docuflow.processor import DocumentPipeline
 
         for name, cls in [
             ("azure-di", AzureDocumentIntelligenceParser),
@@ -205,7 +205,7 @@ class TestParserResolution:
             assert isinstance(pipeline._resolve_parser(), cls)
 
     def test_pipeline_resolves_parser_dicts(self):
-        from docflow.processor import DocumentPipeline
+        from docuflow.processor import DocumentPipeline
 
         pipeline = DocumentPipeline(
             parser={"type": "azure-di", "model": "prebuilt-layout"}

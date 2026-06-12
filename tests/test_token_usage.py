@@ -6,9 +6,9 @@ from unittest.mock import AsyncMock
 import pytest
 from pydantic import BaseModel
 
-from docflow.extraction.engine import ExtractionEngine
-from docflow.extraction.llm.base import LLMResponse
-from docflow.extraction.models import ReviewVerdict, TokenUsage
+from docuflow.extraction.engine import ExtractionEngine
+from docuflow.extraction.llm.base import LLMResponse
+from docuflow.extraction.models import ReviewVerdict, TokenUsage
 
 
 class Invoice(BaseModel):
@@ -17,7 +17,7 @@ class Invoice(BaseModel):
 
 
 def _make_document():
-    from docflow.documents.models import Document, DocumentMetadata, Page
+    from docuflow.documents.models import Document, DocumentMetadata, Page
 
     return Document(
         id="doc-1",
@@ -120,8 +120,8 @@ class TestEngineUsageAggregation:
 
 class TestReviewerUsage:
     async def test_review_step_merges_reviewer_usage(self):
-        from docflow.workflow.state import PipelineState
-        from docflow.workflow.steps import Review
+        from docuflow.workflow.state import PipelineState
+        from docuflow.workflow.steps import Review
 
         class FakeReviewer:
             async def acheck(self, result, document_text=""):
@@ -131,7 +131,7 @@ class TestReviewerUsage:
                 )
 
         state = PipelineState()
-        from docflow.extraction.models import ExtractionResult
+        from docuflow.extraction.models import ExtractionResult
 
         state.extraction_result = ExtractionResult(
             document_id="d1", schema_name="Invoice",
@@ -147,8 +147,8 @@ class TestReviewerUsage:
         assert usage.total_tokens == 950
 
     async def test_review_step_creates_usage_when_absent(self):
-        from docflow.workflow.state import PipelineState
-        from docflow.workflow.steps import Review
+        from docuflow.workflow.state import PipelineState
+        from docuflow.workflow.steps import Review
 
         class FakeReviewer:
             async def acheck(self, result, document_text=""):
@@ -156,7 +156,7 @@ class TestReviewerUsage:
                     reviewer="auditor", verdict="Approved", usage=_usage(300, 50),
                 )
 
-        from docflow.extraction.models import ExtractionResult
+        from docuflow.extraction.models import ExtractionResult
 
         state = PipelineState()
         state.extraction_result = ExtractionResult(document_id="d1", schema_name="I")

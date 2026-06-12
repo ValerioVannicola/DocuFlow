@@ -6,14 +6,14 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from pydantic import BaseModel
 
-from docflow.discover import (
+from docuflow.discover import (
     DiscoveredField,
     DiscoveryResult,
     _build_pydantic_model,
     _build_yaml_template,
     discover_schema,
 )
-from docflow.extraction.llm.base import LLMResponse
+from docuflow.extraction.llm.base import LLMResponse
 
 
 def _make_llm_response() -> LLMResponse:
@@ -111,7 +111,7 @@ class TestDiscoverSchema:
         mock_parser = AsyncMock()
         mock_parser.parse = AsyncMock(side_effect=lambda doc: _set_parsed(doc))
 
-        with patch("docflow.parsing.pdfplumber_parser.PdfplumberParser", return_value=mock_parser):
+        with patch("docuflow.parsing.pdfplumber_parser.PdfplumberParser", return_value=mock_parser):
             result = await discover_schema(str(pdf_path), llm=mock_llm)
 
         assert isinstance(result, DiscoveryResult)
@@ -138,7 +138,7 @@ class TestDiscoverSchema:
         mock_parser = AsyncMock()
         mock_parser.parse = AsyncMock(side_effect=lambda doc: _set_parsed(doc))
 
-        with patch("docflow.parsing.pdfplumber_parser.PdfplumberParser", return_value=mock_parser):
+        with patch("docuflow.parsing.pdfplumber_parser.PdfplumberParser", return_value=mock_parser):
             result = await discover_schema(str(pdf_path), llm=mock_llm)
 
         assert result.yaml_template != ""
@@ -155,7 +155,7 @@ class TestDiscoverSchema:
         mock_parser = AsyncMock()
         mock_parser.parse = AsyncMock(side_effect=lambda doc: _set_parsed(doc))
 
-        with patch("docflow.parsing.pdfplumber_parser.PdfplumberParser", return_value=mock_parser):
+        with patch("docuflow.parsing.pdfplumber_parser.PdfplumberParser", return_value=mock_parser):
             discovery = await discover_schema(str(pdf_path), llm=mock_llm)
 
         schema = discovery.schema_class
@@ -173,7 +173,7 @@ class TestDiscoverSchema:
         mock_parser = AsyncMock()
         mock_parser.parse = AsyncMock(side_effect=lambda doc: _set_parsed(doc))
 
-        with patch("docflow.parsing.pdfplumber_parser.PdfplumberParser", return_value=mock_parser):
+        with patch("docuflow.parsing.pdfplumber_parser.PdfplumberParser", return_value=mock_parser):
             await discover_schema(str(pdf_path), llm=mock_llm)
 
         call_messages = mock_llm.complete.call_args[0][0]

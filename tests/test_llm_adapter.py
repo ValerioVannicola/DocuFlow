@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from docflow.extraction.llm.base import LLMAdapter, LLMResponse
+from docuflow.extraction.llm.base import LLMAdapter, LLMResponse
 
 
 class TestLLMAdapterProtocol:
@@ -36,7 +36,7 @@ class TestLLMResponse:
 
 class TestLiteLLMAdapter:
     async def test_model_name_translation(self):
-        from docflow.extraction.llm.litellm_adapter import _translate_model_name
+        from docuflow.extraction.llm.litellm_adapter import _translate_model_name
 
         assert _translate_model_name("openai:gpt-4o") == "openai/gpt-4o"
         assert (
@@ -59,9 +59,9 @@ class TestLiteLLMAdapter:
         mock_litellm.acompletion = AsyncMock(return_value=mock_response)
 
         with patch.dict(sys.modules, {"litellm": mock_litellm}):
-            if "docflow.extraction.llm.litellm_adapter" in sys.modules:
-                del sys.modules["docflow.extraction.llm.litellm_adapter"]
-            from docflow.extraction.llm.litellm_adapter import LiteLLMAdapter
+            if "docuflow.extraction.llm.litellm_adapter" in sys.modules:
+                del sys.modules["docuflow.extraction.llm.litellm_adapter"]
+            from docuflow.extraction.llm.litellm_adapter import LiteLLMAdapter
 
             adapter = LiteLLMAdapter(model="openai:gpt-4o")
             result = await adapter.complete([{"role": "user", "content": "test"}])
@@ -75,14 +75,14 @@ class TestLiteLLMAdapter:
         mock_litellm.acompletion = AsyncMock(side_effect=RuntimeError("API error"))
 
         with patch.dict(sys.modules, {"litellm": mock_litellm}):
-            if "docflow.extraction.llm.litellm_adapter" in sys.modules:
-                del sys.modules["docflow.extraction.llm.litellm_adapter"]
-            from docflow.extraction.llm.litellm_adapter import LiteLLMAdapter
+            if "docuflow.extraction.llm.litellm_adapter" in sys.modules:
+                del sys.modules["docuflow.extraction.llm.litellm_adapter"]
+            from docuflow.extraction.llm.litellm_adapter import LiteLLMAdapter
 
             adapter = LiteLLMAdapter(model="openai:gpt-4o", max_retries=2)
 
             with patch("asyncio.sleep", new_callable=AsyncMock):
-                from docflow.errors import SchemaExtractionError
+                from docuflow.errors import SchemaExtractionError
 
                 with pytest.raises(SchemaExtractionError, match="failed after 2 attempts"):
                     await adapter.complete([{"role": "user", "content": "test"}])

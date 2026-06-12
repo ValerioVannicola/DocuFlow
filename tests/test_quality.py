@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import json
 
-from docflow.documents.evidence import Evidence
-from docflow.extraction.models import ExtractedField, ExtractionResult, FieldTrust
-from docflow.quality import FieldQuality, QualityReport, quality_report
+from docuflow.documents.evidence import Evidence
+from docuflow.extraction.models import ExtractedField, ExtractionResult, FieldTrust
+from docuflow.quality import FieldQuality, QualityReport, quality_report
 
 
 def _field(

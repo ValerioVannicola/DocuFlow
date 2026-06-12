@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from docflow.workflow.pipeline import Pipeline
-from docflow.workflow.state import PipelineState
-from docflow.workflow.steps import PipelineStep
+from docuflow.workflow.pipeline import Pipeline
+from docuflow.workflow.state import PipelineState
+from docuflow.workflow.steps import PipelineStep
 
 
 class MockStep:

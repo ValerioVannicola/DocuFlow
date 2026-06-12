@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from docflow.documents.locate import locate_text
-from docflow.documents.models import (
+from docuflow.documents.locate import locate_text
+from docuflow.documents.models import (
     Block,
     BlockType,
     BoundingBox,

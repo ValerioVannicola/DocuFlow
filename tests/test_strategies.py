@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from docflow.extraction.models import ExtractionResult
-from docflow.strategies.base import Strategy
+from docuflow.extraction.models import ExtractionResult
+from docuflow.strategies.base import Strategy
 
 
 class TestStrategyProtocol:

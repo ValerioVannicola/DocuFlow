@@ -4,8 +4,8 @@ import json
 
 import pytest
 
-from docflow.documents.evidence import Evidence
-from docflow.extraction.models import (
+from docuflow.documents.evidence import Evidence
+from docuflow.extraction.models import (
     ExtractedField,
     ExtractionResult,
 )

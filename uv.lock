@@ -860,7 +860,7 @@ wheels = [
 ]
 
 [[package]]
-name = "docflow"
+name = "docuflow"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
@@ -938,7 +938,7 @@ requires-dist = [
     { name = "azure-ai-documentintelligence", marker = "extra == 'azure'", specifier = ">=1.0" },
     { name = "boto3", marker = "extra == 'aws'", specifier = ">=1.34" },
     { name = "click", specifier = ">=8.0" },
-    { name = "docflow", extras = ["pdf", "ocr", "llm", "privacy", "docling", "azure", "aws", "gcp", "mcp", "serve"], marker = "extra == 'all'" },
+    { name = "docuflow", extras = ["pdf", "ocr", "llm", "privacy", "docling", "azure", "aws", "gcp", "mcp", "serve"], marker = "extra == 'all'" },
     { name = "docling", marker = "extra == 'docling'", specifier = ">=2.90" },
     { name = "fastapi", marker = "extra == 'serve'", specifier = ">=0.115" },
     { name = "google-cloud-documentai", marker = "extra == 'gcp'", specifier = ">=2.30" },

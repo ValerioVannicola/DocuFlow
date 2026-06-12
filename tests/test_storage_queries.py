@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from docflow.extraction.models import ExtractionResult
-from docflow.storage.base import Storage
-from docflow.storage.local import LocalDocumentStore
+from docuflow.extraction.models import ExtractionResult
+from docuflow.storage.base import Storage
+from docuflow.storage.local import LocalDocumentStore
 
 
 class TestStorageProtocol:

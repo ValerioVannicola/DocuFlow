@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from docflow.documents.evidence import Evidence
-from docflow.extraction.models import ExtractedField, ExtractionResult
-from docflow.review.rules import (
+from docuflow.documents.evidence import Evidence
+from docuflow.extraction.models import ExtractedField, ExtractionResult
+from docuflow.review.rules import (
     AnyFieldConfidenceBelow,
     FieldConfidenceBelow,
     FieldMissing,
@@ -11,8 +11,8 @@ from docflow.review.rules import (
     OverallConfidenceBelow,
     ReviewRule,
 )
-from docflow.workflow.state import PipelineState
-from docflow.workflow.steps import PipelineStep, Review
+from docuflow.workflow.state import PipelineState
+from docuflow.workflow.steps import PipelineStep, Review
 
 
 def _make_result(
@@ -212,7 +212,7 @@ class TestReviewStep:
 
 class TestDocumentPipelineReview:
     def test_pipeline_accepts_review_rules(self):
-        from docflow.processor import DocumentPipeline
+        from docuflow.processor import DocumentPipeline
 
         pipeline = DocumentPipeline(
             review_rules=[OverallConfidenceBelow(0.7), FieldMissing(["total"])],
@@ -220,7 +220,7 @@ class TestDocumentPipelineReview:
         assert len(pipeline._review_rules) == 2
 
     def test_pipeline_no_review_by_default(self):
-        from docflow.processor import DocumentPipeline
+        from docuflow.processor import DocumentPipeline
 
         pipeline = DocumentPipeline()
         assert pipeline._review_rules == []

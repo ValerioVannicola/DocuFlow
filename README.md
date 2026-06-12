@@ -1,30 +1,30 @@
 <p align="center">
-  <img src="docs/assets/docflow-logo.png" alt="DocFlow logo" width="520">
+  <img src="docs/assets/docuflow-logo.png" alt="DocuFlow logo" width="520">
 </p>
 
-# DocFlow
+# DocuFlow
 
 Extract structured data from documents using LLMs — with evidence, validation, review, and full audit trail.
 
-## Why DocFlow?
+## Why DocuFlow?
 
 Most document extraction tools focus on one part of the problem: parsing a PDF, running OCR, or calling an LLM. In real workflows, that is rarely enough. Teams also need schemas, evidence, confidence scores, validation, privacy controls, review steps, corrections, storage, and an audit trail they can trust.
 
-DocFlow was built as a workflow runtime for document extraction. It lets you combine parsers, OCR, LLMs, validation rules, review logic, and deployment options into one reproducible pipeline, so extracted data can move from messy documents into production systems with traceability and control.
+DocuFlow was built as a workflow runtime for document extraction. It lets you combine parsers, OCR, LLMs, validation rules, review logic, and deployment options into one reproducible pipeline, so extracted data can move from messy documents into production systems with traceability and control.
 
 ## Installation
 
 ```bash
-pip install docflow[all]
+pip install docuflow[all]
 ```
 
 Or install only what you need:
 
 ```bash
-pip install docflow[pdf,llm]      # pdfplumber parser + LLM extraction
-pip install docflow[ocr,llm]      # Tesseract OCR + LLM extraction
-pip install docflow[docling,llm]  # Docling parser (best quality) + LLM
-pip install docflow[privacy]      # PII anonymization via Presidio
+pip install docuflow[pdf,llm]      # pdfplumber parser + LLM extraction
+pip install docuflow[ocr,llm]      # Tesseract OCR + LLM extraction
+pip install docuflow[docling,llm]  # Docling parser (best quality) + LLM
+pip install docuflow[privacy]      # PII anonymization via Presidio
 ```
 
 Requires Python >= 3.11.
@@ -33,7 +33,7 @@ Requires Python >= 3.11.
 
 ```python
 from pydantic import BaseModel
-from docflow import extract
+from docuflow import extract
 
 class Invoice(BaseModel):
     supplier_name: str
@@ -98,7 +98,7 @@ review:
 ```
 
 ```python
-from docflow import run_workflow
+from docuflow import run_workflow
 
 result = run_workflow("invoice.yaml", "invoice.pdf")
 ```
@@ -114,13 +114,13 @@ yaml_str = pipeline.export_yaml(Invoice, name="invoice")
 Document extraction is often one step in a larger workflow built in multiple languages. Wrap any workflow config as an HTTP microservice:
 
 ```bash
-pip install docflow[serve]
+pip install docuflow[serve]
 
 # Local development server
-docflow serve workflow.yaml --port 8000
+docuflow serve workflow.yaml --port 8000
 
 # Generate a Docker deployment
-docflow dockerize workflow.yaml --output ./deploy
+docuflow dockerize workflow.yaml --output ./deploy
 cd deploy && docker compose up --build
 ```
 
@@ -137,13 +137,13 @@ Three endpoints: `GET /health`, `GET /schema`, `POST /extract` (file upload → 
 ### CLI
 
 ```bash
-docflow run invoice.yaml invoice.pdf --output result.json
-docflow extract invoice.pdf --schema invoice
-docflow extract-folder ./invoices --schema invoice --output results.csv
-docflow serve workflow.yaml --port 8000
-docflow dockerize workflow.yaml --output ./deploy --with-storage
-docflow screenshot document.pdf -o ./pages
-docflow templates list
+docuflow run invoice.yaml invoice.pdf --output result.json
+docuflow extract invoice.pdf --schema invoice
+docuflow extract-folder ./invoices --schema invoice --output results.csv
+docuflow serve workflow.yaml --port 8000
+docuflow dockerize workflow.yaml --output ./deploy --with-storage
+docuflow screenshot document.pdf -o ./pages
+docuflow templates list
 ```
 
 ## Documentation

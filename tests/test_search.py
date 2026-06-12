@@ -1,7 +1,14 @@
 from __future__ import annotations
 
-from docflow.documents.models import Block, BlockType, BoundingBox, Document, DocumentMetadata, Page
-from docflow.search import search_document
+from docuflow.documents.models import (
+    Block,
+    BlockType,
+    BoundingBox,
+    Document,
+    DocumentMetadata,
+    Page,
+)
+from docuflow.search import search_document
 
 
 def _make_doc() -> Document:

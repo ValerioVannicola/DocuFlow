@@ -5,9 +5,9 @@ from datetime import datetime
 
 import pytest
 
-from docflow.documents.evidence import Evidence
-from docflow.extraction.models import ExtractedField, ExtractionResult, FieldTrust
-from docflow.quality import QualityLog, QualitySnapshot, quality_report
+from docuflow.documents.evidence import Evidence
+from docuflow.extraction.models import ExtractedField, ExtractionResult, FieldTrust
+from docuflow.quality import QualityLog, QualitySnapshot, quality_report
 
 
 def _field(value, confidence=0.9, found_in_source=True, auto_accept=True):

@@ -1,6 +1,8 @@
 import asyncio
-from docflow.documents.models import Document, DocumentMetadata
-from docflow.parsing.docling_parser import DoclingParser
+
+from docuflow.documents.models import Document, DocumentMetadata
+from docuflow.parsing.docling_parser import DoclingParser
+
 
 async def main():
     doc = Document(

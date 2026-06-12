@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from click.testing import CliRunner
 
-from docflow.cli.main import main
+from docuflow.cli.main import main
 
 
 class TestCLI:
@@ -17,7 +17,7 @@ class TestCLI:
         runner = CliRunner()
         result = runner.invoke(main, ["--help"])
         assert result.exit_code == 0
-        assert "docflow" in result.output
+        assert "docuflow" in result.output
 
     def test_extract_help(self):
         runner = CliRunner()
@@ -61,19 +61,19 @@ class TestCLIUtils:
     def test_load_template_schema(self):
         from pydantic import BaseModel
 
-        from docflow.cli.utils import load_schema
+        from docuflow.cli.utils import load_schema
 
         schema = load_schema("invoice")
         assert issubclass(schema, BaseModel)
 
     def test_load_unknown_raises(self):
-        from docflow.cli.utils import load_schema
+        from docuflow.cli.utils import load_schema
 
         with pytest.raises(ValueError):
             load_schema("totally_nonexistent_schema")
 
     def test_load_dotted_path(self):
-        from docflow.cli.utils import load_schema
+        from docuflow.cli.utils import load_schema
 
         schema = load_schema("examples.schemas.invoice.Invoice")
         assert schema.__name__ == "Invoice"
