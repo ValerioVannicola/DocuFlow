@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/docuflow-logo.png" alt="DocuFlow logo" width="520">
+</p>
+
 # DocuFlow — Complete User Guide
 
 > Extract structured data from documents using LLMs — with evidence, validation, review, and full audit trail.
