@@ -144,6 +144,12 @@ result.fields["total"].evidence[0].text        # "1234.56"
 result.fields["total"].evidence[0].page_number # 0
 result.fields["total"].evidence[0].bbox        # BoundingBox(x0=72, y0=130, x1=200, y1=148)
 result.confidence                    # 0.85 (overall)
+result.usage                         # TokenUsage | None — aggregated LLM token usage
+result.usage.prompt_tokens           # summed across ALL calls (instances, decider,
+result.usage.completion_tokens       #   JSON-repair retries, LLM reviewers)
+result.usage.total_tokens
+result.usage.n_llm_calls             # how many LLM calls produced this result
+result.usage.cost_usd                # litellm-priced cost (None if model unknown)
 result.needs_review                  # True/False
 result.review_reasons                # ["Field 'total' confidence below 0.8"]
 result.review_verdicts               # [ReviewVerdict(reviewer="auditor", verdict="Approved")]
@@ -260,6 +266,7 @@ report = process_batch(
 )
 report.total, report.succeeded, report.failed, report.needs_review
 report.average_confidence
+report.usage               # TokenUsage | None — tokens/cost summed over the whole batch
 report.top_review_reasons
 report.to_csv()            # CSV string
 report.to_dataframe()      # pandas DataFrame

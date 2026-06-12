@@ -9,7 +9,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from docflow._sync import run_sync
-from docflow.extraction.models import ExtractionResult
+from docflow.extraction.models import ExtractionResult, TokenUsage
 
 
 class DocumentSummary(BaseModel):
@@ -31,6 +31,7 @@ class BatchReport(BaseModel):
     needs_review: int = 0
     approved: int = 0
     average_confidence: float = 0.0
+    usage: TokenUsage | None = None
     top_review_reasons: dict[str, int] = Field(default_factory=dict)
     field_names: list[str] = Field(default_factory=list)
     documents: list[DocumentSummary] = Field(default_factory=list)
@@ -144,6 +145,11 @@ async def process_batch(
         for reason in s.review_reasons:
             reason_counter[reason] += 1
 
+    total_usage: TokenUsage | None = None
+    for r in results:
+        if r.usage is not None:
+            total_usage = (total_usage or TokenUsage()).combined(r.usage)
+
     return BatchReport(
         total=len(files),
         succeeded=len(succeeded),
@@ -151,6 +157,7 @@ async def process_batch(
         needs_review=len(review_needed),
         approved=len([s for s in succeeded if not s.needs_review]),
         average_confidence=avg_conf,
+        usage=total_usage,
         top_review_reasons=dict(reason_counter.most_common(10)),
         field_names=all_field_names,
         documents=summaries,

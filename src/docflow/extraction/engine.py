@@ -13,7 +13,12 @@ from docflow.documents.models import Document
 from docflow.errors import SchemaExtractionError
 from docflow.extraction.evidence import attach_evidence
 from docflow.extraction.llm.base import LLMAdapter
-from docflow.extraction.models import ExtractedField, ExtractionResult, FieldTrust
+from docflow.extraction.models import (
+    ExtractedField,
+    ExtractionResult,
+    FieldTrust,
+    TokenUsage,
+)
 from docflow.extraction.prompts import (
     JSON_REPAIR_PROMPT,
     build_extraction_prompt,
@@ -27,6 +32,35 @@ from docflow.extraction.scoring import (
 from docflow.observability.traces import Trace
 
 JSON_MODE = {"type": "json_object"}
+
+
+class _UsageTracker:
+    """Wraps an LLMAdapter and records the usage of every call, so a single
+    aggregate can be attached to the ExtractionResult."""
+
+    def __init__(self, llm: LLMAdapter):
+        self._llm = llm
+        self.usages: list[dict] = []
+
+    async def complete(
+        self,
+        messages: list[dict],
+        response_format: object = None,
+        temperature: float = 0.0,
+    ):
+        response = await self._llm.complete(
+            messages, response_format=response_format, temperature=temperature,
+        )
+        if response.usage:
+            self.usages.append(response.usage)
+        return response
+
+    def total(self) -> TokenUsage | None:
+        return TokenUsage.from_usages(self.usages)
+
+
+def _usage_of(llm: object) -> TokenUsage | None:
+    return llm.total() if isinstance(llm, _UsageTracker) else None
 
 
 def _strip_markdown_fences(text: str) -> str:
@@ -158,6 +192,7 @@ def _build_result(
     candidates: list[dict] | None = None,
     scoring: str = "qualitative",
     n_instances: int = 1,
+    usage: TokenUsage | None = None,
 ) -> ExtractionResult:
     raw_data = parsed.get("data", parsed)
     evidence_map = parsed.get("evidence", {})
@@ -287,6 +322,7 @@ def _build_result(
         fields=fields,
         confidence=overall_conf,
         ocr=doc_ocr,
+        usage=usage,
         needs_review=False,
         trace_id=trace.trace_id if trace else str(uuid.uuid4()),
         model_name=model_name,
@@ -356,7 +392,10 @@ async def _run_multi(
             if r is not None:
                 first_model = r["model"]
                 break
-        return _build_result(document, schema, candidates[0], first_model, trace, scoring=scoring)
+        return _build_result(
+            document, schema, candidates[0], first_model, trace,
+            scoring=scoring, usage=_usage_of(llm),
+        )
 
     decider_messages = _build_decider_prompt(schema, candidates, document.raw_text)
 
@@ -382,6 +421,7 @@ async def _run_multi(
     return _build_result(
         document, schema, decider_parsed, decider_response.model, trace,
         candidates=candidates, scoring=scoring, n_instances=n_instances,
+        usage=_usage_of(llm),
     )
 
 
@@ -405,6 +445,7 @@ class ExtractionEngine:
         import time
 
         start = time.monotonic()
+        llm = _UsageTracker(self.llm)
         page_texts = [p.text for p in document.pages] if document.pages else None
         messages = build_extraction_prompt(
             schema, document.raw_text, page_texts, context=self.context,
@@ -412,13 +453,13 @@ class ExtractionEngine:
 
         if mode == "multi":
             return await _run_multi(
-                self.llm, document, schema, messages, trace, start,
+                llm, document, schema, messages, trace, start,
                 n_instances=n_instances, temperatures=temperatures,
                 scoring=scoring,
             )
 
         try:
-            response = await self.llm.complete(
+            response = await llm.complete(
                 messages, temperature=0.0, response_format=JSON_MODE,
             )
         except Exception as exc:
@@ -431,8 +472,11 @@ class ExtractionEngine:
                 duration_ms=duration_ms, model=response.model, usage=response.usage,
             )
 
-        parsed = await _parse_json_with_retry(self.llm, response.content, messages)
-        return _build_result(document, schema, parsed, response.model, trace, scoring=scoring)
+        parsed = await _parse_json_with_retry(llm, response.content, messages)
+        return _build_result(
+            document, schema, parsed, response.model, trace,
+            scoring=scoring, usage=llm.total(),
+        )
 
 
 class VisionExtractionEngine:
@@ -527,16 +571,17 @@ class VisionExtractionEngine:
             )
 
         messages = build_vision_extraction_prompt(schema, images_b64, context=self.context)
+        llm = _UsageTracker(self.llm)
 
         if mode == "multi":
             return await _run_multi(
-                self.llm, document, schema, messages, trace, start,
+                llm, document, schema, messages, trace, start,
                 n_instances=n_instances, temperatures=temperatures,
                 scoring=scoring,
             )
 
         try:
-            response = await self.llm.complete(
+            response = await llm.complete(
                 messages, temperature=0.0, response_format=JSON_MODE,
             )
         except Exception as exc:
@@ -549,9 +594,12 @@ class VisionExtractionEngine:
                 duration_ms=duration_ms, model=response.model, usage=response.usage,
             )
 
-        parsed = await _parse_json_with_retry(self.llm, response.content, messages)
+        parsed = await _parse_json_with_retry(llm, response.content, messages)
 
-        return _build_result(document, schema, parsed, response.model, trace, scoring=scoring)
+        return _build_result(
+            document, schema, parsed, response.model, trace,
+            scoring=scoring, usage=llm.total(),
+        )
 
 
 HYBRID_DECIDER_SYSTEM_PROMPT = """You are a data extraction judge with vision capabilities. \
@@ -677,8 +725,9 @@ class HybridExtractionEngine:
         if len(temps) != n_instances:
             temps = _generate_temperatures(n_instances)
 
-        vision_tasks = [_single_llm_call(self.llm, vision_messages, t) for t in temps]
-        text_tasks = [_single_llm_call(self.llm, text_messages, t) for t in temps]
+        llm = _UsageTracker(self.llm)
+        vision_tasks = [_single_llm_call(llm, vision_messages, t) for t in temps]
+        text_tasks = [_single_llm_call(llm, text_messages, t) for t in temps]
         all_results = await asyncio.gather(*vision_tasks, *text_tasks)
 
         candidates: list[dict] = []
@@ -708,14 +757,17 @@ class HybridExtractionEngine:
                 if r is not None:
                     first_model = r["model"]
                     break
-            return _build_result(document, schema, candidates[0], first_model, trace, scoring=scoring)
+            return _build_result(
+                document, schema, candidates[0], first_model, trace,
+                scoring=scoring, usage=llm.total(),
+            )
 
         decider_messages = _build_hybrid_decider_prompt(
             schema, candidates, candidate_labels, images_b64,
         )
 
         try:
-            decider_response = await self.llm.complete(
+            decider_response = await llm.complete(
                 decider_messages, temperature=0.0, response_format=JSON_MODE,
             )
         except Exception as exc:
@@ -731,10 +783,11 @@ class HybridExtractionEngine:
             )
 
         decider_parsed = await _parse_json_with_retry(
-            self.llm, decider_response.content, decider_messages,
+            llm, decider_response.content, decider_messages,
         )
 
         return _build_result(
             document, schema, decider_parsed, decider_response.model, trace,
             candidates=candidates, scoring=scoring, n_instances=n_instances * 2,
+            usage=llm.total(),
         )

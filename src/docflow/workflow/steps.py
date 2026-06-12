@@ -308,6 +308,11 @@ class Review:
                 )
                 if isinstance(result, ReviewVerdict):
                     state.extraction_result.review_verdicts.append(result)
+                    if result.usage:
+                        from docflow.extraction.models import TokenUsage
+
+                        current = state.extraction_result.usage or TokenUsage()
+                        state.extraction_result.usage = current.merged(result.usage)
                     if result.verdict != "Approved":
                         reasons.append(f"{result.reviewer}: {result.reasoning}")
                 elif result:

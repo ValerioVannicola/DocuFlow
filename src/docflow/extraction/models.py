@@ -11,6 +11,59 @@ from docflow.documents.models import BoundingBox, PageRect
 T = TypeVar("T")
 
 
+class TokenUsage(BaseModel):
+    """Aggregated LLM token usage for an extraction.
+
+    Sums every LLM call made to produce the result: extraction instances,
+    decider, JSON-repair retries and LLM reviewers. `cost_usd` is filled
+    when the adapter can price the model (litellm), else None.
+    """
+
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
+    n_llm_calls: int = 0
+    cost_usd: float | None = None
+
+    def merged(self, usage: dict) -> TokenUsage:
+        """Return a new TokenUsage with one call's usage dict added."""
+        cost = usage.get("cost_usd")
+        new_cost = self.cost_usd
+        if cost is not None:
+            new_cost = round((new_cost or 0.0) + cost, 6)
+        return TokenUsage(
+            prompt_tokens=self.prompt_tokens + int(usage.get("prompt_tokens", 0) or 0),
+            completion_tokens=self.completion_tokens
+            + int(usage.get("completion_tokens", 0) or 0),
+            total_tokens=self.total_tokens + int(usage.get("total_tokens", 0) or 0),
+            n_llm_calls=self.n_llm_calls + 1,
+            cost_usd=new_cost,
+        )
+
+    def combined(self, other: TokenUsage) -> TokenUsage:
+        """Return a new TokenUsage adding another aggregate (e.g. per-document
+        usages into a batch total)."""
+        cost = None
+        if self.cost_usd is not None or other.cost_usd is not None:
+            cost = round((self.cost_usd or 0.0) + (other.cost_usd or 0.0), 6)
+        return TokenUsage(
+            prompt_tokens=self.prompt_tokens + other.prompt_tokens,
+            completion_tokens=self.completion_tokens + other.completion_tokens,
+            total_tokens=self.total_tokens + other.total_tokens,
+            n_llm_calls=self.n_llm_calls + other.n_llm_calls,
+            cost_usd=cost,
+        )
+
+    @classmethod
+    def from_usages(cls, usages: list[dict]) -> TokenUsage | None:
+        if not usages:
+            return None
+        total = cls()
+        for u in usages:
+            total = total.merged(u)
+        return total
+
+
 class OCRFieldConfidence(BaseModel):
     """OCR confidence for one field, matched back from the extracted value.
 
@@ -89,6 +142,7 @@ class ReviewVerdict(BaseModel):
     reviewer: str
     verdict: str
     reasoning: str = ""
+    usage: dict = Field(default_factory=dict)
 
 
 class FieldProvenance(BaseModel):
@@ -121,6 +175,7 @@ class ExtractionResult(BaseModel):
     fields: dict[str, ExtractedField] = Field(default_factory=dict)
     confidence: float = 0.0
     ocr: OCRDocumentConfidence | None = None
+    usage: TokenUsage | None = None
     needs_review: bool = False
     review_status: str = "pending"
     reviewed_by: str = ""

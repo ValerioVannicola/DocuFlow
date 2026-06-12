@@ -72,6 +72,12 @@ class LiteLLMAdapter:
                         "completion_tokens": response.usage.completion_tokens,
                         "total_tokens": response.usage.total_tokens,
                     }
+                    try:
+                        cost = litellm.completion_cost(completion_response=response)
+                        if cost:
+                            usage["cost_usd"] = round(cost, 6)
+                    except Exception:  # noqa: S110 — unknown model pricing; tokens still reported
+                        pass
                 return LLMResponse(
                     content=content,
                     usage=usage,

@@ -72,11 +72,13 @@ class LLMReviewer:
     ) -> ReviewVerdict:
         messages = self._build_messages(result, document_text)
 
+        usage: dict = {}
         try:
             response = await self.llm.complete(
                 messages, temperature=0.0,
                 response_format={"type": "json_object"},
             )
+            usage = response.usage or {}
             content = response.content.strip()
             if content.startswith("```"):
                 content = content.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
@@ -86,6 +88,7 @@ class LLMReviewer:
                 reviewer=self.name,
                 verdict="Not Approved",
                 reasoning=f"Reviewer failed: {exc}",
+                usage=usage,
             )
 
         raw_verdict = str(parsed.get("verdict", "Not Approved"))
@@ -96,6 +99,7 @@ class LLMReviewer:
             reviewer=self.name,
             verdict=verdict,
             reasoning=reasoning,
+            usage=usage,
         )
 
     def check(self, result: ExtractionResult) -> str | None:
