@@ -12,6 +12,7 @@ from docflow.workflow.steps import (
     Review,
     Store,
     Validate,
+    VerifyFields,
 )
 
 __all__ = [
@@ -29,4 +30,5 @@ __all__ = [
     "Review",
     "Store",
     "Validate",
+    "VerifyFields",
 ]

@@ -132,6 +132,37 @@ gates on the OCR confidence scores after parsing and re-reads the original file 
 the vision (or hybrid) engine when quality is below threshold. Escalation is suppressed
 when a PrivacyPolicy is configured (vision bypasses text anonymization).
 
+## Zoom-and-Verify (per-field verification)
+
+After extraction, fields with weak signals (low consensus, low/unmatched OCR span) can
+be re-read individually: the field's page is rendered at high DPI, cropped to the
+field's highlight rect (plus padding), and a vision LLM answers a focused question
+about just that region. Costs pennies vs a full re-extraction.
+
+```python
+pipeline = DocumentPipeline(
+    verification={                      # enables the VerifyFields step
+        "trigger_consensus_below": 0.7, # verify when consensus ratio is below
+        "trigger_ocr_below": 0.6,       # verify when OCR span score is below
+        "include_unmatched": True,      # verify values OCR couldn't locate
+        "max_fields": 5,                # cost cap per document
+        "dpi": 300,                     # zoom render DPI
+        "apply_corrections": True,      # apply schema-valid corrections
+    },
+)
+
+field.verification                 # FieldVerification | None
+field.verification.agrees          # re-read confirmed the value (confidence -> >= 0.9)
+field.verification.changed         # correction applied (original in original_value)
+field.verification.verified_value  # what the zoomed re-read returned
+field.verification.reason          # why this field was verified
+```
+
+Corrections only apply when the new value passes schema validation; changed fields
+keep confidence <= 0.6 so review rules still catch them. Verification token usage is
+merged into `result.usage`. Works in YAML via a `verification:` block. Requires a
+vision-capable model.
+
 **Vision and hybrid require `parser=None`:**
 
 ```python

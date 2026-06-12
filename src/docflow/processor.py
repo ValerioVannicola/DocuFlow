@@ -27,6 +27,7 @@ class DocumentPipeline:
         context: str | None = None,
         scoring: str = "qualitative",
         escalation: dict | None = None,
+        verification: dict | None = None,
         llm_kwargs: dict | None = None,
     ):
         self._parser = parser
@@ -44,6 +45,7 @@ class DocumentPipeline:
         self._context = context
         self._scoring = scoring
         self._escalation = escalation
+        self._verification = verification
         self._llm_kwargs = llm_kwargs or {}
 
         parser_type = self._parser
@@ -305,6 +307,17 @@ class DocumentPipeline:
                     temperatures=self._temperatures,
                     context=self._context,
                     scoring=self._scoring,
+                )
+            )
+
+        if self._verification is not None:
+            from docflow.extraction.verify import VerificationPolicy
+            from docflow.workflow.steps import VerifyFields
+
+            steps.append(
+                VerifyFields(
+                    schema=schema, llm=llm,
+                    policy=VerificationPolicy(**self._verification),
                 )
             )
 

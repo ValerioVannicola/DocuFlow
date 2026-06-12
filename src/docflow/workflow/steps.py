@@ -394,6 +394,52 @@ class ExtractAuto:
         return state
 
 
+class VerifyFields:
+    """Zoom-and-verify: re-read weak fields from a high-DPI crop of their
+    page region with the vision LLM. Runs after extraction, before review.
+
+    Requires a vision-capable model (the same adapter used for extraction).
+    """
+
+    name = "verify_fields"
+
+    def __init__(
+        self,
+        schema: type[BaseModel] | None = None,
+        llm: Any = None,
+        policy: Any = None,
+    ):
+        self._schema = schema
+        self.llm = llm
+        self.policy = policy
+
+    async def execute(self, state: PipelineState) -> PipelineState:
+        if state.extraction_result is None:
+            state.errors.append("No extraction result to verify")
+            state.status = "failed"
+            return state
+        if state.document is None:
+            return state
+
+        schema = self._schema or state.metadata.get("schema")
+        if schema is None:
+            return state
+
+        from docflow.extraction.verify import verify_result
+
+        start = time.monotonic()
+        n_verified = await verify_result(
+            state.document, state.extraction_result, schema,
+            self.llm, policy=self.policy, trace=state.trace,
+        )
+        duration = (time.monotonic() - start) * 1000
+        state.trace.add_event(
+            "verify_fields", step_name=self.name,
+            duration_ms=duration, n_verified=n_verified,
+        )
+        return state
+
+
 class Review:
     name = "review"
 

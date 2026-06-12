@@ -1048,6 +1048,50 @@ escalation:
   escalate_to: vision
 ```
 
+#### Zoom-and-Verify (`verification=`)
+
+Confidence scores tell you *which* fields are weak — zoom-and-verify does something
+about it, surgically. After extraction, each weak field (low consensus, low OCR span
+score, or a value OCR couldn't locate) gets one targeted vision call: its page is
+rendered at high DPI (default 300), cropped to the field's highlight rect plus padding,
+and the model answers a focused question about just that region — where 0/O, 1/l/7 and
+5/S are actually distinguishable.
+
+```python
+pipeline = DocumentPipeline(
+    extraction_mode="multi",
+    verification={"trigger_consensus_below": 0.7, "trigger_ocr_below": 0.6},
+)
+result = pipeline.run_sync("claim_form.pdf", schema=InsuranceClaim)
+
+f = result.fields["total"]
+f.verification.reason          # "OCR span confidence 0.42 below 0.6"
+f.verification.agrees          # the re-read confirmed the value
+f.verification.changed         # or: a correction was applied
+f.verification.original_value  # always preserved when changed
+```
+
+Outcomes:
+
+- **Confirmed** (`agrees=True`): the zoomed re-read matches → field confidence rises to ≥ 0.9.
+- **Corrected** (`changed=True`): the re-read differs *and* the new value passes schema
+  validation → value replaced, original preserved, confidence capped at 0.6 so review
+  rules still see it.
+- **Rejected**: a correction that fails schema validation is recorded but never applied.
+- **Unreadable**: the model couldn't read the region → field untouched, `verified=False`.
+
+Cost is capped (`max_fields`, default 5) and every verification call's tokens are merged
+into `result.usage`. In YAML:
+
+```yaml
+verification:
+  trigger_consensus_below: 0.7
+  trigger_ocr_below: 0.6
+  max_fields: 5
+```
+
+Requires a vision-capable model (the same adapter used for extraction).
+
 ### Extraction Modes
 
 Each extraction type supports two modes:
@@ -1326,6 +1370,7 @@ All parameters:
 | `validators` | list | `None` | List of Validator instances |
 | `review_rules` | list | `None` | List of ReviewRule or LLMReviewer instances |
 | `escalation` | dict | `None` | Auto-mode escalation thresholds (see Auto Extraction) |
+| `verification` | dict | `None` | Zoom-and-verify thresholds (see Zoom-and-Verify) |
 | `privacy` | PrivacyPolicy | `None` | Privacy/anonymization config |
 | `extraction_mode` | str | `"single"` | `"single"` or `"multi"` |
 | `extraction_type` | str | `"text"` | `"text"`, `"vision"`, or `"hybrid"` |
@@ -2101,6 +2146,7 @@ docflow run invoice.yaml invoice.pdf --output result.json
 | `n_instances` | int | `5` | Parallel instances for multi mode |
 | `scoring` | str | `"qualitative"` | `"qualitative"` \| `"quantitative"` |
 | `escalation` | dict | null | Auto-mode thresholds: `min_ocr_score`, `max_low_confidence_ratio`, `min_chars_per_page`, `escalate_to` |
+| `verification` | dict | null | Zoom-and-verify: `trigger_consensus_below`, `trigger_ocr_below`, `max_fields`, `dpi`, `apply_corrections` |
 | `context` | str | null | Domain context for the LLM |
 | `validation` | list | `[]` | Validation rules (see below) |
 | `review` | list | `[]` | Review rules (see below) |

@@ -104,6 +104,24 @@ class FieldConsensus(BaseModel):
     majority_ratio: float = 0.0
 
 
+class FieldVerification(BaseModel):
+    """Outcome of a zoom-and-verify pass on a weak field.
+
+    The vision LLM re-read a high-DPI crop of the field's region.
+    `agrees` — the re-read confirmed the extracted value. `changed` — the
+    re-read produced a different value that passed schema validation and
+    was applied (original preserved in `original_value`).
+    """
+
+    verified: bool = False
+    agrees: bool = False
+    changed: bool = False
+    original_value: Any = None
+    verified_value: Any = None
+    reason: str = ""
+    page_number: int | None = None
+
+
 class FieldTrust(BaseModel):
     agreement: str = ""
     agreement_ratio: float = 0.0
@@ -124,6 +142,7 @@ class ExtractedField(BaseModel, Generic[T]):
     trust: FieldTrust | None = None
     ocr: OCRFieldConfidence | None = None
     consensus: FieldConsensus | None = None
+    verification: FieldVerification | None = None
     evidence: list[Evidence] = Field(default_factory=list)
     validation_status: str = "pending"
     errors: list[str] = Field(default_factory=list)
