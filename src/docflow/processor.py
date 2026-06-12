@@ -12,7 +12,7 @@ from docflow.extraction.models import ExtractionResult
 class DocumentPipeline:
     def __init__(
         self,
-        parser: Any | str | dict | None = "pymupdf",
+        parser: Any | str | dict | None = "pdfplumber",
         ocr: Any | str | None = None,
         model: str = "openai/gpt-4o",
         storage: Any | str | dict | None = None,
@@ -46,7 +46,7 @@ class DocumentPipeline:
 
         parser_type = self._parser
         if isinstance(self._parser, dict):
-            parser_type = self._parser.get("type", "pymupdf")
+            parser_type = self._parser.get("type", "pdfplumber")
 
         if (
             self._extraction_type in ("vision", "hybrid")
@@ -70,9 +70,9 @@ class DocumentPipeline:
         return self._parser
 
     def _resolve_parser_from_str(self, name: str) -> Any:
-        if name == "pymupdf":
-            from docflow.parsing.pymupdf import PyMuPDFParser
-            return PyMuPDFParser()
+        if name == "pdfplumber":
+            from docflow.parsing.pdfplumber_parser import PdfplumberParser
+            return PdfplumberParser()
         if name == "tesseract":
             from docflow.parsing.tesseract_parser import TesseractParser
             return TesseractParser()
@@ -94,11 +94,11 @@ class DocumentPipeline:
         raise ValueError(f"Unknown parser: {name!r}")
 
     def _resolve_parser_from_dict(self, cfg: dict) -> Any:
-        parser_type = cfg.get("type", "pymupdf")
+        parser_type = cfg.get("type", "pdfplumber")
 
-        if parser_type == "pymupdf":
-            from docflow.parsing.pymupdf import PyMuPDFParser
-            return PyMuPDFParser()
+        if parser_type == "pdfplumber":
+            from docflow.parsing.pdfplumber_parser import PdfplumberParser
+            return PdfplumberParser()
 
         if parser_type == "tesseract":
             from docflow.parsing.tesseract_parser import TesseractParser

@@ -77,7 +77,7 @@ class TestLoadConfig:
         cfg = load_workflow_config(MINIMAL_YAML)
         assert cfg.name == "invoice"
         assert "supplier_name" in cfg.schema_
-        assert cfg.parser == "pymupdf"
+        assert cfg.parser == "pdfplumber"
         assert cfg.model == "openai/gpt-4o"
 
     def test_load_from_dict_full(self):
@@ -113,7 +113,7 @@ class TestLoadConfig:
         cfg = load_workflow_config({"schema": {"a": {"type": "str"}}})
         assert cfg.name == "workflow"
         assert cfg.version == "1.0"
-        assert cfg.parser == "pymupdf"
+        assert cfg.parser == "pdfplumber"
         assert cfg.extraction_mode == "single"
         assert cfg.quality_threshold == 0.7
 
@@ -301,7 +301,7 @@ class TestBuildPipeline:
         pipeline = cfg.build_pipeline()
 
         assert isinstance(pipeline, DocumentPipeline)
-        assert pipeline._parser == "pymupdf"
+        assert pipeline._parser == "pdfplumber"
         assert pipeline._model == "openai/gpt-4o"
         assert pipeline._validators == []
         assert pipeline._review_rules == []
@@ -548,22 +548,22 @@ class TestParserDictConfig:
         assert parser.dpi == 250
         assert parser.min_text_length == 50
 
-    def test_parser_dict_pymupdf(self):
+    def test_parser_dict_pdfplumber(self):
         cfg = load_workflow_config({
             "schema": {"a": {"type": "str"}},
-            "parser": {"type": "pymupdf"},
+            "parser": {"type": "pdfplumber"},
         })
         pipeline = cfg.build_pipeline()
         parser = pipeline._resolve_parser()
-        from docflow.parsing.pymupdf import PyMuPDFParser
-        assert isinstance(parser, PyMuPDFParser)
+        from docflow.parsing.pdfplumber_parser import PdfplumberParser
+        assert isinstance(parser, PdfplumberParser)
 
-    def test_parser_dict_defaults_to_pymupdf(self):
+    def test_parser_dict_defaults_to_pdfplumber(self):
         cfg = load_workflow_config({
             "schema": {"a": {"type": "str"}},
             "parser": {},
         })
-        assert cfg.parser_type == "pymupdf"
+        assert cfg.parser_type == "pdfplumber"
 
     def test_parser_string_still_works(self):
         cfg = load_workflow_config({

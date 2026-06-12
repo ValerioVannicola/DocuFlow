@@ -18,10 +18,10 @@ class TestParserProtocol:
         assert isinstance(FakeParser(), Parser)
 
 
-class TestPyMuPDFParser:
+class TestPdfplumberParser:
     @pytest.mark.integration
     async def test_parse_real_pdf(self, tmp_path):
-        from docflow.parsing.pymupdf import PyMuPDFParser
+        from docflow.parsing.pdfplumber_parser import PdfplumberParser
 
         pdf_path = tmp_path / "test.pdf"
         _create_test_pdf(pdf_path)
@@ -36,7 +36,7 @@ class TestPyMuPDFParser:
             ),
         )
 
-        parser = PyMuPDFParser()
+        parser = PdfplumberParser()
         result = await parser.parse(doc)
 
         assert result.status == "parsed"
@@ -48,7 +48,7 @@ class TestPyMuPDFParser:
 
     @pytest.mark.integration
     async def test_parse_nonexistent_file(self):
-        from docflow.parsing.pymupdf import PyMuPDFParser
+        from docflow.parsing.pdfplumber_parser import PdfplumberParser
 
         doc = Document(
             id="test-doc",
@@ -59,19 +59,12 @@ class TestPyMuPDFParser:
             ),
         )
 
-        parser = PyMuPDFParser()
+        parser = PdfplumberParser()
         with pytest.raises(ParsingError):
             await parser.parse(doc)
 
 
 def _create_test_pdf(path: Path) -> None:
-    try:
-        import fitz
+    from tests.conftest import make_test_pdf
 
-        doc = fitz.open()
-        page = doc.new_page()
-        page.insert_text((72, 72), "Hello World - Test Invoice\nTotal: 1234.56")
-        doc.save(str(path))
-        doc.close()
-    except ImportError:
-        pytest.skip("PyMuPDF not installed")
+    make_test_pdf(path, [(72, 72, "Hello World - Test Invoice"), (72, 90, "Total: 1234.56")])

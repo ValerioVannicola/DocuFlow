@@ -24,7 +24,7 @@ class WorkflowConfig(BaseModel):
 
     schema_: dict[str, Any] = Field(default_factory=dict, alias="schema")
 
-    parser: str | dict[str, Any] = "pymupdf"
+    parser: str | dict[str, Any] = "pdfplumber"
     model: str = "openai/gpt-4o"
     extraction_type: str = "text"
     extraction_mode: str = "single"
@@ -47,7 +47,7 @@ class WorkflowConfig(BaseModel):
     @property
     def parser_type(self) -> str:
         if isinstance(self.parser, dict):
-            return self.parser.get("type", "pymupdf")
+            return self.parser.get("type", "pdfplumber")
         return self.parser
 
     def build_schema(self) -> type[BaseModel]:
@@ -316,8 +316,8 @@ def _export_parser(pipeline: Any) -> str | dict[str, Any]:
     if isinstance(parser, dict):
         return dict(parser)
     name = type(parser).__name__
-    if "PyMuPDF" in name:
-        return "pymupdf"
+    if "Pdfplumber" in name:
+        return "pdfplumber"
     if "Tesseract" in name and "Smart" not in name:
         cfg: dict[str, Any] = {"type": "tesseract"}
         if hasattr(parser, "languages") and parser.languages != ["eng"]:
@@ -352,7 +352,7 @@ def _export_parser(pipeline: Any) -> str | dict[str, Any]:
         return cfg if len(cfg) > 1 else "textract"
     if "GoogleDocumentAI" in name:
         return "google-docai"
-    return "pymupdf"
+    return "pdfplumber"
 
 
 def export_config(

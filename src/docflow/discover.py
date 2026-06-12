@@ -101,16 +101,16 @@ async def discover_schema(
     path: str,
     llm: LLMAdapter | None = None,
     model: str = "openai/gpt-4o",
-    parser: str = "pymupdf",
+    parser: str = "pdfplumber",
 ) -> DiscoveryResult:
     from docflow.ingestion.local import ingest_file
 
     document = await ingest_file(path)
 
-    if parser == "pymupdf":
-        from docflow.parsing.pymupdf import PyMuPDFParser
+    if parser == "pdfplumber":
+        from docflow.parsing.pdfplumber_parser import PdfplumberParser
 
-        document = await PyMuPDFParser().parse(document)
+        document = await PdfplumberParser().parse(document)
     elif parser == "tesseract":
         from docflow.parsing.tesseract_parser import TesseractParser
 
@@ -173,6 +173,6 @@ def discover_schema_sync(
     path: str,
     llm: LLMAdapter | None = None,
     model: str = "openai/gpt-4o",
-    parser: str = "pymupdf",
+    parser: str = "pdfplumber",
 ) -> DiscoveryResult:
     return run_sync(discover_schema(path, llm, model, parser))

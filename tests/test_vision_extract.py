@@ -98,7 +98,7 @@ class TestDocumentPipelineVision:
 
         with pytest.raises(ValueError, match="cannot be used with a parser"):
             DocumentPipeline(
-                parser="pymupdf",
+                parser="pdfplumber",
                 extraction_type="vision",
             )
 
@@ -125,7 +125,7 @@ class TestDocumentPipelineVision:
         from docflow.processor import DocumentPipeline
 
         pipeline = DocumentPipeline(
-            parser="pymupdf",
+            parser="pdfplumber",
             extraction_type="text",
         )
         assert pipeline._extraction_type == "text"
@@ -138,10 +138,9 @@ class TestVisionExtractionEngine:
 
         engine = VisionExtractionEngine(llm=mock_llm, dpi=100)
 
-        # pymupdf.FileNotFoundError is not a subclass of Python's FileNotFoundError
-        import pymupdf
+        from docflow.errors import ParsingError
 
-        with pytest.raises(pymupdf.FileNotFoundError):
+        with pytest.raises(ParsingError):
             await engine.extract(_make_doc(), schema=Invoice)
 
     async def test_extract_single_mode_calls_llm_once(self):

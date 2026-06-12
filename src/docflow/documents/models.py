@@ -49,7 +49,7 @@ class Block(BaseModel):
 
     OCR-based parsers populate `words` (one entry per recognized word, each
     with its own confidence) and set `confidence` to the aggregate for the
-    line. Native parsers (PyMuPDF) leave `words` empty and `confidence` None.
+    line. Native parsers (pdfplumber) fill `words` too but leave `confidence` None.
     """
 
     model_config = ConfigDict(frozen=True)

@@ -13,19 +13,14 @@ class TestDoclingParser:
 
     @pytest.mark.integration
     async def test_parse_real_pdf(self, tmp_path):
-        try:
-            import fitz
-        except ImportError:
-            pytest.skip("PyMuPDF not installed for test PDF creation")
+        from tests.conftest import make_test_pdf
 
         pdf_path = tmp_path / "test.pdf"
-        doc = fitz.open()
-        page = doc.new_page()
-        page.insert_text((72, 72), "Hello World - Docling Test")
-        page.insert_text((72, 120), "Invoice Number: INV-001")
-        page.insert_text((72, 150), "Total: 1234.56")
-        doc.save(str(pdf_path))
-        doc.close()
+        make_test_pdf(pdf_path, [
+            (72, 72, "Hello World - Docling Test"),
+            (72, 120, "Invoice Number: INV-001"),
+            (72, 150, "Total: 1234.56"),
+        ])
 
         document = Document(
             id="doc-1",

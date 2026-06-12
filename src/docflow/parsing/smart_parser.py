@@ -31,7 +31,7 @@ class SmartParser:
     """Tries native PDF text first, falls back to OCR only for pages that need it.
 
     For each page:
-    1. Extract text with PyMuPDF (fast, no OCR)
+    1. Extract text with pdfplumber (no OCR)
     2. Check if the page has enough usable text
     3. If not (scanned, sparse, garbled, image-heavy), OCR that page with Tesseract
     4. Keep the best result per page
@@ -52,10 +52,10 @@ class SmartParser:
         if not Path(file_path).is_file():
             raise ParsingError(f"File not found: {file_path}")
 
-        from docflow.parsing.pymupdf import PyMuPDFParser
+        from docflow.parsing.pdfplumber_parser import PdfplumberParser
 
-        pymupdf = PyMuPDFParser()
-        document = await pymupdf.parse(document)
+        native = PdfplumberParser()
+        document = await native.parse(document)
 
         pages_needing_ocr = [p for p in document.pages if _page_needs_ocr(p)]
 

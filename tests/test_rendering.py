@@ -41,13 +41,6 @@ class TestRendering:
 
 
 def _create_test_pdf(path: Path) -> None:
-    try:
-        import fitz
+    from tests.conftest import make_test_pdf
 
-        doc = fitz.open()
-        page = doc.new_page()
-        page.insert_text((72, 72), "Test rendering content")
-        doc.save(str(path))
-        doc.close()
-    except ImportError:
-        pytest.skip("PyMuPDF not installed")
+    make_test_pdf(path, [(72, 72, "Test rendering content")])

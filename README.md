@@ -11,7 +11,7 @@ pip install docflow[all]
 Or install only what you need:
 
 ```bash
-pip install docflow[pdf,llm]      # PyMuPDF parser + LLM extraction
+pip install docflow[pdf,llm]      # pdfplumber parser + LLM extraction
 pip install docflow[ocr,llm]      # Tesseract OCR + LLM extraction
 pip install docflow[docling,llm]  # Docling parser (best quality) + LLM
 pip install docflow[privacy]      # PII anonymization via Presidio
@@ -39,7 +39,8 @@ print(result.fields["total"].evidence[0])   # page 0, bbox, source text
 ## Features
 
 ### Parsing
-- **4 parsers**: PyMuPDF (fast), Tesseract OCR (scanned docs), Docling (tables/layout), Smart (auto per-page)
+- **7 parsers**: pdfplumber (native PDFs), Tesseract OCR (scanned docs), Docling (tables/layout), Smart (auto per-page), Azure Document Intelligence, AWS Textract, Google Document AI
+- **Permissive licensing throughout**: every dependency is MIT/BSD/Apache-2.0 — no copyleft (AGPL/GPL) anywhere in the tree
 - Every parser produces blocks with bounding boxes for evidence grounding
 
 ### Extraction

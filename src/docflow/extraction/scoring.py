@@ -26,7 +26,7 @@ def compute_document_ocr_confidence(
     """Aggregate OCR confidence across all blocks of a document.
 
     Returns None when no block carries a confidence — the signal that no
-    OCR ran in the pipeline (e.g. PyMuPDF parsing of a native PDF).
+    OCR ran in the pipeline (e.g. pdfplumber parsing of a native PDF).
     """
     confidences: list[float] = []
     for page in document.pages:

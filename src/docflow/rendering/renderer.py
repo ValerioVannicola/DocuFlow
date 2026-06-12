@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
@@ -14,33 +14,48 @@ if TYPE_CHECKING:
 _EXECUTOR = ThreadPoolExecutor(max_workers=4)
 
 
-def _render_page_sync(file_path: str, page_number: int, dpi: int) -> Image:
+def _import_pdfium():
     try:
-        import fitz
+        import pypdfium2 as pdfium
     except ImportError as e:
         raise ImportError(
-            "PyMuPDF is required for rendering. Install with: pip install docflow[pdf]"
+            "pypdfium2 is required for rendering. Install with: pip install docflow[pdf]"
         ) from e
-    from PIL import Image as PILImage
+    return pdfium
+
+
+def _render_page_sync(file_path: str, page_number: int, dpi: int) -> Image:
+    pdfium = _import_pdfium()
 
     try:
-        doc = fitz.open(file_path)
+        pdf = pdfium.PdfDocument(file_path)
     except Exception as exc:
         raise ParsingError(f"Failed to open PDF: {file_path}") from exc
 
     try:
-        if page_number < 0 or page_number >= len(doc):
+        if page_number < 0 or page_number >= len(pdf):
             raise ParsingError(
-                f"Page {page_number} out of range (document has {len(doc)} pages)"
+                f"Page {page_number} out of range (document has {len(pdf)} pages)"
             )
-        page = doc[page_number]
-        zoom = dpi / 72.0
-        mat = fitz.Matrix(zoom, zoom)
-        pix = page.get_pixmap(matrix=mat)
-        img = PILImage.frombytes("RGB", (pix.width, pix.height), pix.samples)
+        page = pdf[page_number]
+        bitmap = page.render(scale=dpi / 72.0)
+        img = bitmap.to_pil().convert("RGB")
     finally:
-        doc.close()
+        pdf.close()
     return img
+
+
+def _page_count_sync(file_path: str) -> int:
+    pdfium = _import_pdfium()
+
+    try:
+        pdf = pdfium.PdfDocument(file_path)
+    except Exception as exc:
+        raise ParsingError(f"Failed to open PDF: {file_path}") from exc
+    try:
+        return len(pdf)
+    finally:
+        pdf.close()
 
 
 async def render_page(file_path: str | Path, page_number: int = 0, dpi: int = DEFAULT_DPI) -> Image:
@@ -53,18 +68,12 @@ async def render_page(file_path: str | Path, page_number: int = 0, dpi: int = DE
 
 
 async def render_all_pages(file_path: str | Path, dpi: int = DEFAULT_DPI) -> list[Image]:
-    try:
-        import fitz
-    except ImportError as e:
-        raise ImportError(
-            "PyMuPDF is required for rendering. Install with: pip install docflow[pdf]"
-        ) from e
-
-    doc = fitz.open(str(file_path))
-    page_count = len(doc)
-    doc.close()
-
     import asyncio
+
+    loop = asyncio.get_event_loop()
+    page_count = await loop.run_in_executor(
+        _EXECUTOR, partial(_page_count_sync, str(file_path))
+    )
 
     tasks = [render_page(file_path, i, dpi) for i in range(page_count)]
     return await asyncio.gather(*tasks)

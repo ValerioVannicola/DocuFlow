@@ -159,10 +159,10 @@ class TestTrace:
 
     def test_add_event(self):
         trace = create_trace("doc-1")
-        trace.add_event("parsing", step_name="PyMuPDFParser", duration_ms=150.0)
+        trace.add_event("parsing", step_name="PdfplumberParser", duration_ms=150.0)
         assert len(trace.events) == 1
         assert trace.events[0].event_type == "parsing"
-        assert trace.events[0].step_name == "PyMuPDFParser"
+        assert trace.events[0].step_name == "PdfplumberParser"
         assert trace.events[0].duration_ms == 150.0
 
     def test_complete(self):

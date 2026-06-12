@@ -8,17 +8,10 @@ import pytest
 class TestScreenshots:
     @pytest.mark.integration
     async def test_screenshot_all_pages(self, tmp_path):
-        try:
-            import fitz
-        except ImportError:
-            pytest.skip("PyMuPDF not installed")
+        from tests.conftest import make_test_pdf
 
         pdf_path = tmp_path / "test.pdf"
-        doc = fitz.open()
-        doc.new_page()
-        doc.new_page()
-        doc.save(str(pdf_path))
-        doc.close()
+        make_test_pdf(pdf_path, pages=2)
 
         from docflow.screenshots import screenshot_pages
 
@@ -33,17 +26,10 @@ class TestScreenshots:
 
     @pytest.mark.integration
     async def test_screenshot_specific_pages(self, tmp_path):
-        try:
-            import fitz
-        except ImportError:
-            pytest.skip("PyMuPDF not installed")
+        from tests.conftest import make_test_pdf
 
         pdf_path = tmp_path / "test.pdf"
-        doc = fitz.open()
-        for _ in range(5):
-            doc.new_page()
-        doc.save(str(pdf_path))
-        doc.close()
+        make_test_pdf(pdf_path, pages=5)
 
         from docflow.screenshots import screenshot_pages
 
@@ -61,16 +47,10 @@ class TestScreenshots:
 class TestScreenshotCLI:
     @pytest.mark.integration
     def test_cli_screenshot(self, tmp_path):
-        try:
-            import fitz
-        except ImportError:
-            pytest.skip("PyMuPDF not installed")
+        from tests.conftest import make_test_pdf
 
         pdf_path = tmp_path / "test.pdf"
-        doc = fitz.open()
-        doc.new_page()
-        doc.save(str(pdf_path))
-        doc.close()
+        make_test_pdf(pdf_path)
 
         from click.testing import CliRunner
 

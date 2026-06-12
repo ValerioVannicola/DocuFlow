@@ -118,7 +118,7 @@ class TestDocumentPipelineHybrid:
         from docflow.processor import DocumentPipeline
 
         with pytest.raises(ValueError, match="cannot be used with a parser"):
-            DocumentPipeline(parser="pymupdf", extraction_type="hybrid")
+            DocumentPipeline(parser="pdfplumber", extraction_type="hybrid")
 
     def test_hybrid_with_parser_none_ok(self):
         from docflow.processor import DocumentPipeline

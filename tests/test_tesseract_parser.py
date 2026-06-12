@@ -25,17 +25,10 @@ class TestTesseractParser:
 class TestTesseractParserExecution:
     @pytest.mark.integration
     async def test_parse_real_pdf(self, tmp_path):
-        try:
-            import fitz
-        except ImportError:
-            pytest.skip("PyMuPDF not installed")
+        from tests.conftest import make_test_pdf
 
         pdf_path = tmp_path / "test.pdf"
-        doc = fitz.open()
-        page = doc.new_page()
-        page.insert_text((72, 72), "Hello World Test Document")
-        doc.save(str(pdf_path))
-        doc.close()
+        make_test_pdf(pdf_path, [(72, 72, "Hello World Test Document")])
 
         document = Document(
             id="doc-1",
@@ -75,13 +68,13 @@ class TestParseStepResolution:
         resolved = pipeline._resolve_parser()
         assert isinstance(resolved, TesseractParser)
 
-    def test_processor_resolves_pymupdf(self):
-        from docflow.parsing.pymupdf import PyMuPDFParser
+    def test_processor_resolves_pdfplumber(self):
+        from docflow.parsing.pdfplumber_parser import PdfplumberParser
         from docflow.processor import DocumentPipeline
 
-        pipeline = DocumentPipeline(parser="pymupdf")
+        pipeline = DocumentPipeline(parser="pdfplumber")
         resolved = pipeline._resolve_parser()
-        assert isinstance(resolved, PyMuPDFParser)
+        assert isinstance(resolved, PdfplumberParser)
 
     def test_processor_unknown_raises(self):
         from docflow.processor import DocumentPipeline

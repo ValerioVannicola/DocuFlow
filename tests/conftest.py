@@ -15,6 +15,24 @@ from docflow.documents.models import (
 )
 from docflow.extraction.models import ExtractedField, ExtractionResult
 
+_PAGE_SIZE = (595, 842)
+
+
+def make_test_pdf(path, texts: list[tuple[float, float, str]] | None = None, pages: int = 1) -> None:
+    """Create a PDF fixture with reportlab. `texts` are (x, y-from-top, text)."""
+    try:
+        from reportlab.pdfgen import canvas
+    except ImportError:
+        pytest.skip("reportlab not installed for test PDF creation")
+
+    c = canvas.Canvas(str(path), pagesize=_PAGE_SIZE)
+    for page_index in range(pages):
+        if page_index == 0:
+            for x, y, text in texts or []:
+                c.drawString(x, _PAGE_SIZE[1] - y, text)
+        c.showPage()
+    c.save()
+
 
 @pytest.fixture
 def sample_bbox() -> BoundingBox:

@@ -20,7 +20,7 @@ def workflow_yaml(tmp_path):
             "supplier": {"type": "str", "required": True},
             "total": {"type": "float"},
         },
-        "parser": "pymupdf",
+        "parser": "pdfplumber",
         "model": "openai/gpt-4o",
     }
     path = tmp_path / "workflow.yaml"

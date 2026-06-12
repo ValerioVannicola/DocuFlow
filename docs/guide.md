@@ -84,10 +84,10 @@ The parser converts the raw PDF into structured content. This is where the heavy
 - `document.raw_text` — all page text concatenated, which is what gets sent to the LLM
 
 **The 4 parsers produce different levels of richness:**
-- **PyMuPDF**: reads the PDF's embedded text layer directly. Fast, but blocks have no confidence scores (the text is either there or it isn't). Fails on scanned PDFs (returns empty text).
+- **pdfplumber**: reads the PDF's embedded text layer directly. Fast, but blocks have no confidence scores (the text is either there or it isn't). Fails on scanned PDFs (returns empty text).
 - **Tesseract**: renders each page to an image at 200 DPI, runs OCR, produces word-level blocks with per-word confidence scores (0-1). Works on scanned documents.
 - **Docling**: uses IBM's document AI model. Understands layout (titles, paragraphs, headers, footers, formulas). Produces structured `Table` objects with cell-level data, row/column headers, and spans. The richest output.
-- **Smart**: runs PyMuPDF first. For each page, checks if the text is usable (enough characters, not garbled, not just images). Pages that fail get OCR'd with Tesseract. This means digital pages are fast and scanned pages still work.
+- **Smart**: runs pdfplumber first. For each page, checks if the text is usable (enough characters, not garbled, not just images). Pages that fail get OCR'd with Tesseract. This means digital pages are fast and scanned pages still work.
 
 After parsing, `document.status` changes from `"ingested"` to `"parsed"`.
 
@@ -213,14 +213,14 @@ Each step receives the state, does its work, and returns the updated state. The 
 pip install docflow[all]
 ```
 
-This installs everything: all parsers (PyMuPDF, Tesseract, Docling), LLM support, privacy/anonymization, and all dependencies. This is the heaviest option (~500MB+ due to PyTorch from Docling).
+This installs everything: all parsers (pdfplumber, Tesseract, Docling), LLM support, privacy/anonymization, and all dependencies. This is the heaviest option (~500MB+ due to PyTorch from Docling).
 
 ### Selective Installation
 
 Install only what you need:
 
 ```bash
-pip install docflow[pdf,llm]        # PyMuPDF parser + LLM (lightweight)
+pip install docflow[pdf,llm]        # pdfplumber parser + LLM (lightweight)
 pip install docflow[ocr,llm]        # Tesseract OCR + LLM
 pip install docflow[docling,llm]    # Docling parser + LLM (best quality)
 pip install docflow[privacy]        # Presidio anonymization
@@ -230,7 +230,7 @@ pip install docflow[privacy]        # Presidio anonymization
 
 | Group | Packages | Purpose |
 |-------|----------|---------|
-| `pdf` | pymupdf | PDF text extraction and rendering |
+| `pdf` | pdfplumber, pypdfium2 | PDF text extraction (pdfplumber) and page rendering (pypdfium2) |
 | `ocr` | pytesseract, Pillow | OCR with Tesseract |
 | `llm` | litellm | LLM calls (OpenAI, Anthropic, Gemini, etc.) |
 | `privacy` | presidio-analyzer, presidio-anonymizer | PII detection and anonymization |
@@ -245,10 +245,10 @@ DocFlow itself is ~3 MB. The dependencies vary significantly by what you install
 | Installation | Disk space | What you get |
 |-------------|-----------|-------------|
 | `docflow` (core only) | ~15 MB | Pydantic, YAML, aiofiles, click — no parsing or LLM |
-| `docflow[pdf]` | ~70 MB | + PyMuPDF (~50 MB) — digital PDF parsing |
+| `docflow[pdf]` | ~70 MB | + pdfplumber (~50 MB) — digital PDF parsing |
 | `docflow[ocr]` | ~30 MB | + pytesseract + Pillow (~15 MB) — OCR (requires Tesseract binary) |
 | `docflow[llm]` | ~80 MB | + litellm (~55 MB) + OpenAI/HTTP clients |
-| `docflow[pdf,llm]` | ~140 MB | PyMuPDF + LLM — the lightweight production setup |
+| `docflow[pdf,llm]` | ~140 MB | pdfplumber + LLM — the lightweight production setup |
 | `docflow[ocr,llm]` | ~110 MB | Tesseract + LLM — for scanned documents |
 | `docflow[privacy]` | ~50 MB | + Presidio analyzer + anonymizer + spaCy model |
 | `docflow[docling]` | ~800 MB | + Docling + PyTorch (~470 MB) + transformers — best parsing quality |
@@ -595,7 +595,7 @@ for f in discovery.fields:
 Parameters:
 - `path` — path to the document
 - `model` — LLM model (default: `"openai/gpt-4o"`)
-- `parser` — which parser to use for reading the document (default: `"pymupdf"`)
+- `parser` — which parser to use for reading the document (default: `"pdfplumber"`)
 
 This is useful when you have a new document type and want a quick starting point. Discover the schema from one example, review/edit the YAML, then use it for batch processing.
 
@@ -605,12 +605,12 @@ This is useful when you have a new document type and want a quick starting point
 
 Parsers convert raw PDF files into structured `Document` objects with pages, blocks, bounding boxes, and text. DocFlow includes 4 parsers.
 
-### PyMuPDFParser (`"pymupdf"`)
+### PdfplumberParser (`"pdfplumber"`)
 
 Extracts embedded text directly from the PDF's internal text layer. Fast, accurate for digital PDFs, but returns empty text for scanned documents.
 
 ```python
-pipeline = DocumentPipeline(parser="pymupdf")
+pipeline = DocumentPipeline(parser="pdfplumber")
 ```
 
 - **Speed**: ~100ms per document
@@ -655,12 +655,12 @@ pipeline = DocumentPipeline(parser="docling")
 - **Best for**: complex layouts, tables, multi-column documents, non-PDF formats
 - **Produces**: semantic blocks (title, paragraph, table, formula, etc.) with bounding boxes
 - **Formats**: PDF, DOCX, PPTX, XLSX, HTML, images
-- **Table extraction**: 97.9% accuracy on complex tables — far better than PyMuPDF/Tesseract
+- **Table extraction**: 97.9% accuracy on complex tables — far better than pdfplumber/Tesseract
 - **Install**: `pip install docflow[docling]` (heavy — includes PyTorch)
 
 ### SmartParser (`"smart"`)
 
-Automatically picks the best approach per page. First tries native text extraction (PyMuPDF). For pages where that fails (scanned, sparse, garbled), falls back to Tesseract OCR.
+Automatically picks the best approach per page. First tries native text extraction (pdfplumber). For pages where that fails (scanned, sparse, garbled), falls back to Tesseract OCR.
 
 ```python
 pipeline = DocumentPipeline(parser="smart")
@@ -688,7 +688,7 @@ A page triggers OCR if:
 
 ### Comparison Table
 
-| Feature | PyMuPDF | Tesseract | Docling | Smart |
+| Feature | pdfplumber | Tesseract | Docling | Smart |
 |---------|---------|-----------|---------|-------|
 | Digital PDFs | Excellent | Good | Excellent | Excellent |
 | Scanned PDFs | Fails | Good | Good | Good |
@@ -785,7 +785,7 @@ records = table.to_dict_records()
 | Parser | `page.tables` | Table quality |
 |--------|--------------|---------------|
 | Docling | Structured `Table` objects | Full cells, headers, spans, bboxes |
-| PyMuPDF | Empty `[]` | Tables appear as text blocks |
+| pdfplumber | Empty `[]` | Tables appear as text blocks |
 | Tesseract | Empty `[]` | Tables appear as OCR'd text |
 | Smart | Empty `[]` | Tables appear as text blocks |
 
@@ -815,7 +815,7 @@ The parser produces text → the LLM reads that text. This is the default.
 
 ```python
 pipeline = DocumentPipeline(
-    parser="pymupdf",           # or "tesseract", "docling", "smart"
+    parser="pdfplumber",           # or "tesseract", "docling", "smart"
     extraction_type="text",     # default
 )
 ```
@@ -997,7 +997,7 @@ Set your API key via environment variable (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`
 ```python
 from docflow.extraction.llm.litellm_adapter import LiteLLMAdapter
 llm = LiteLLMAdapter(model="openai/gpt-4o", api_key="sk-...")
-pipeline = DocumentPipeline(parser="pymupdf")
+pipeline = DocumentPipeline(parser="pdfplumber")
 # Use manual Pipeline with Extract(llm=llm) for custom LLM instances
 ```
 
@@ -1016,7 +1016,7 @@ result = extract(
     "invoice.pdf",
     schema=Invoice,
     model="openai/gpt-4o",
-    parser="pymupdf",
+    parser="pdfplumber",
     storage="local",
     privacy=PrivacyPolicy(...),
 )
@@ -1051,7 +1051,7 @@ All parameters:
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `parser` | str or Parser | `"pymupdf"` | `"pymupdf"`, `"tesseract"`, `"docling"`, `"smart"`, `None` |
+| `parser` | str or Parser | `"pdfplumber"` | `"pdfplumber"`, `"tesseract"`, `"docling"`, `"smart"`, `None` |
 | `model` | str | `"openai/gpt-4o"` | LLM model (litellm format) |
 | `storage` | str or Storage | `None` | `None`, `"local"`, or Storage instance |
 | `validators` | list | `None` | List of Validator instances |
@@ -1779,7 +1779,7 @@ docflow run invoice.yaml invoice.pdf --output result.json
 | `name` | str | `"workflow"` | Workflow name |
 | `version` | str | `"1.0"` | Version string |
 | `schema` | dict | required | Field definitions (same format as YAML templates) |
-| `parser` | str | `"pymupdf"` | `"pymupdf"` \| `"tesseract"` \| `"docling"` \| `"smart"` |
+| `parser` | str | `"pdfplumber"` | `"pdfplumber"` \| `"tesseract"` \| `"docling"` \| `"smart"` |
 | `model` | str | `"openai/gpt-4o"` | Any litellm model string |
 | `extraction_type` | str | `"text"` | `"text"` \| `"vision"` \| `"hybrid"` |
 | `extraction_mode` | str | `"single"` | `"single"` \| `"multi"` |
@@ -1991,7 +1991,7 @@ docflow extract-folder ./invoices --schema invoice --output results.csv --parser
 Options:
 - `--schema, -s` (required) — schema name or Python dotted path
 - `--model, -m` — LLM model (default: `openai/gpt-4o`)
-- `--parser, -p` — parser (default: `pymupdf`). Options: `pymupdf`, `tesseract`, `docling`, `smart`
+- `--parser, -p` — parser (default: `pdfplumber`). Options: `pdfplumber`, `tesseract`, `docling`, `smart`
 - `--output, -o` — output CSV file
 - `--pattern` — file glob pattern (default: `**/*.pdf`)
 - `--concurrency, -c` — max parallel extractions (default: 5)
@@ -2028,7 +2028,7 @@ from docflow import extract, DocumentPipeline, Pipeline, PrivacyPolicy
 from docflow import process_batch, compare_documents
 
 # Parsers
-from docflow.parsing.pymupdf import PyMuPDFParser
+from docflow.parsing.pdfplumber_parser import PdfplumberParser
 from docflow.parsing.tesseract_parser import TesseractParser
 from docflow.parsing.docling_parser import DoclingParser
 from docflow.parsing.smart_parser import SmartParser

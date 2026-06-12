@@ -18,7 +18,7 @@ def config():
         version="1.0",
         description="Test workflow",
         schema_={"supplier": {"type": "str", "required": True}, "total": {"type": "float"}},
-        parser="pymupdf",
+        parser="pdfplumber",
         model="openai/gpt-4o",
     )
 
@@ -42,7 +42,7 @@ class TestHealth:
         assert data["workflow"] == "test-workflow"
         assert data["version"] == "1.0"
         assert data["model"] == "openai/gpt-4o"
-        assert data["parser"] == "pymupdf"
+        assert data["parser"] == "pdfplumber"
 
 
 class TestSchema:

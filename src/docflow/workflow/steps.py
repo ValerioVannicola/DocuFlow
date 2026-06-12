@@ -52,9 +52,9 @@ class Parse:
             return state
 
         parser = self.parser
-        if parser is None or parser == "pymupdf":
-            from docflow.parsing.pymupdf import PyMuPDFParser
-            parser = PyMuPDFParser()
+        if parser is None or parser == "pdfplumber":
+            from docflow.parsing.pdfplumber_parser import PdfplumberParser
+            parser = PdfplumberParser()
         elif parser == "tesseract":
             from docflow.parsing.tesseract_parser import TesseractParser
             parser = TesseractParser()

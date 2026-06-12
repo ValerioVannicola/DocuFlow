@@ -15,22 +15,22 @@ class TestDocumentPipeline:
     def test_init_with_defaults(self):
         pipeline = DocumentPipeline()
         assert pipeline._model == "openai/gpt-4o"
-        assert pipeline._parser == "pymupdf"
+        assert pipeline._parser == "pdfplumber"
 
     def test_init_with_custom(self):
         pipeline = DocumentPipeline(
-            parser="pymupdf",
+            parser="pdfplumber",
             model="anthropic:claude-sonnet-4-20250514",
             storage="local",
         )
         assert pipeline._model == "anthropic:claude-sonnet-4-20250514"
 
-    def test_resolve_parser_pymupdf(self):
-        pipeline = DocumentPipeline(parser="pymupdf")
+    def test_resolve_parser_pdfplumber(self):
+        pipeline = DocumentPipeline(parser="pdfplumber")
         parser = pipeline._resolve_parser()
-        from docflow.parsing.pymupdf import PyMuPDFParser
+        from docflow.parsing.pdfplumber_parser import PdfplumberParser
 
-        assert isinstance(parser, PyMuPDFParser)
+        assert isinstance(parser, PdfplumberParser)
 
     def test_resolve_parser_unknown_raises(self):
         pipeline = DocumentPipeline(parser="unknown")
