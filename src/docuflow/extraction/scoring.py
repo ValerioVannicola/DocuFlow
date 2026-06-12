@@ -60,6 +60,7 @@ def compute_field_ocr_confidence(
     hint_text: str = "",
     hint_page: int | None = None,
     fuzzy_threshold: float = DEFAULT_FUZZY_THRESHOLD,
+    stream: list | None = None,
 ) -> OCRFieldConfidence | None:
     """Match an extracted value back to OCR text and score it.
 
@@ -93,6 +94,7 @@ def compute_field_ocr_confidence(
         spans = locate_text(
             document, target,
             hint_page=hint_page, fuzzy_threshold=fuzzy_threshold,
+            stream=stream,
         )
         if not spans:
             continue

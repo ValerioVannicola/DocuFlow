@@ -157,14 +157,13 @@ def _normalize_value(value: object) -> str:
     return s
 
 
-def _value_found_in_source(value: object, document: Document) -> bool:
+def _value_found_in_source(value: object, doc_text_normalized: str) -> bool:
     if value is None:
         return False
     normalized = _normalize_value(value)
     if not normalized:
         return False
-    doc_text = _normalize_value(document.raw_text)
-    return normalized in doc_text
+    return normalized in doc_text_normalized
 
 
 def _compute_agreement(
@@ -216,10 +215,23 @@ def _build_result(
                 "ocr_confidence_error", step_name="extraction", error=str(exc),
             )
 
+    # Shared across all fields: the locator word stream and the normalized
+    # document text are document-level artifacts — building them per field
+    # is O(fields x document size) for nothing.
+    try:
+        from docuflow.documents.locate import build_stream
+
+        stream = build_stream(document)
+    except Exception:
+        stream = None
+    doc_text_normalized = _normalize_value(document.raw_text)
+
     fields: dict[str, ExtractedField] = {}
     for field_name, value in data_dict.items():
         evidence_hints = evidence_map.get(field_name, {})
-        evidences = attach_evidence(document, field_name, value, evidence_hints)
+        evidences = attach_evidence(
+            document, field_name, value, evidence_hints, stream=stream,
+        )
 
         field_ocr = None
         if doc_ocr is not None:
@@ -229,6 +241,7 @@ def _build_result(
                     value,
                     hint_text=evidence_hints.get("text", "") if evidence_hints else "",
                     hint_page=evidence_hints.get("page") if evidence_hints else None,
+                    stream=stream,
                 )
             except Exception as exc:
                 if trace:
@@ -250,7 +263,7 @@ def _build_result(
                         field=field_name, error=str(exc),
                     )
 
-        found_in_source = _value_found_in_source(value, document)
+        found_in_source = _value_found_in_source(value, doc_text_normalized)
         is_valid = True
         has_consensus = candidates is not None and len(candidates) > 1
 
@@ -486,8 +499,32 @@ class ExtractionEngine:
         n_instances: int = 5,
         temperatures: list[float] | None = None,
         scoring: str = "qualitative",
+        shards: int | None = None,
     ) -> ExtractionResult:
         import time
+
+        if shards and shards > 1:
+            from docuflow.extraction.sharding import merge_shard_results, shard_schema
+
+            sub_schemas = shard_schema(schema, shards)
+            if len(sub_schemas) > 1:
+                if trace:
+                    trace.add_event(
+                        "schema_sharding", step_name="extraction",
+                        n_shards=len(sub_schemas),
+                        fields_per_shard=[
+                            len(s.model_fields) for s in sub_schemas
+                        ],
+                    )
+                results = await asyncio.gather(*(
+                    self.extract(
+                        document, sub, trace=trace, mode=mode,
+                        n_instances=n_instances, temperatures=temperatures,
+                        scoring=scoring,
+                    )
+                    for sub in sub_schemas
+                ))
+                return merge_shard_results(list(results), schema)
 
         start = time.monotonic()
         llm = _UsageTracker(self.llm)

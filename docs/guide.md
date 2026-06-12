@@ -1290,6 +1290,39 @@ result.usage.cost_usd           # litellm-priced estimate; None if the model is 
 aggregates it too: `report.usage` sums tokens, calls and cost across the whole batch.
 The `/extract` HTTP endpoint and the CLI JSON output include it automatically.
 
+### Schema Sharding (`schema_shards=`)
+
+For wide schemas (25+ fields), generation time dominates — the LLM writes the output
+tokens serially. Sharding splits the schema into K contiguous field groups extracted
+**in parallel**, then merges the results (fields, evidence, confidence scores, token
+usage) back into one result for the full schema:
+
+```python
+pipeline = DocumentPipeline(schema_shards=3)   # or schema_shards: 3 in YAML
+```
+
+Trade-offs, honestly: the document text is sent K times (input cost multiplies), and
+fields split across shards lose cross-field coherence — the LLM extracting `total`
+no longer sees `line_items`. Use it for wide, flat schemas where fields are
+independent; keep related fields adjacent in the schema definition, since shards are
+contiguous groups. Text extraction only (vision/hybrid would multiply the much larger
+image cost). A `schema_sharding` trace event records the split.
+
+### Prompt Caching
+
+For batches sharing one workflow, the system prompt + schema prefix repeats on every
+call. Anthropic models cache it explicitly (opt-in); OpenAI caches automatically:
+
+```python
+pipeline = DocumentPipeline(
+    model="anthropic/claude-sonnet-4-6",
+    llm_kwargs={"prompt_caching": True},
+)
+```
+
+This is mostly a cost win (cached prefix tokens are billed at a fraction) with a
+modest time-to-first-token improvement.
+
 ### LLM Providers
 
 DocuFlow uses litellm under the hood, which supports 100+ LLM providers. The `model` parameter uses litellm's format:
@@ -1378,6 +1411,7 @@ All parameters:
 | `review_rules` | list | `None` | List of ReviewRule or LLMReviewer instances |
 | `escalation` | dict | `None` | Auto-mode escalation thresholds (see Auto Extraction) |
 | `verification` | dict | `None` | Zoom-and-verify thresholds (see Zoom-and-Verify) |
+| `schema_shards` | int | `None` | Split wide schemas into K parallel extractions (see Schema Sharding) |
 | `privacy` | PrivacyPolicy | `None` | Privacy/anonymization config |
 | `extraction_mode` | str | `"single"` | `"single"` or `"multi"` |
 | `extraction_type` | str | `"text"` | `"text"`, `"vision"`, or `"hybrid"` |
@@ -2154,6 +2188,7 @@ docuflow run invoice.yaml invoice.pdf --output result.json
 | `scoring` | str | `"qualitative"` | `"qualitative"` \| `"quantitative"` |
 | `escalation` | dict | null | Auto-mode thresholds: `min_ocr_score`, `max_low_confidence_ratio`, `min_chars_per_page`, `escalate_to` |
 | `verification` | dict | null | Zoom-and-verify: `trigger_consensus_below`, `trigger_ocr_below`, `max_fields`, `dpi`, `apply_corrections` |
+| `schema_shards` | int | null | Split wide schemas into K parallel extractions (text only) |
 | `context` | str | null | Domain context for the LLM |
 | `validation` | list | `[]` | Validation rules (see below) |
 | `review` | list | `[]` | Review rules (see below) |

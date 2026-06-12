@@ -53,6 +53,11 @@ def _normalize(value: object, case_sensitive: bool = False) -> str:
     return " ".join(s.split())
 
 
+def build_stream(document: Document, case_sensitive: bool = False) -> list[_StreamWord]:
+    """Prebuild the locator word stream for repeated locate_text calls."""
+    return _build_stream(document, case_sensitive)
+
+
 def _build_stream(document: Document, case_sensitive: bool) -> list[_StreamWord]:
     """Flatten the document into one word stream, crossing block and page
     boundaries. Blocks without word detail contribute whitespace-split tokens
@@ -206,6 +211,7 @@ def locate_text(
     fuzzy_threshold: float = DEFAULT_FUZZY_THRESHOLD,
     hint_page: int | None = None,
     find_all: bool = False,
+    stream: list[_StreamWord] | None = None,
 ) -> list[TextSpan]:
     """Locate a phrase in the document and return precise highlight spans.
 
@@ -222,7 +228,10 @@ def locate_text(
     if not q:
         return []
 
-    stream = _build_stream(document, case_sensitive)
+    # Callers locating many phrases in one document can prebuild the word
+    # stream once via build_stream() and pass it in.
+    if stream is None:
+        stream = _build_stream(document, case_sensitive)
     if not stream:
         return []
 

@@ -1,18 +1,18 @@
-# DocFlow — Agent Integration Guide
+# DocuFlow — Agent Integration Guide
 
-This file tells AI coding agents everything they need to know to integrate DocFlow into a project.
+This file tells AI coding agents everything they need to know to integrate DocuFlow into a project.
 
-## What DocFlow Does
+## What DocuFlow Does
 
-DocFlow extracts structured data from documents (PDFs, scans, images) using LLMs. You define a Pydantic schema, point it at a document, and get back validated fields with evidence, confidence scores, and bounding boxes.
+DocuFlow extracts structured data from documents (PDFs, scans, images) using LLMs. You define a Pydantic schema, point it at a document, and get back validated fields with evidence, confidence scores, and bounding boxes.
 
 ## Installation
 
 ```bash
-pip install docflow[all]          # Everything
-pip install docflow[pdf,llm]      # Lightweight: pdfplumber + LLM only
-pip install docflow[ocr,llm]      # Tesseract OCR + LLM
-pip install docflow[docling,llm]  # Docling (best parsing) + LLM
+pip install docuflow[all]          # Everything
+pip install docuflow[pdf,llm]      # Lightweight: pdfplumber + LLM only
+pip install docuflow[ocr,llm]      # Tesseract OCR + LLM
+pip install docuflow[docling,llm]  # Docling (best parsing) + LLM
 ```
 
 Requires Python >= 3.11.
@@ -22,7 +22,7 @@ Requires Python >= 3.11.
 ### 1. One-liner (simplest)
 
 ```python
-from docflow import extract
+from docuflow import extract
 
 result = extract("invoice.pdf", schema=Invoice, model="openai/gpt-4o")
 ```
@@ -30,7 +30,7 @@ result = extract("invoice.pdf", schema=Invoice, model="openai/gpt-4o")
 ### 2. DocumentPipeline (configurable, reusable)
 
 ```python
-from docflow import DocumentPipeline
+from docuflow import DocumentPipeline
 
 pipeline = DocumentPipeline(
     parser="pdfplumber",           # "pdfplumber" | "tesseract" | "docling" | "smart"
@@ -45,7 +45,7 @@ result = pipeline.run_sync("invoice.pdf", schema=Invoice)
 ### 3. Manual Pipeline (full control)
 
 ```python
-from docflow.workflow import Pipeline, Ingest, Parse, Extract, Validate, Review, Store
+from docuflow.workflow import Pipeline, Ingest, Parse, Extract, Validate, Review, Store
 
 pipeline = Pipeline([
     Ingest(path="file.pdf"),
@@ -76,7 +76,7 @@ class Invoice(BaseModel):
 ### YAML template
 
 ```python
-from docflow.templates import load_template
+from docuflow.templates import load_template
 Invoice = load_template("invoice")  # built-in: invoice, contract, receipt
 ```
 
@@ -84,13 +84,13 @@ Invoice = load_template("invoice")  # built-in: invoice, contract, receipt
 
 | Parser | Use when | Speed | Install |
 |--------|----------|-------|---------|
-| `"pdfplumber"` | Digital/native PDFs | Fast (~100ms) | `docflow[pdf]` |
-| `"tesseract"` | Scanned documents | Slow (1-5s/page) | `docflow[ocr]` |
-| `"docling"` | Complex layouts, tables | Slow (4-5s/page) | `docflow[docling]` |
-| `"smart"` | Mixed docs (auto-detects per page) | Varies | `docflow[pdf,ocr]` |
-| `"azure-di"` | Cloud OCR, Azure Document Intelligence | API call | `docflow[azure]` |
-| `"textract"` | Cloud OCR, AWS Textract | API call/page | `docflow[aws,pdf]` |
-| `"google-docai"` | Cloud OCR, Google Document AI | API call | `docflow[gcp]` |
+| `"pdfplumber"` | Digital/native PDFs | Fast (~100ms) | `docuflow[pdf]` |
+| `"tesseract"` | Scanned documents | Slow (1-5s/page) | `docuflow[ocr]` |
+| `"docling"` | Complex layouts, tables | Slow (4-5s/page) | `docuflow[docling]` |
+| `"smart"` | Mixed docs (auto-detects per page) | Varies | `docuflow[pdf,ocr]` |
+| `"azure-di"` | Cloud OCR, Azure Document Intelligence | API call | `docuflow[azure]` |
+| `"textract"` | Cloud OCR, AWS Textract | API call/page | `docuflow[aws,pdf]` |
+| `"google-docai"` | Cloud OCR, Google Document AI | API call | `docuflow[gcp]` |
 
 ### Cloud OCR configuration
 
@@ -169,6 +169,17 @@ vision-capable model.
 pipeline = DocumentPipeline(parser=None, extraction_type="vision", model="openai/gpt-4o")
 ```
 
+## Schema Sharding & Prompt Caching
+
+```python
+# Wide schemas: K parallel partial-schema extractions, merged (text only)
+pipeline = DocumentPipeline(schema_shards=3)
+
+# Anthropic prompt caching for repeated workflow runs (OpenAI caches automatically)
+pipeline = DocumentPipeline(model="anthropic/claude-sonnet-4-6",
+                            llm_kwargs={"prompt_caching": True})
+```
+
 ## Extraction Modes
 
 | Mode | LLM calls | Description |
@@ -207,7 +218,7 @@ result.model_dump_json()             # full JSON serialization
 ## Validation
 
 ```python
-from docflow.validation import RequiredFields, EvidenceRequired
+from docuflow.validation import RequiredFields, EvidenceRequired
 
 pipeline = DocumentPipeline(
     validators=[
@@ -220,7 +231,7 @@ pipeline = DocumentPipeline(
 ## Review Rules
 
 ```python
-from docflow.review import (
+from docuflow.review import (
     OverallConfidenceBelow,
     FieldConfidenceBelow,
     AnyFieldConfidenceBelow,
@@ -242,8 +253,8 @@ pipeline = DocumentPipeline(
 ### LLM Reviewer (prompt-driven)
 
 ```python
-from docflow.review import LLMReviewer
-from docflow.extraction.llm.litellm_adapter import LiteLLMAdapter
+from docuflow.review import LLMReviewer
+from docuflow.extraction.llm.litellm_adapter import LiteLLMAdapter
 
 auditor = LLMReviewer(
     name="financial_auditor",
@@ -279,8 +290,8 @@ p.corrected, p.corrected_by, p.correction_reason
 ## Privacy / Anonymization
 
 ```python
-from docflow import DocumentPipeline, PrivacyPolicy
-from docflow.privacy import PresidioProvider
+from docuflow import DocumentPipeline, PrivacyPolicy
+from docuflow.privacy import PresidioProvider
 
 pipeline = DocumentPipeline(
     parser="tesseract",
@@ -304,7 +315,7 @@ pipeline = DocumentPipeline(
 ## Batch Processing
 
 ```python
-from docflow import DocumentPipeline, process_batch
+from docuflow import DocumentPipeline, process_batch
 
 pipeline = DocumentPipeline(parser="smart", model="openai/gpt-4o")
 report = process_batch(
@@ -323,7 +334,7 @@ report.to_dataframe()      # pandas DataFrame
 ## Document Comparison
 
 ```python
-from docflow import compare_documents
+from docuflow import compare_documents
 
 comparison = compare_documents(
     files=["v1.pdf", "v2.pdf", "v3.pdf"],
@@ -338,7 +349,7 @@ for field, cells in comparison.fields.items():
 ## Search & Text Location (Highlighting)
 
 ```python
-from docflow.search import search_document
+from docuflow.search import search_document
 
 result = search_document(document, "Acme Corp")          # exact (normalized)
 result = search_document(document, "INV-001", fuzzy=True)  # tolerate OCR garble
@@ -353,7 +364,7 @@ Lower-level: `locate_text()` finds any phrase at word-span precision —
 matches cross word, line and **page** boundaries:
 
 ```python
-from docflow.documents.locate import locate_text
+from docuflow.documents.locate import locate_text
 
 spans = locate_text(document, "carried forward to the next page", find_all=True)
 span = spans[0]
@@ -384,7 +395,7 @@ the matched words and `field.evidence[0].rects` handles multi-line spans.
 ## Screenshots
 
 ```python
-from docflow.screenshots import screenshot_pages_sync
+from docuflow.screenshots import screenshot_pages_sync
 
 shots = screenshot_pages_sync("doc.pdf", output_dir="./pages", dpi=200)
 ```
@@ -392,7 +403,7 @@ shots = screenshot_pages_sync("doc.pdf", output_dir="./pages", dpi=200)
 ## Quality Report
 
 ```python
-from docflow import quality_report
+from docuflow import quality_report
 
 report = quality_report(result)
 report.score               # 0.85 — overall quality (0-1)
@@ -411,7 +422,7 @@ batch_report = quality_report([result1, result2, result3])
 batch_report.worst_fields  # fields with lowest avg quality
 
 # Record quality over time (append-only JSONL)
-from docflow.quality import QualityLog
+from docuflow.quality import QualityLog
 
 log = QualityLog("./quality.jsonl")
 await log.record(report, tags={"schema": "Invoice", "model": "gpt-4o"})
@@ -439,13 +450,13 @@ review:
 ```
 
 ```python
-from docflow import run_workflow
+from docuflow import run_workflow
 
 result = run_workflow("invoice.yaml", "invoice.pdf")
 ```
 
 ```bash
-docflow run invoice.yaml invoice.pdf --output result.json
+docuflow run invoice.yaml invoice.pdf --output result.json
 ```
 
 Export an existing pipeline:
@@ -457,7 +468,7 @@ yaml_str = pipeline.export_yaml(Invoice, name="invoice")
 ## Storage
 
 ```python
-pipeline = DocumentPipeline(storage="local")  # saves to .docflow_store/
+pipeline = DocumentPipeline(storage="local")  # saves to .docuflow_store/
 # Saves: original.pdf, document.json, extraction.json, trace.json
 # On failure: partial state auto-saved if storage is configured
 ```
@@ -465,7 +476,7 @@ pipeline = DocumentPipeline(storage="local")  # saves to .docflow_store/
 ## Error Handling
 
 ```python
-from docflow.errors import WorkflowError
+from docuflow.errors import WorkflowError
 
 try:
     result = pipeline.run_sync("file.pdf", schema=Invoice)
@@ -480,14 +491,14 @@ except WorkflowError as e:
 Wrap any workflow config as an HTTP API — useful when extraction is one step in a larger multi-language pipeline.
 
 ```bash
-pip install docflow[serve]  # adds fastapi, uvicorn, python-multipart
+pip install docuflow[serve]  # adds fastapi, uvicorn, python-multipart
 ```
 
 ### Local server
 
 ```python
-from docflow.serve import create_app, run_server
-from docflow.workflow_config import load_workflow_config
+from docuflow.serve import create_app, run_server
+from docuflow.workflow_config import load_workflow_config
 
 config = load_workflow_config("workflow.yaml")
 app = create_app(config)  # FastAPI app with /health, /schema, /extract
@@ -497,7 +508,7 @@ run_server("workflow.yaml", port=8000)
 ### Docker deployment
 
 ```python
-from docflow.dockerize import generate_deployment
+from docuflow.dockerize import generate_deployment
 
 generate_deployment("workflow.yaml", "./deploy")              # stateless
 generate_deployment("workflow.yaml", "./deploy", with_storage=True)  # with /data volume
@@ -512,72 +523,72 @@ generate_deployment("workflow.yaml", "./deploy", with_storage=True)  # with /dat
 ### CLI
 
 ```bash
-docflow serve workflow.yaml --port 8000
-docflow dockerize workflow.yaml --output ./deploy
-docflow dockerize workflow.yaml --output ./deploy --with-storage
+docuflow serve workflow.yaml --port 8000
+docuflow dockerize workflow.yaml --output ./deploy
+docuflow dockerize workflow.yaml --output ./deploy --with-storage
 ```
 
 ## CLI
 
 ```bash
-docflow extract file.pdf --schema invoice --output result.json
-docflow extract-folder ./invoices --schema invoice --output results.csv --parser smart
-docflow run workflow.yaml invoice.pdf --output result.json
-docflow serve workflow.yaml --port 8000
-docflow dockerize workflow.yaml --output ./deploy --with-storage
-docflow screenshot file.pdf -o ./pages --dpi 200
-docflow templates list
-docflow templates show invoice
-docflow templates init invoice
+docuflow extract file.pdf --schema invoice --output result.json
+docuflow extract-folder ./invoices --schema invoice --output results.csv --parser smart
+docuflow run workflow.yaml invoice.pdf --output result.json
+docuflow serve workflow.yaml --port 8000
+docuflow dockerize workflow.yaml --output ./deploy --with-storage
+docuflow screenshot file.pdf -o ./pages --dpi 200
+docuflow templates list
+docuflow templates show invoice
+docuflow templates init invoice
 ```
 
 ## Key Imports
 
 ```python
 # Top-level
-from docflow import extract, DocumentPipeline, Pipeline, PrivacyPolicy
-from docflow import process_batch, compare_documents
+from docuflow import extract, DocumentPipeline, Pipeline, PrivacyPolicy
+from docuflow import process_batch, compare_documents
 
 # Parsing
-from docflow.parsing.pdfplumber_parser import PdfplumberParser
-from docflow.parsing.tesseract_parser import TesseractParser
-from docflow.parsing.docling_parser import DoclingParser
-from docflow.parsing.smart_parser import SmartParser
+from docuflow.parsing.pdfplumber_parser import PdfplumberParser
+from docuflow.parsing.tesseract_parser import TesseractParser
+from docuflow.parsing.docling_parser import DoclingParser
+from docuflow.parsing.smart_parser import SmartParser
 
 # Templates
-from docflow.templates import load_template, list_templates
+from docuflow.templates import load_template, list_templates
 
 # Validation
-from docflow.validation import RequiredFields, EvidenceRequired, TypeValidation
+from docuflow.validation import RequiredFields, EvidenceRequired, TypeValidation
 
 # Review
-from docflow.review import (
+from docuflow.review import (
     OverallConfidenceBelow, FieldConfidenceBelow, AnyFieldConfidenceBelow,
     HasValidationErrors, FieldMissing, NoEvidence, LLMReviewer,
 )
 
 # Privacy
-from docflow.privacy import PrivacyPolicy, Anonymizer, PresidioProvider
+from docuflow.privacy import PrivacyPolicy, Anonymizer, PresidioProvider
 
 # Storage
-from docflow.storage.local import LocalDocumentStore
+from docuflow.storage.local import LocalDocumentStore
 
 # LLM
-from docflow.extraction.llm.litellm_adapter import LiteLLMAdapter
+from docuflow.extraction.llm.litellm_adapter import LiteLLMAdapter
 
 # Pipeline steps (for manual Pipeline)
-from docflow.workflow import (
+from docuflow.workflow import (
     Pipeline, Ingest, Parse, Extract, ExtractVision, ExtractHybrid,
     Anonymize, Validate, Review, Store,
 )
 
 # Utilities
-from docflow.search import search_document
-from docflow.screenshots import screenshot_pages_sync
-from docflow.quality import quality_report, QualityReport, QualitySnapshot, QualityLog
-from docflow.workflow_config import load_workflow_config, run_workflow, WorkflowConfig
-from docflow.batch import process_batch, BatchReport
-from docflow.comparison import compare_documents, ComparisonResult
+from docuflow.search import search_document
+from docuflow.screenshots import screenshot_pages_sync
+from docuflow.quality import quality_report, QualityReport, QualitySnapshot, QualityLog
+from docuflow.workflow_config import load_workflow_config, run_workflow, WorkflowConfig
+from docuflow.batch import process_batch, BatchReport
+from docuflow.comparison import compare_documents, ComparisonResult
 ```
 
 ## Schema Discovery
@@ -585,7 +596,7 @@ from docflow.comparison import compare_documents, ComparisonResult
 Auto-generate a schema from a document — the LLM reads it and suggests fields:
 
 ```python
-from docflow import discover_schema
+from docuflow import discover_schema
 
 discovery = discover_schema("invoice.pdf")
 print(discovery.document_type)     # "invoice"
@@ -596,7 +607,7 @@ Invoice = discovery.schema_class
 result = extract("invoice.pdf", schema=Invoice)
 
 # Or save as YAML template
-with open("docflow_templates/my_invoice.yaml", "w") as f:
+with open("docuflow_templates/my_invoice.yaml", "w") as f:
     f.write(discovery.yaml_template)
 ```
 
@@ -605,7 +616,7 @@ with open("docflow_templates/my_invoice.yaml", "w") as f:
 When using `parser="docling"`, tables are extracted as first-class objects:
 
 ```python
-from docflow.documents.tables import Table, Cell
+from docuflow.documents.tables import Table, Cell
 
 for page in document.pages:
     for table in page.tables:
@@ -622,7 +633,7 @@ Other parsers produce `page.tables = []`.
 
 ## Trust Scoring
 
-DocFlow uses agreement + source verification, NOT LLM self-reported confidence:
+DocuFlow uses agreement + source verification, NOT LLM self-reported confidence:
 
 ```python
 field.trust.agreement        # "4/5" (multi mode) or "" (single mode)
@@ -682,7 +693,7 @@ field.consensus.n_succeeded      # instances that returned valid JSON
 Measure extraction accuracy against ground truth (corrections = your gold set):
 
 ```python
-from docflow.eval import EvalHarness
+from docuflow.eval import EvalHarness
 
 harness = EvalHarness()
 harness.add_ground_truth(approved_result)  # correct values
@@ -730,11 +741,11 @@ await store.get_by_status("rejected") # reviewed and rejected
 
 ## MCP Server (AI Agent Integration)
 
-DocFlow runs as an MCP server with 14 tools any AI agent can call:
+DocuFlow runs as an MCP server with 14 tools any AI agent can call:
 
 ```bash
-pip install docflow[mcp]
-docflow-mcp  # starts the server
+pip install docuflow[mcp]
+docuflow-mcp  # starts the server
 ```
 
 Tools: `extract_document`, `extract_with_vision`, `discover_schema`, `compare_documents`, `process_batch`, `list_templates`, `show_template`, `search_in_document`, `get_pending_reviews`, `get_extraction_result`, `correct_field`, `approve_document`, `reject_document`, `screenshot_document`.
@@ -742,7 +753,7 @@ Tools: `extract_document`, `extract_with_vision`, `discover_schema`, `compare_do
 ## Project Structure
 
 ```
-src/docflow/
+src/docuflow/
   __init__.py          # Public API (extract, DocumentPipeline, Pipeline)
   api.py               # extract() one-liner
   processor.py         # DocumentPipeline

@@ -21,17 +21,42 @@ def _translate_model_name(model: str) -> str:
     return model
 
 
+def _mark_system_cacheable(messages: list[dict]) -> list[dict]:
+    """Mark the system message for Anthropic prompt caching.
+
+    The system prompt + schema prefix repeats across every document in a
+    workflow run; caching it cuts cost and time-to-first-token. OpenAI
+    caches automatically; Anthropic needs explicit cache_control blocks.
+    """
+    marked = []
+    for m in messages:
+        if m.get("role") == "system" and isinstance(m.get("content"), str):
+            marked.append({
+                **m,
+                "content": [{
+                    "type": "text",
+                    "text": m["content"],
+                    "cache_control": {"type": "ephemeral"},
+                }],
+            })
+        else:
+            marked.append(m)
+    return marked
+
+
 class LiteLLMAdapter:
     def __init__(
         self,
         model: str = "openai/gpt-4o",
         api_key: str | None = None,
         max_retries: int = 3,
+        prompt_caching: bool = False,
         **kwargs: Any,
     ):
         self.model = _translate_model_name(model)
         self.api_key = api_key
         self.max_retries = max_retries
+        self.prompt_caching = prompt_caching
         self.extra_kwargs = kwargs
 
     async def complete(
@@ -46,6 +71,9 @@ class LiteLLMAdapter:
             raise ImportError(
                 "litellm is required for LLM calls. Install with: pip install docuflow[llm]"
             ) from e
+
+        if self.prompt_caching and self.model.startswith("anthropic"):
+            messages = _mark_system_cacheable(messages)
 
         kwargs: dict[str, Any] = {
             "model": self.model,

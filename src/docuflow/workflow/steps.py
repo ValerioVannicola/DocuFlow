@@ -134,6 +134,7 @@ class Extract:
         temperatures: list[float] | None = None,
         context: str | None = None,
         scoring: str = "qualitative",
+        schema_shards: int | None = None,
     ):
         self._schema = schema
         self.llm = llm
@@ -142,6 +143,7 @@ class Extract:
         self.temperatures = temperatures
         self.context = context
         self.scoring = scoring
+        self.schema_shards = schema_shards
 
     async def execute(self, state: PipelineState) -> PipelineState:
         if state.document is None:
@@ -163,6 +165,7 @@ class Extract:
             state.document, schema, trace=state.trace,
             mode=self.mode, n_instances=self.n_instances,
             temperatures=self.temperatures, scoring=self.scoring,
+            shards=self.schema_shards,
         )
         duration = (time.monotonic() - start) * 1000
         state.trace.add_event("extract", step_name=self.name, duration_ms=duration)

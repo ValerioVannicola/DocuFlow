@@ -169,6 +169,17 @@ vision-capable model.
 pipeline = DocumentPipeline(parser=None, extraction_type="vision", model="openai/gpt-4o")
 ```
 
+## Schema Sharding & Prompt Caching
+
+```python
+# Wide schemas: K parallel partial-schema extractions, merged (text only)
+pipeline = DocumentPipeline(schema_shards=3)
+
+# Anthropic prompt caching for repeated workflow runs (OpenAI caches automatically)
+pipeline = DocumentPipeline(model="anthropic/claude-sonnet-4-6",
+                            llm_kwargs={"prompt_caching": True})
+```
+
 ## Extraction Modes
 
 | Mode | LLM calls | Description |

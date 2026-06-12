@@ -33,6 +33,7 @@ class WorkflowConfig(BaseModel):
     extraction_mode: str = "single"
     escalation: dict[str, Any] | None = None
     verification: dict[str, Any] | None = None
+    schema_shards: int | None = None
     n_instances: int = 5
     temperatures: list[float] | None = None
     vision_dpi: int | None = None
@@ -166,6 +167,7 @@ class WorkflowConfig(BaseModel):
             "extraction_mode": self.extraction_mode,
             "escalation": self.escalation,
             "verification": self.verification,
+            "schema_shards": self.schema_shards,
             "n_instances": self.n_instances,
             "scoring": self.scoring,
             "validators": self.build_validators() or None,
@@ -385,6 +387,8 @@ def export_config(
         config["escalation"] = dict(pipeline._escalation)
     if getattr(pipeline, "_verification", None):
         config["verification"] = dict(pipeline._verification)
+    if getattr(pipeline, "_schema_shards", None):
+        config["schema_shards"] = pipeline._schema_shards
     config["n_instances"] = pipeline._n_instances
     config["scoring"] = pipeline._scoring
 

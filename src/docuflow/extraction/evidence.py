@@ -10,6 +10,7 @@ def attach_evidence(
     field_name: str,
     extracted_value: object,
     evidence_hints: dict,
+    stream: list | None = None,
 ) -> list[Evidence]:
     """Map LLM evidence hints to Evidence objects grounded in the document.
 
@@ -34,7 +35,7 @@ def attach_evidence(
 
     best_span = None
     for target in targets:
-        spans = locate_text(document, target, hint_page=hint_page)
+        spans = locate_text(document, target, hint_page=hint_page, stream=stream)
         if not spans:
             continue
         if spans[0].method == "exact":

@@ -28,6 +28,7 @@ class DocumentPipeline:
         scoring: str = "qualitative",
         escalation: dict | None = None,
         verification: dict | None = None,
+        schema_shards: int | None = None,
         llm_kwargs: dict | None = None,
     ):
         self._parser = parser
@@ -46,6 +47,7 @@ class DocumentPipeline:
         self._scoring = scoring
         self._escalation = escalation
         self._verification = verification
+        self._schema_shards = schema_shards
         self._llm_kwargs = llm_kwargs or {}
 
         parser_type = self._parser
@@ -307,6 +309,7 @@ class DocumentPipeline:
                     temperatures=self._temperatures,
                     context=self._context,
                     scoring=self._scoring,
+                    schema_shards=self._schema_shards,
                 )
             )
 
