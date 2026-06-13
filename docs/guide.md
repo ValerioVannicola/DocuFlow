@@ -285,6 +285,7 @@ pip install docuflow[privacy]        # Presidio anonymization
 | `gcp` | google-cloud-documentai | Google Document AI cloud OCR |
 | `serve` | fastapi, uvicorn, python-multipart | HTTP serving and dockerize |
 | `mcp` | mcp | MCP server for AI agents |
+| `jupyter` | nest_asyncio | Sync API in Jupyter notebooks (see below) |
 | `all` | All of the above | Everything |
 | `dev` | pytest, pytest-asyncio, pytest-cov, ruff | Development tools |
 
@@ -400,6 +401,35 @@ if result.usage:
     print(f"Tokens: {result.usage.total_tokens} across {result.usage.n_llm_calls} LLM calls")
     if result.usage.cost_usd is not None:
         print(f"Cost: ${result.usage.cost_usd:.4f}")
+```
+
+### Using DocuFlow in Jupyter Notebooks
+
+DocuFlow's sync API (`extract()`, `run_workflow()`, `pipeline.run_sync()`,
+`router.route_sync()`) uses `asyncio.run()` internally. Jupyter already runs its own
+event loop, which normally causes a `RuntimeError: Cannot call run_sync() from within
+a running event loop` error.
+
+DocuFlow handles this automatically when `nest_asyncio` is installed:
+
+```bash
+pip install nest_asyncio
+# or
+pip install "docuflow[jupyter]"
+```
+
+Once installed, the sync API works in notebooks with no code changes. If
+`nest_asyncio` is not installed, DocuFlow raises a clear error pointing to the
+install command.
+
+Alternatively, use the async API directly — Jupyter supports `await` at the cell
+top level without any extra packages:
+
+```python
+# async API — works in Jupyter without nest_asyncio
+result = await extract_async("invoice.pdf", schema=Invoice)
+report = await router.route(["a.pdf", "b.pdf"])
+result = await pipeline.run("invoice.pdf", schema=Invoice)
 ```
 
 ---
@@ -1931,8 +1961,49 @@ document goes to `unclassified` rather than guessing. Each routed result records
 classification decision, confidence and reason for auditability.
 
 Registration accepts YAML workflow configs (path or dict) or explicit
-`pipeline=` + `schema=` pairs. Descriptions matter — they are what the classifier
-sees — and default to the workflow description or the schema's field names.
+`pipeline=` + `schema=` pairs.
+
+### The `description` is the routing signal
+
+The `description` string you pass to `register()` is **the exact text the classifier
+LLM reads** when deciding which workflow a document belongs to. It is not metadata —
+it is the prompt. A vague description produces unreliable routing; a precise one
+produces reliable routing.
+
+**Write descriptions for a classifier that knows nothing about your business:**
+
+```python
+# Too vague — "invoice" could be anything
+router.register("invoice", pipeline=..., schema=Invoice,
+                description="invoices")
+
+# Clear and discriminative — includes AND excludes
+router.register("invoice", pipeline=..., schema=Invoice,
+                description="supplier invoices with line items and totals; "
+                            "NOT repair quotes or credit notes")
+
+router.register("claim", pipeline=..., schema=Claim,
+                description="motor or property insurance claim forms "
+                            "with policy number and damage amount")
+
+router.register("contract", pipeline=..., schema=Contract,
+                description="service or vendor contracts with parties, "
+                            "term dates and payment clauses; NOT purchase orders")
+```
+
+Good description patterns:
+- **State what the document is** — "supplier invoices", "motor insurance claim forms"
+- **State key fields** — "with policy number and damage amount" — these are textual
+  landmarks the classifier will spot in the document's first page
+- **Exclude near-neighbours** with `NOT` — "NOT repair quotes" prevents the most
+  common misroutes between similar document types
+- **Use plain language** — avoid abbreviations and jargon the LLM won't recognise
+
+If no `description` is provided, DocuFlow falls back to the workflow YAML's
+`description:` field, or to a list of the schema's field names (e.g.
+`"documents with fields: supplier_name, total"`). Field-name fallbacks work for
+distinct schemas but fail when two schemas share similar fields — write an explicit
+description in that case.
 
 No-code version — a routes file:
 
