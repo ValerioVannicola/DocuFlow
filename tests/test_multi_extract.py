@@ -17,6 +17,19 @@ class Invoice(BaseModel):
     total: float
 
 
+class LineItem(BaseModel):
+    description: str
+    quantity: float | None = None
+    unit_price: float | None = None
+    tax_rate: float | None = None
+    amount: float
+
+
+class DetailedInvoice(BaseModel):
+    tax_rate: float | None = None
+    line_items: list[LineItem] | None = None
+
+
 def _make_doc() -> Document:
     return Document(
         id="doc-1",
@@ -184,6 +197,60 @@ class TestMultiExtract:
 
         assert isinstance(result, ExtractionResult)
         assert result.data["supplier_name"] == "Acme Corp"
+
+    async def test_multi_mode_repairs_schema_shaped_output(self):
+        bad = {
+            "data": {
+                "tax_rate": "8.25%",
+                "line_items": (
+                    "1 Enterprise Data Platform License 1 $24,500.00 "
+                    "8.25% $24,500.00"
+                ),
+            },
+            "evidence": {
+                "tax_rate": {"page": 0, "text": "8.25%"},
+                "line_items": {
+                    "page": 0,
+                    "text": (
+                        "1 Enterprise Data Platform License 1 $24,500.00 "
+                        "8.25% $24,500.00"
+                    ),
+                },
+            },
+        }
+        repaired = {
+            "data": {
+                "tax_rate": 8.25,
+                "line_items": [
+                    {
+                        "description": "Enterprise Data Platform License",
+                        "quantity": 1,
+                        "unit_price": 24500.0,
+                        "tax_rate": 8.25,
+                        "amount": 24500.0,
+                    }
+                ],
+            },
+            "evidence": bad["evidence"],
+        }
+
+        mock_llm = AsyncMock()
+        mock_llm.complete = AsyncMock(side_effect=[
+            LLMResponse(content=json.dumps(bad), model="gpt-4o"),
+            LLMResponse(content=json.dumps(bad), model="gpt-4o"),
+            LLMResponse(content=json.dumps(bad), model="gpt-4o"),
+            LLMResponse(content=json.dumps(repaired), model="gpt-4o"),
+        ])
+
+        engine = ExtractionEngine(llm=mock_llm)
+        result = await engine.extract(
+            _make_doc(), schema=DetailedInvoice, mode="multi", n_instances=3,
+        )
+
+        assert mock_llm.complete.call_count == 4
+        assert result.data["tax_rate"] == 8.25
+        assert len(result.data["line_items"]) == 1
+        assert result.data["line_items"][0]["amount"] == 24500.0
 
     async def test_multi_mode_all_fail_raises(self):
         mock_llm = AsyncMock()

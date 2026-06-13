@@ -60,6 +60,10 @@ Rules:
 5. Return ONLY valid JSON — no markdown, no explanation, no extra text.
 6. For evidence, quote the EXACT text snippet from the document that supports each value.
 7. Use the exact field names from the schema — do not rename or reformat them.
+8. Values in "data" MUST match the JSON Schema types exactly: numbers as JSON numbers
+   without currency symbols, commas, or percent signs; arrays as JSON arrays; objects as
+   JSON objects; booleans as booleans. Keep formatting such as "$1,234.00" or "8.25%"
+   only inside evidence text, not in data values.
 
 Output format — you MUST return exactly this JSON structure:
 {
@@ -95,6 +99,10 @@ Rules:
 5. Return ONLY valid JSON — no markdown, no explanation, no extra text.
 6. For evidence, quote the text as you read it from the image.
 7. Use the exact field names from the schema — do not rename or reformat them.
+8. Values in "data" MUST match the JSON Schema types exactly: numbers as JSON numbers
+   without currency symbols, commas, or percent signs; arrays as JSON arrays; objects as
+   JSON objects; booleans as booleans. Keep formatting such as "$1,234.00" or "8.25%"
+   only inside evidence text, not in data values.
 
 Output format — you MUST return exactly this JSON structure:
 {

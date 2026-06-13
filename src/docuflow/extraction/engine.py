@@ -4,7 +4,10 @@ import asyncio
 import base64
 import io
 import json
+import re
 import uuid
+from types import UnionType
+from typing import Any, Union, get_args, get_origin
 
 from pydantic import BaseModel
 
@@ -32,6 +35,7 @@ from docuflow.extraction.scoring import (
 from docuflow.observability.traces import Trace
 
 JSON_MODE = {"type": "json_object"}
+_MISSING = object()
 
 
 class _UsageTracker:
@@ -99,6 +103,242 @@ async def _parse_json_with_retry(
         raise SchemaExtractionError(
             f"Failed to parse LLM response as JSON after retry: {exc}"
         ) from exc
+
+
+def _strip_optional(annotation: Any) -> Any:
+    origin = get_origin(annotation)
+    if origin in (Union, UnionType):
+        args = [a for a in get_args(annotation) if a is not type(None)]
+        if len(args) == 1:
+            return args[0]
+    return annotation
+
+
+def _coerce_number_string(value: object, target_type: type) -> object:
+    if not isinstance(value, str):
+        return value
+    text = value.strip()
+    if not text:
+        return value
+
+    negative = text.startswith("(") and text.endswith(")")
+    cleaned = text.strip("()")
+    cleaned = cleaned.replace(",", "")
+    for ch in "$€£¥%":
+        cleaned = cleaned.replace(ch, "")
+    cleaned = cleaned.strip()
+
+    match = re.search(r"[-+]?\d+(?:\.\d+)?", cleaned)
+    if not match:
+        return value
+    number_text = match.group(0)
+    if negative and not number_text.startswith("-"):
+        number_text = f"-{number_text}"
+
+    try:
+        if target_type is int:
+            return int(float(number_text))
+        return float(number_text)
+    except ValueError:
+        return value
+
+
+def _coerce_bool_string(value: object) -> object:
+    if not isinstance(value, str):
+        return value
+    normalized = value.strip().lower()
+    if normalized in {"true", "yes", "y", "1"}:
+        return True
+    if normalized in {"false", "no", "n", "0"}:
+        return False
+    return value
+
+
+def _coerce_value_for_annotation(value: object, annotation: Any) -> object:
+    annotation = _strip_optional(annotation)
+    origin = get_origin(annotation)
+
+    if value is None:
+        return None
+
+    if annotation in (float, int):
+        return _coerce_number_string(value, annotation)
+
+    if annotation is bool:
+        return _coerce_bool_string(value)
+
+    if origin is list:
+        item_args = get_args(annotation)
+        item_annotation = item_args[0] if item_args else Any
+        if isinstance(value, list):
+            return [
+                _coerce_value_for_annotation(item, item_annotation)
+                for item in value
+            ]
+        if isinstance(value, str) and _strip_optional(item_annotation) is str:
+            return [value]
+        return value
+
+    if isinstance(annotation, type) and issubclass(annotation, BaseModel):
+        if isinstance(value, dict):
+            return _coerce_data_for_schema(annotation, value)
+        return value
+
+    return value
+
+
+def _coerce_data_for_schema(
+    schema: type[BaseModel],
+    raw_data: dict[str, object],
+) -> dict[str, object]:
+    coerced = dict(raw_data)
+    for field_name, field_info in schema.model_fields.items():
+        if field_name not in coerced:
+            continue
+        coerced[field_name] = _coerce_value_for_annotation(
+            coerced[field_name], field_info.annotation,
+        )
+    return coerced
+
+
+def _validate_schema_data(
+    schema: type[BaseModel],
+    raw_data: object,
+) -> tuple[dict[str, object], BaseModel]:
+    if not isinstance(raw_data, dict):
+        raise TypeError("LLM output data must be a JSON object")
+    coerced = _coerce_data_for_schema(schema, raw_data)
+    validated = schema.model_validate(coerced)
+    return coerced, validated
+
+
+def _empty_value_for_field(field_info: object) -> object:
+    annotation = _strip_optional(getattr(field_info, "annotation", Any))
+    origin = get_origin(annotation)
+    if origin is list:
+        return []
+    return _MISSING
+
+
+def _safe_schema_data_after_failed_repair(
+    schema: type[BaseModel],
+    raw_data: object,
+) -> dict[str, object] | None:
+    """Last-resort normalization for fields that are structurally unusable.
+
+    LLMs sometimes collapse a table/list field into one long string. If the
+    schema allows an empty list, prefer a schema-valid empty list over failing
+    the whole extraction. Required scalars are never fabricated here.
+    """
+    if not isinstance(raw_data, dict):
+        return None
+    safe = _coerce_data_for_schema(schema, raw_data)
+    changed = False
+    for name, field_info in schema.model_fields.items():
+        if name in safe:
+            value = safe[name]
+            annotation = _strip_optional(field_info.annotation)
+            if get_origin(annotation) is list and not isinstance(value, list):
+                safe[name] = []
+                changed = True
+        elif not field_info.is_required():
+            empty = _empty_value_for_field(field_info)
+            if empty is not _MISSING:
+                safe[name] = empty
+                changed = True
+    return safe if changed else None
+
+
+def _schema_validation_repair_prompt(
+    schema: type[BaseModel],
+    parsed: dict,
+    validation_error: Exception,
+) -> str:
+    return (
+        "Your previous JSON was valid JSON but did not match the required schema.\n"
+        "Return ONLY a corrected JSON object with the same top-level shape:\n"
+        '{"data": {...}, "evidence": {...}}\n\n'
+        "Rules:\n"
+        "- Preserve values that are already correct.\n"
+        "- Fix only type/shape issues reported by validation.\n"
+        "- Numbers must be JSON numbers without currency symbols, commas, or percent signs.\n"
+        "- Arrays must be JSON arrays, never strings. If a table/list is present, split it into objects matching the item schema.\n"
+        "- Objects must be JSON objects.\n"
+        "- If a value cannot be corrected from the document/evidence, use null for optional fields or [] for list fields.\n"
+        "- Keep original formatted snippets in evidence text.\n\n"
+        f"## JSON Schema\n```json\n{json.dumps(schema.model_json_schema(), indent=2)}\n```\n\n"
+        f"## Validation Error\n{validation_error}\n\n"
+        f"## Previous JSON\n```json\n{json.dumps(parsed, indent=2, default=str)}\n```\n"
+    )
+
+
+async def _validate_or_repair_parsed(
+    llm: LLMAdapter,
+    schema: type[BaseModel],
+    parsed: dict,
+    messages: list[dict],
+    trace: Trace | None,
+) -> dict:
+    raw_data = parsed.get("data", parsed)
+    validation_error: Exception
+    try:
+        _coerced, validated = _validate_schema_data(schema, raw_data)
+        return {**parsed, "data": validated.model_dump()}
+    except Exception as first_exc:
+        validation_error = first_exc
+        if trace:
+            trace.add_event(
+                "schema_validation_repair",
+                step_name="extraction",
+                error=str(validation_error),
+            )
+
+    repair_messages = [
+        *messages,
+        {"role": "assistant", "content": json.dumps(parsed, default=str)},
+        {
+            "role": "user",
+            "content": _schema_validation_repair_prompt(schema, parsed, validation_error),
+        },
+    ]
+    try:
+        repair_response = await llm.complete(
+            repair_messages, temperature=0.0, response_format=JSON_MODE,
+        )
+        repaired = await _parse_json_with_retry(
+            llm, repair_response.content, repair_messages,
+        )
+        raw_repaired = repaired.get("data", repaired)
+        _coerced, validated = _validate_schema_data(schema, raw_repaired)
+        if trace:
+            trace.add_event(
+                "schema_validation_repaired",
+                step_name="extraction",
+                model=repair_response.model,
+            )
+        return {**repaired, "data": validated.model_dump()}
+    except Exception as repair_exc:
+        safe_data = _safe_schema_data_after_failed_repair(schema, raw_data)
+        if safe_data is not None:
+            try:
+                validated = schema.model_validate(safe_data)
+                if trace:
+                    trace.add_event(
+                        "schema_validation_repair_fallback",
+                        step_name="extraction",
+                        error=str(repair_exc),
+                    )
+                return {**parsed, "data": validated.model_dump()}
+            except Exception as fallback_exc:
+                if trace:
+                    trace.add_event(
+                        "schema_validation_repair_fallback_failed",
+                        step_name="extraction",
+                        error=str(fallback_exc),
+                    )
+        raise SchemaExtractionError(
+            f"LLM output does not match schema: {validation_error}"
+        ) from repair_exc
 
 
 def _generate_temperatures(n: int, mean: float = 0.3, spread: float = 0.15) -> list[float]:
@@ -435,8 +675,11 @@ async def _run_multi(
             if r is not None:
                 first_model = r["model"]
                 break
+        parsed = await _validate_or_repair_parsed(
+            llm, schema, candidates[0], messages, trace,
+        )
         return _build_result(
-            document, schema, candidates[0], first_model, trace,
+            document, schema, parsed, first_model, trace,
             scoring=scoring, usage=_usage_of(llm),
         )
 
@@ -449,8 +692,11 @@ async def _run_multi(
         first_model = next(
             (r["model"] for r in raw_results if r is not None), "",
         )
+        parsed = await _validate_or_repair_parsed(
+            llm, schema, candidates[0], messages, trace,
+        )
         return _build_result(
-            document, schema, candidates[0], first_model, trace,
+            document, schema, parsed, first_model, trace,
             candidates=candidates, scoring=scoring, n_instances=n_instances,
             usage=_usage_of(llm),
         )
@@ -475,6 +721,9 @@ async def _run_multi(
 
     decider_parsed = await _parse_json_with_retry(
         llm, decider_response.content, decider_messages,
+    )
+    decider_parsed = await _validate_or_repair_parsed(
+        llm, schema, decider_parsed, decider_messages, trace,
     )
     return _build_result(
         document, schema, decider_parsed, decider_response.model, trace,
@@ -555,6 +804,9 @@ class ExtractionEngine:
             )
 
         parsed = await _parse_json_with_retry(llm, response.content, messages)
+        parsed = await _validate_or_repair_parsed(
+            llm, schema, parsed, messages, trace,
+        )
         return _build_result(
             document, schema, parsed, response.model, trace,
             scoring=scoring, usage=llm.total(),
@@ -691,6 +943,9 @@ class VisionExtractionEngine:
             )
 
         parsed = await _parse_json_with_retry(llm, response.content, messages)
+        parsed = await _validate_or_repair_parsed(
+            llm, schema, parsed, messages, trace,
+        )
 
         await enrich_task
         _trace_enrichment()
@@ -874,8 +1129,11 @@ class HybridExtractionEngine:
                 if r is not None:
                     first_model = r["model"]
                     break
+            parsed = await _validate_or_repair_parsed(
+                llm, schema, candidates[0], vision_messages, trace,
+            )
             return _build_result(
-                document, schema, candidates[0], first_model, trace,
+                document, schema, parsed, first_model, trace,
                 scoring=scoring, usage=llm.total(),
             )
 
@@ -889,8 +1147,11 @@ class HybridExtractionEngine:
             first_model = next(
                 (r["model"] for r in all_results if r is not None), "",
             )
+            parsed = await _validate_or_repair_parsed(
+                llm, schema, candidates[0], vision_messages, trace,
+            )
             return _build_result(
-                document, schema, candidates[0], first_model, trace,
+                document, schema, parsed, first_model, trace,
                 candidates=candidates, scoring=scoring,
                 n_instances=n_instances * 2, usage=llm.total(),
             )
@@ -917,6 +1178,9 @@ class HybridExtractionEngine:
 
         decider_parsed = await _parse_json_with_retry(
             llm, decider_response.content, decider_messages,
+        )
+        decider_parsed = await _validate_or_repair_parsed(
+            llm, schema, decider_parsed, decider_messages, trace,
         )
 
         return _build_result(
