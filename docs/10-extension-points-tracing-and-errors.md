@@ -71,6 +71,7 @@ LiteLLMAdapter(
     api_key: str | None = None,
     max_retries: int = 3,
     prompt_caching: bool = False,
+    suppress_debug_info: bool = True,
     **kwargs: Any,
 )
 ```
@@ -83,6 +84,7 @@ Parameters:
 | `api_key` | `None` | Explicit API key. If omitted, provider env vars are used. |
 | `max_retries` | `3` | Number of retry attempts. |
 | `prompt_caching` | `False` | For Anthropic models, marks the system message cacheable. |
+| `suppress_debug_info` | `True` | Suppresses LiteLLM's feedback/debug-help banner on provider errors. Set to `False` to restore it. |
 | `**kwargs` | `{}` | Extra kwargs passed to `litellm.acompletion()`. |
 
 Method:

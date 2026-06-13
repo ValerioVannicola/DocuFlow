@@ -240,6 +240,7 @@ Supported adapter constructor parameters:
 | `api_key` | `None` | Optional explicit API key. Otherwise provider env vars are used. |
 | `max_retries` | `3` | Retry count for failed LLM calls. |
 | `prompt_caching` | `False` | When true and model starts with `anthropic`, marks the system prompt cacheable. |
+| `suppress_debug_info` | `True` | Suppresses LiteLLM's feedback/debug-help banner on provider errors. Set to `False` when debugging LiteLLM itself. |
 | `**kwargs` | `{}` | Passed through to `litellm.acompletion()`. |
 
 Example:
@@ -250,6 +251,7 @@ pipeline = DocumentPipeline(
     llm_kwargs={
         "max_retries": 5,
         "prompt_caching": True,
+        "suppress_debug_info": True,
         "timeout": 60,
     },
 )

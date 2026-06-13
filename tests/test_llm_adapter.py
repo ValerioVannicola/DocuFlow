@@ -69,6 +69,28 @@ class TestLiteLLMAdapter:
         assert result.content == '{"result": "test"}'
         assert result.model == "gpt-4o"
         assert result.usage["prompt_tokens"] == 100
+        assert mock_litellm.suppress_debug_info is True
+
+    async def test_litellm_debug_info_can_be_enabled(self):
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = '{"result": "test"}'
+        mock_response.usage = None
+        mock_response.model = "gpt-4o"
+
+        mock_litellm = MagicMock()
+        mock_litellm.suppress_debug_info = True
+        mock_litellm.acompletion = AsyncMock(return_value=mock_response)
+
+        with patch.dict(sys.modules, {"litellm": mock_litellm}):
+            if "docuflow.extraction.llm.litellm_adapter" in sys.modules:
+                del sys.modules["docuflow.extraction.llm.litellm_adapter"]
+            from docuflow.extraction.llm.litellm_adapter import LiteLLMAdapter
+
+            adapter = LiteLLMAdapter(model="openai:gpt-4o", suppress_debug_info=False)
+            await adapter.complete([{"role": "user", "content": "test"}])
+
+        assert mock_litellm.suppress_debug_info is False
 
     async def test_retry_on_failure(self):
         mock_litellm = MagicMock()

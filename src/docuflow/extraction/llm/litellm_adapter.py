@@ -51,12 +51,14 @@ class LiteLLMAdapter:
         api_key: str | None = None,
         max_retries: int = 3,
         prompt_caching: bool = False,
+        suppress_debug_info: bool = True,
         **kwargs: Any,
     ):
         self.model = _translate_model_name(model)
         self.api_key = api_key
         self.max_retries = max_retries
         self.prompt_caching = prompt_caching
+        self.suppress_debug_info = suppress_debug_info
         self.extra_kwargs = kwargs
 
     async def complete(
@@ -71,6 +73,8 @@ class LiteLLMAdapter:
             raise ImportError(
                 "litellm is required for LLM calls. Install with: pip install docuflow[llm]"
             ) from e
+
+        litellm.suppress_debug_info = self.suppress_debug_info
 
         if self.prompt_caching and self.model.startswith("anthropic"):
             messages = _mark_system_cacheable(messages)
