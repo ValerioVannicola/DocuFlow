@@ -1,8 +1,12 @@
 <p align="center">
-  <img src="assets/docuflow-logo.png" alt="DocuFlow logo" width="520">
+  <img src="docs/assets/docuflow-logo.png" alt="DocuFlow logo" width="520">
 </p>
 
 # DocuFlow — Complete User Guide
+
+> This guide is the practical user guide. The deeper technical library documentation,
+> including public APIs, parameters, selectable options, data models, deployment,
+> extension points, and error handling, lives under [`docs/`](docs/).
 
 > Extract structured data from documents using LLMs — with evidence, validation, review, and full audit trail.
 
