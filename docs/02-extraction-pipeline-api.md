@@ -359,7 +359,7 @@ Supported built-in storage values:
 | `{"type": "local", "path": "..."}` | Store under the given directory. |
 
 You may pass a custom object implementing the storage protocol documented in
-`validation-review-privacy-and-storage.md`.
+`07-validation-review-privacy-and-storage.md`.
 
 ### Validation And Review Options
 

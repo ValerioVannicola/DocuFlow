@@ -327,7 +327,7 @@ result.reject(rejected_by="alice", reason="wrong document")
 result.correct_field("total", 1235.0, corrected_by="alice", reason="OCR error")
 ```
 
-See `results-and-data-models.md` for the exact result fields modified by these methods.
+See `06-results-and-data-models.md` for the exact result fields modified by these methods.
 
 ## Privacy Policy
 

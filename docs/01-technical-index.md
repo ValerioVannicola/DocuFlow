@@ -7,23 +7,25 @@ the complete public API, supported options, and examples.
 
 ## Documentation Map
 
-- `technical-index.md` — installation extras, API conventions, and a map of the library.
-- `extraction-pipeline-api.md` — `extract()`, `extract_async()`, `DocumentPipeline`, extraction
+- `01-technical-index.md` — installation extras, API conventions, and a map of the library.
+- `02-extraction-pipeline-api.md` — `extract()`, `extract_async()`, `DocumentPipeline`, extraction
   types, extraction modes, scoring, escalation, verification, sharding, and LLM options.
-- `workflow-configs-and-manual-pipelines.md` — YAML workflows, `WorkflowConfig`, `run_workflow()`,
+- `03-workflow-configs-and-manual-pipelines.md` — YAML workflows, `WorkflowConfig`, `run_workflow()`,
   export helpers, `Pipeline`, and workflow steps.
-- `schemas-templates-and-discovery.md` — Pydantic schemas, YAML templates, template registry,
+- `04-schemas-templates-and-discovery.md` — Pydantic schemas, YAML templates, template registry,
   and LLM schema discovery.
-- `parsers-ocr-rendering-and-search.md` — parser choices and constructor options, OCR behavior,
+- `05-parsers-ocr-rendering-and-search.md` — parser choices and constructor options, OCR behavior,
   coordinate conventions, screenshots, field highlights, text search, and text location.
-- `results-and-data-models.md` — `ExtractionResult`, fields, evidence, confidence, trust,
+- `06-results-and-data-models.md` — `ExtractionResult`, fields, evidence, confidence, trust,
   provenance, document/page/block/table models, and token usage.
-- `validation-review-privacy-and-storage.md` — validators, review rules, LLM reviewers, privacy
+- `07-validation-review-privacy-and-storage.md` — validators, review rules, LLM reviewers, privacy
   policy/anonymization, mapping stores, and local document storage.
-- `batch-comparison-routing-quality-and-eval.md` — batch processing, document comparison, workflow
+- `08-batch-comparison-routing-quality-and-eval.md` — batch processing, document comparison, workflow
   routing, quality reports/logging, and evaluation harnesses.
-- `serving-cli-mcp-and-deployment.md` — FastAPI serving, Docker generation, CLI commands, MCP
+- `09-serving-cli-mcp-and-deployment.md` — FastAPI serving, Docker generation, CLI commands, MCP
   tools, and deployment parameters.
+- `10-extension-points-tracing-and-errors.md` — custom adapters/providers, ingestion, rendering,
+  tracing, strategy protocol, and exceptions.
 
 ## Installation Extras
 
