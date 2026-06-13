@@ -77,17 +77,24 @@ def _collect_rects(
     return by_page
 
 
-def _annotate(img: object, boxes: list, dpi: int) -> object:
+def _darken(color: tuple[int, int, int, int], factor: float = 0.55) -> tuple[int, int, int, int]:
+    """Return the same hue at reduced brightness, fully opaque."""
+    r, g, b, _ = color
+    return (int(r * factor), int(g * factor), int(b * factor), 255)
+
+
+def _annotate(img: object, boxes: list, dpi: int, show_labels: bool = True) -> object:
     from PIL import Image as PILImage
     from PIL import ImageDraw, ImageFont
 
     scale = dpi / 72.0
     overlay = PILImage.new("RGBA", img.size, (0, 0, 0, 0))  # type: ignore[arg-type]
     draw = ImageDraw.Draw(overlay)
-    try:
-        font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", max(11, dpi // 12))
-    except Exception:
-        font = ImageFont.load_default()
+    if show_labels:
+        try:
+            font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", max(11, dpi // 12))
+        except Exception:
+            font = ImageFont.load_default()
 
     for field_name, bbox, color in boxes:
         x0 = int(round(bbox.x0 * scale))
@@ -99,10 +106,11 @@ def _annotate(img: object, boxes: list, dpi: int) -> object:
         x1, y1 = min(w, x1), min(h, y1)
         if x1 <= x0 or y1 <= y0:
             continue
-        border = (color[0], color[1], color[2], 220)
+        border = _darken(color)
         draw.rectangle([x0, y0, x1, y1], fill=color, outline=border, width=2)
-        label_y = y0 - max(14, dpi // 10) if y0 > max(14, dpi // 10) else y1
-        draw.text((x0 + 2, label_y), field_name.replace("_", " "), fill=border, font=font)
+        if show_labels:
+            label_y = y0 - max(14, dpi // 10) if y0 > max(14, dpi // 10) else y1
+            draw.text((x0 + 2, label_y), field_name.replace("_", " "), fill=border, font=font)
 
     return PILImage.alpha_composite(img.convert("RGBA"), overlay).convert("RGB")  # type: ignore[union-attr]
 
@@ -115,6 +123,7 @@ async def highlight_fields_async(
     dpi: int = 150,
     format: str = "png",
     color: str | tuple | None = None,
+    show_labels: bool = True,
 ) -> list[str]:
     """Render each page that has field evidence, draw colored bounding boxes, save to disk.
 
@@ -132,6 +141,7 @@ async def highlight_fields_async(
             - A CSS color name string: ``"red"``, ``"cyan"``, ``"#ff0"``
             - An RGB/RGBA tuple: ``(255, 0, 0)`` or ``(255, 0, 0, 120)``
             - ``"auto"``: a distinct color per field from the built-in palette
+        show_labels: Draw the field name above each box. Default True.
     """
     from docuflow.rendering.renderer import render_page
 
@@ -146,7 +156,7 @@ async def highlight_fields_async(
 
     for page_num, boxes in sorted(by_page.items()):
         img = await render_page(file_path, page_num, dpi=dpi)
-        annotated = _annotate(img, boxes, dpi)
+        annotated = _annotate(img, boxes, dpi, show_labels=show_labels)
         dest = out / f"{stem}_page_{page_num}_highlighted.{format}"
         annotated.save(str(dest), format=format.upper())
         saved.append(str(dest))
@@ -162,6 +172,7 @@ def highlight_fields(
     dpi: int = 150,
     format: str = "png",
     color: str | tuple | None = None,
+    show_labels: bool = True,
 ) -> list[str]:
     """Sync version of :func:`highlight_fields_async`. Returns saved file paths.
 
@@ -173,11 +184,12 @@ def highlight_fields(
         dpi: Render resolution (150 = readable, 72 = fast).
         format: Output image format ("png" or "jpeg").
         color: Highlight color — None (yellow), CSS name, RGB/RGBA tuple, or ``"auto"``.
+        show_labels: Draw the field name above each box. Default True.
     """
     return run_sync(
         highlight_fields_async(
             file_path, result,
             output_dir=output_dir, fields=fields,
-            dpi=dpi, format=format, color=color,
+            dpi=dpi, format=format, color=color, show_labels=show_labels,
         )
     )
