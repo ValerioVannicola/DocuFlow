@@ -2,6 +2,10 @@
 
 This file tells AI coding agents everything they need to know to integrate DocuFlow into a project.
 
+For the full user-facing technical library documentation, read the Markdown files under `docs/`.
+Those files are the source of truth for public APIs, selectable parameters, supported options,
+and usage examples. Use this file as the agent integration quick reference.
+
 ## What DocuFlow Does
 
 DocuFlow extracts structured data from documents (PDFs, scans, images) using LLMs. You define a Pydantic schema, point it at a document, and get back validated fields with evidence, confidence scores, and bounding boxes.
