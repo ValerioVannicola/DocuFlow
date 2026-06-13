@@ -51,7 +51,7 @@ Parameters:
 | `schema` | `type[BaseModel]` | Required | Pydantic schema class that defines fields to extract. |
 | `model` | `str` | `"openai/gpt-4o"` | LiteLLM model string. `provider/model` and `provider:model` forms are accepted by the LiteLLM adapter. |
 | `parser` | `str` | `"pdfplumber"` | Parser name. See parser options below. |
-| `storage` | `str | None` | `None` | Storage backend. `None` disables storage; `"local"` stores under `./.docuflow_store`. |
+| `storage` | `str \| None` | `None` | Storage backend. `None` disables storage; `"local"` stores under `./.docuflow_store`. |
 | `privacy` | `Any` | `None` | Usually a `PrivacyPolicy`. When set, parsed text is anonymized before extraction. |
 | `**kwargs` | `Any` | `{}` | Forwarded directly to `DocumentPipeline`. Use for `extraction_type`, `extraction_mode`, `n_instances`, `review_rules`, etc. |
 
