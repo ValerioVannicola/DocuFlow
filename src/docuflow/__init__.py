@@ -86,6 +86,14 @@ def __getattr__(name: str) -> object:
         from docuflow.router import RoutedReport
 
         return RoutedReport
+    if name == "highlight_fields":
+        from docuflow.rendering.highlight import highlight_fields
+
+        return highlight_fields
+    if name == "highlight_fields_async":
+        from docuflow.rendering.highlight import highlight_fields_async
+
+        return highlight_fields_async
     raise AttributeError(f"module 'docuflow' has no attribute {name!r}")
 
 
