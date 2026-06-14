@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/docuflow-logo.png" alt="DocuFlow logo" width="520">
+  <img src="docs/assets/docuflow-logo.png" alt="DocuFlow logo" width="720">
 </p>
 
 # DocuFlow
