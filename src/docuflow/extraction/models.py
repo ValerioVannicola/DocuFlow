@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from docuflow.documents.evidence import Evidence
 from docuflow.documents.models import BoundingBox, PageRect
+from docuflow.observability.traces import Trace
 
 T = TypeVar("T")
 
@@ -209,6 +210,8 @@ class ExtractionResult(BaseModel):
     trace_id: str = ""
     model_name: str = ""
     parser_name: str = ""
+    raw_text: str = ""
+    trace: Trace | None = Field(default=None, exclude=True)
 
     def correct_field(
         self,

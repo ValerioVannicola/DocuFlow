@@ -346,7 +346,11 @@ class DocumentPipeline:
                 result=result,
             )
 
-        return result.state.extraction_result
+        extraction_result = result.state.extraction_result
+        extraction_result.trace = result.trace
+        if result.state.document is not None:
+            extraction_result.raw_text = result.state.document.raw_text
+        return extraction_result
 
     def run_sync(
         self,
