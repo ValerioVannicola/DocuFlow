@@ -117,6 +117,7 @@ These are the most common selectable values across the high-level APIs.
 | Parser | `parser` | `"pdfplumber"`, `"tesseract"`, `"docling"`, `"smart"`, `"azure-di"`, `"textract"`, `"google-docai"`, `"none"`/`None` for direct vision modes. |
 | Extraction type | `extraction_type` | `"text"`, `"vision"`, `"hybrid"`, `"auto"`. |
 | Extraction mode | `extraction_mode` / `mode` | `"single"`, `"multi"`. |
+| Output style | `normalize_output` | `False` preserves exact source text for textual fields; `True` canonicalizes text such as ISO dates. |
 | Storage | `storage` | `None`, `"local"`, `{"type": "local", "path": "..."}`, or a storage object. |
 | Privacy mode | `PrivacyPolicy.mode` | `"redact"`, `"mask"`, `"pseudonymize"`, `"hash"`. |
 | Review status | `ExtractionResult.review_status` | `"pending"`, `"approved"`, `"rejected"`. |

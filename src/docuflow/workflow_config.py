@@ -38,6 +38,7 @@ class WorkflowConfig(BaseModel):
     temperatures: list[float] | None = None
     vision_dpi: int | None = None
     context: str | None = None
+    normalize_output: bool = False
 
     validation: list[dict[str, Any]] = Field(default_factory=list)
     review: list[dict[str, Any]] = Field(default_factory=list)
@@ -168,6 +169,7 @@ class WorkflowConfig(BaseModel):
             "verification": self.verification,
             "schema_shards": self.schema_shards,
             "n_instances": self.n_instances,
+            "normalize_output": self.normalize_output,
             "validators": self.build_validators() or None,
             "review_rules": self.build_review_rules() or None,
         }
@@ -393,6 +395,8 @@ def export_config(
         config["temperatures"] = pipeline._temperatures
     if pipeline._context:
         config["context"] = pipeline._context
+    if getattr(pipeline, "_normalize_output", False):
+        config["normalize_output"] = True
 
     validators = _validators_to_list(pipeline._validators)
     if validators:

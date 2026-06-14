@@ -53,7 +53,7 @@ Parameters:
 | `parser` | `str` | `"pdfplumber"` | Parser name. See parser options below. |
 | `storage` | `str \| None` | `None` | Storage backend. `None` disables storage; `"local"` stores under `./.docuflow_store`. |
 | `privacy` | `Any` | `None` | Usually a `PrivacyPolicy`. When set, parsed text is anonymized before extraction. |
-| `**kwargs` | `Any` | `{}` | Forwarded directly to `DocumentPipeline`. Use for `extraction_type`, `extraction_mode`, `n_instances`, `review_rules`, etc. |
+| `**kwargs` | `Any` | `{}` | Forwarded directly to `DocumentPipeline`. Use for `extraction_type`, `extraction_mode`, `n_instances`, `normalize_output`, `review_rules`, etc. |
 
 Returns: `ExtractionResult`.
 
@@ -122,6 +122,7 @@ DocumentPipeline(
     verification: dict | None = None,
     schema_shards: int | None = None,
     llm_kwargs: dict | None = None,
+    normalize_output: bool = False,
 )
 ```
 
@@ -142,6 +143,7 @@ DocumentPipeline(
 | `temperatures` | `None` | Optional list of temperatures for multi-instance candidates. If omitted, engines choose their defaults. |
 | `vision_dpi` | `DEFAULT_DPI` | DPI for rendering PDF pages when using vision, hybrid, auto escalation, or field verification. |
 | `context` | `None` | Domain instructions appended to extraction prompts, such as policy-number formats or business rules. |
+| `normalize_output` | `False` | When `False`, textual fields preserve the exact source wording by default. Set `True` to ask the model for canonicalized text such as ISO dates. |
 | `escalation` | `None` | Dict configuring auto-mode vision escalation. |
 | `verification` | `None` | Dict enabling zoom-and-verify for weak fields. |
 | `schema_shards` | `None` | Number of text-only schema shards for wide schemas. |
@@ -214,6 +216,8 @@ Related parameters:
 - `temperatures`: optional list of floats. Use to control candidate diversity.
 
 In both modes, DocuFlow does not trust LLM self-reported confidence. It combines agreement, source verification, validation, evidence, and OCR signals when available.
+
+By default, DocuFlow preserves the exact source text for textual fields. If you want normalized textual outputs such as ISO date strings, set `normalize_output=True` on the pipeline or workflow config.
 
 ### LLM Options
 

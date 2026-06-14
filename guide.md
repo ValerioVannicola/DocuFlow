@@ -360,6 +360,7 @@ from docuflow import DocumentPipeline
 pipeline = DocumentPipeline(
     parser="tesseract",
     model="openai/gpt-4o",
+    normalize_output=False,  # default: preserve exact source text
     storage="local",
 )
 
@@ -368,6 +369,8 @@ for pdf in ["inv1.pdf", "inv2.pdf", "inv3.pdf"]:
     result = pipeline.run_sync(pdf, schema=Invoice)
     print(f"{pdf}: {result.data['total']}")
 ```
+
+Set `normalize_output=True` if you want DocuFlow to canonicalize textual values such as ISO dates instead of preserving the exact source wording.
 
 ### Inspecting Results
 

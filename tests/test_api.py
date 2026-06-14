@@ -16,14 +16,17 @@ class TestDocumentPipeline:
         pipeline = DocumentPipeline()
         assert pipeline._model == "openai/gpt-4o"
         assert pipeline._parser == "pdfplumber"
+        assert pipeline._normalize_output is False
 
     def test_init_with_custom(self):
         pipeline = DocumentPipeline(
             parser="pdfplumber",
             model="anthropic:claude-sonnet-4-20250514",
             storage="local",
+            normalize_output=True,
         )
         assert pipeline._model == "anthropic:claude-sonnet-4-20250514"
+        assert pipeline._normalize_output is True
 
     def test_resolve_parser_pdfplumber(self):
         pipeline = DocumentPipeline(parser="pdfplumber")

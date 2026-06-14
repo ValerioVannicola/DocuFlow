@@ -44,6 +44,22 @@ def _build_example_output(schema: type[BaseModel]) -> str:
     return json.dumps({"data": data_example, "evidence": evidence_example}, indent=2)
 
 
+def _output_style_instructions(normalize_output: bool) -> str:
+    if normalize_output:
+        return (
+            "When a field is textual, you may normalize it to a canonical form "
+            "that best fits the schema, such as ISO date strings for dates, "
+            "while keeping the JSON data valid."
+        )
+    return (
+        "Preserve the exact source text for textual fields. Do not convert "
+        "dates to ISO, do not rewrite names or IDs, and do not paraphrase. "
+        "Keep the wording, punctuation, spacing, and casing as they appear "
+        "in the source. For numeric and boolean fields, still return valid "
+        "JSON values of the correct type."
+    )
+
+
 class ExtractionResponse(BaseModel):
     data: dict = Field(default_factory=dict)
     evidence: dict = Field(default_factory=dict)
@@ -133,7 +149,12 @@ JSON_REPAIR_PROMPT = (
 )
 
 
-def _build_system_prompt(base_prompt: str, context: str | None = None) -> str:
+def _build_system_prompt(
+    base_prompt: str,
+    context: str | None = None,
+    normalize_output: bool = False,
+) -> str:
+    base_prompt = f"{base_prompt}\n\nOutput style:\n{_output_style_instructions(normalize_output)}"
     if not context:
         return base_prompt
     return f"{base_prompt}\n\nDomain context:\n{context}"
@@ -144,6 +165,7 @@ def build_extraction_prompt(
     document_text: str,
     page_texts: list[str] | None = None,
     context: str | None = None,
+    normalize_output: bool = False,
 ) -> list[dict]:
     field_desc = _schema_to_field_descriptions(schema)
     json_schema = json.dumps(schema.model_json_schema(), indent=2)
@@ -165,7 +187,9 @@ def build_extraction_prompt(
     )
 
     return [
-        {"role": "system", "content": _build_system_prompt(EXTRACTION_SYSTEM_PROMPT, context)},
+        {"role": "system", "content": _build_system_prompt(
+            EXTRACTION_SYSTEM_PROMPT, context, normalize_output=normalize_output,
+        )},
         {"role": "user", "content": "\n".join(user_content_parts)},
     ]
 
@@ -174,6 +198,7 @@ def build_vision_extraction_prompt(
     schema: type[BaseModel],
     images_base64: list[str],
     context: str | None = None,
+    normalize_output: bool = False,
 ) -> list[dict]:
     field_desc = _schema_to_field_descriptions(schema)
     json_schema_str = json.dumps(schema.model_json_schema(), indent=2)
@@ -199,6 +224,8 @@ def build_vision_extraction_prompt(
         })
 
     return [
-        {"role": "system", "content": _build_system_prompt(VISION_EXTRACTION_SYSTEM_PROMPT, context)},
+        {"role": "system", "content": _build_system_prompt(
+            VISION_EXTRACTION_SYSTEM_PROMPT, context, normalize_output=normalize_output,
+        )},
         {"role": "user", "content": content_parts},
     ]

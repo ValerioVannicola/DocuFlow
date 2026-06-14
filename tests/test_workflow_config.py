@@ -282,6 +282,7 @@ class TestBuildPipeline:
         assert pipeline._extraction_mode == "multi"
         assert pipeline._n_instances == 3
         assert pipeline._context == "You are processing pharmaceutical invoices."
+        assert pipeline._normalize_output is False
         assert len(pipeline._validators) == 2
         assert len(pipeline._review_rules) == 2
 
@@ -312,12 +313,14 @@ class TestExport:
         pipeline = DocumentPipeline(
             parser="smart",
             model="openai/gpt-4o-mini",
+            normalize_output=True,
         )
         config = export_config(pipeline, Invoice, name="invoice", version="1.0")
 
         assert config["name"] == "invoice"
         assert config["parser"] == "smart"
         assert config["model"] == "openai/gpt-4o-mini"
+        assert config["normalize_output"] is True
         assert "supplier" in config["schema"]
         assert "total" in config["schema"]
         assert config["schema"]["supplier"]["type"] == "str"
@@ -454,6 +457,7 @@ class TestRoundtrip:
             parser="tesseract",
             model="openai/gpt-4o",
             validators=[RequiredFields(["store"])],
+            normalize_output=True,
         )
 
         yaml_str = pipeline.export_yaml(Receipt, name="receipt")
@@ -463,6 +467,7 @@ class TestRoundtrip:
         cfg = load_workflow_config(yaml_path)
         assert cfg.name == "receipt"
         assert cfg.parser == "tesseract"
+        assert cfg.normalize_output is True
         assert cfg.build_validators()[0].fields == ["store"]
 
 

@@ -29,6 +29,7 @@ class DocumentPipeline:
         verification: dict | None = None,
         schema_shards: int | None = None,
         llm_kwargs: dict | None = None,
+        normalize_output: bool = False,
     ):
         self._parser = parser
         self._ocr = ocr
@@ -47,6 +48,7 @@ class DocumentPipeline:
         self._verification = verification
         self._schema_shards = schema_shards
         self._llm_kwargs = llm_kwargs or {}
+        self._normalize_output = normalize_output
 
         parser_type = self._parser
         if isinstance(self._parser, dict):
@@ -240,6 +242,7 @@ class DocumentPipeline:
                     temperatures=self._temperatures,
                     dpi=self._vision_dpi,
                     context=self._context,
+                    normalize_output=self._normalize_output,
                 )
             )
         elif self._extraction_type == "hybrid":
@@ -254,6 +257,7 @@ class DocumentPipeline:
                     temperatures=self._temperatures,
                     dpi=self._vision_dpi,
                     context=self._context,
+                    normalize_output=self._normalize_output,
                 )
             )
         elif self._extraction_type == "auto":
@@ -287,6 +291,7 @@ class DocumentPipeline:
                     # Vision sends raw page images to the LLM, bypassing
                     # anonymization — never escalate when privacy is on.
                     allow_escalation=self._privacy is None,
+                    normalize_output=self._normalize_output,
                 )
             )
         else:
@@ -296,7 +301,7 @@ class DocumentPipeline:
                 from docuflow.workflow.steps import Anonymize
 
                 steps.append(Anonymize(policy=self._privacy))
-            steps.append(
+                steps.append(
                 Extract(
                     schema=schema, llm=llm,
                     mode=self._extraction_mode,
@@ -304,6 +309,7 @@ class DocumentPipeline:
                     temperatures=self._temperatures,
                     context=self._context,
                     schema_shards=self._schema_shards,
+                    normalize_output=self._normalize_output,
                 )
             )
 

@@ -722,9 +722,15 @@ async def _run_multi(
 class ExtractionEngine:
     """Text-based extraction. Requires parsed document with text."""
 
-    def __init__(self, llm: LLMAdapter, context: str | None = None):
+    def __init__(
+        self,
+        llm: LLMAdapter,
+        context: str | None = None,
+        normalize_output: bool = False,
+    ):
         self.llm = llm
         self.context = context
+        self.normalize_output = normalize_output
 
     async def extract(
         self,
@@ -764,7 +770,11 @@ class ExtractionEngine:
         llm = _UsageTracker(self.llm)
         page_texts = [p.text for p in document.pages] if document.pages else None
         messages = build_extraction_prompt(
-            schema, document.raw_text, page_texts, context=self.context,
+            schema,
+            document.raw_text,
+            page_texts,
+            context=self.context,
+            normalize_output=self.normalize_output,
         )
 
         if mode == "multi":
@@ -805,10 +815,17 @@ class VisionExtractionEngine:
     evidence grounding without requiring a separate Parse step.
     """
 
-    def __init__(self, llm: LLMAdapter, dpi: int = DEFAULT_DPI, context: str | None = None):
+    def __init__(
+        self,
+        llm: LLMAdapter,
+        dpi: int = DEFAULT_DPI,
+        context: str | None = None,
+        normalize_output: bool = False,
+    ):
         self.llm = llm
         self.dpi = dpi
         self.context = context
+        self.normalize_output = normalize_output
 
     async def _render_pages(self, file_path: str) -> list:
         from docuflow.rendering.renderer import render_all_pages
@@ -894,7 +911,12 @@ class VisionExtractionEngine:
                     overlapped_with_llm=True,
                 )
 
-        messages = build_vision_extraction_prompt(schema, images_b64, context=self.context)
+        messages = build_vision_extraction_prompt(
+            schema,
+            images_b64,
+            context=self.context,
+            normalize_output=self.normalize_output,
+        )
         llm = _UsageTracker(self.llm)
 
         if mode == "multi":
@@ -1006,10 +1028,17 @@ class HybridExtractionEngine:
     - 1 vision decider call that sees page images + all candidates
     """
 
-    def __init__(self, llm: LLMAdapter, dpi: int = DEFAULT_DPI, context: str | None = None):
+    def __init__(
+        self,
+        llm: LLMAdapter,
+        dpi: int = DEFAULT_DPI,
+        context: str | None = None,
+        normalize_output: bool = False,
+    ):
         self.llm = llm
         self.dpi = dpi
         self.context = context
+        self.normalize_output = normalize_output
 
     async def extract(
         self,
@@ -1046,7 +1075,10 @@ class HybridExtractionEngine:
 
         llm = _UsageTracker(self.llm)
         vision_messages = build_vision_extraction_prompt(
-            schema, images_b64, context=self.context,
+            schema,
+            images_b64,
+            context=self.context,
+            normalize_output=self.normalize_output,
         )
 
         # Vision candidates need only the images — launch them immediately
@@ -1079,7 +1111,11 @@ class HybridExtractionEngine:
 
         page_texts = [p.text for p in document.pages] if document.pages else None
         text_messages = build_extraction_prompt(
-            schema, document.raw_text, page_texts, context=self.context,
+            schema,
+            document.raw_text,
+            page_texts,
+            context=self.context,
+            normalize_output=self.normalize_output,
         )
         text_tasks = [_single_llm_call(llm, text_messages, t) for t in temps]
         all_results = await asyncio.gather(*vision_tasks, *text_tasks)

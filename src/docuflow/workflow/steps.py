@@ -134,6 +134,7 @@ class Extract:
         temperatures: list[float] | None = None,
         context: str | None = None,
         schema_shards: int | None = None,
+        normalize_output: bool = False,
     ):
         self._schema = schema
         self.llm = llm
@@ -142,6 +143,7 @@ class Extract:
         self.temperatures = temperatures
         self.context = context
         self.schema_shards = schema_shards
+        self.normalize_output = normalize_output
 
     async def execute(self, state: PipelineState) -> PipelineState:
         if state.document is None:
@@ -157,7 +159,11 @@ class Extract:
 
         from docuflow.extraction.engine import ExtractionEngine
 
-        engine = ExtractionEngine(llm=self.llm, context=self.context)
+        engine = ExtractionEngine(
+            llm=self.llm,
+            context=self.context,
+            normalize_output=self.normalize_output,
+        )
         start = time.monotonic()
         state.extraction_result = await engine.extract(
             state.document, schema, trace=state.trace,
@@ -182,6 +188,7 @@ class ExtractVision:
         temperatures: list[float] | None = None,
         dpi: int = DEFAULT_DPI,
         context: str | None = None,
+        normalize_output: bool = False,
     ):
         self._schema = schema
         self.llm = llm
@@ -190,6 +197,7 @@ class ExtractVision:
         self.temperatures = temperatures
         self.dpi = dpi
         self.context = context
+        self.normalize_output = normalize_output
 
     async def execute(self, state: PipelineState) -> PipelineState:
         if state.document is None:
@@ -214,7 +222,12 @@ class ExtractVision:
 
         from docuflow.extraction.engine import VisionExtractionEngine
 
-        engine = VisionExtractionEngine(llm=self.llm, dpi=self.dpi, context=self.context)
+        engine = VisionExtractionEngine(
+            llm=self.llm,
+            dpi=self.dpi,
+            context=self.context,
+            normalize_output=self.normalize_output,
+        )
         start = time.monotonic()
         state.extraction_result = await engine.extract(
             state.document, schema, trace=state.trace,
@@ -237,6 +250,7 @@ class ExtractHybrid:
         temperatures: list[float] | None = None,
         dpi: int = DEFAULT_DPI,
         context: str | None = None,
+        normalize_output: bool = False,
     ):
         self._schema = schema
         self.llm = llm
@@ -244,6 +258,7 @@ class ExtractHybrid:
         self.temperatures = temperatures
         self.dpi = dpi
         self.context = context
+        self.normalize_output = normalize_output
 
     async def execute(self, state: PipelineState) -> PipelineState:
         if state.document is None:
@@ -268,7 +283,12 @@ class ExtractHybrid:
 
         from docuflow.extraction.engine import HybridExtractionEngine
 
-        engine = HybridExtractionEngine(llm=self.llm, dpi=self.dpi, context=self.context)
+        engine = HybridExtractionEngine(
+            llm=self.llm,
+            dpi=self.dpi,
+            context=self.context,
+            normalize_output=self.normalize_output,
+        )
         start = time.monotonic()
         state.extraction_result = await engine.extract(
             state.document, schema, trace=state.trace,
@@ -306,6 +326,7 @@ class ExtractAuto:
         context: str | None = None,
         policy: Any = None,
         allow_escalation: bool = True,
+        normalize_output: bool = False,
     ):
         self._schema = schema
         self.llm = llm
@@ -316,6 +337,7 @@ class ExtractAuto:
         self.context = context
         self.policy = policy
         self.allow_escalation = allow_escalation
+        self.normalize_output = normalize_output
 
     async def execute(self, state: PipelineState) -> PipelineState:
         if state.document is None:
@@ -350,7 +372,10 @@ class ExtractAuto:
                 from docuflow.extraction.engine import HybridExtractionEngine
 
                 engine = HybridExtractionEngine(
-                    llm=self.llm, dpi=self.dpi, context=self.context,
+                    llm=self.llm,
+                    dpi=self.dpi,
+                    context=self.context,
+                    normalize_output=self.normalize_output,
                 )
                 result = await engine.extract(
                     state.document, schema, trace=state.trace,
@@ -361,7 +386,10 @@ class ExtractAuto:
                 from docuflow.extraction.engine import VisionExtractionEngine
 
                 engine = VisionExtractionEngine(
-                    llm=self.llm, dpi=self.dpi, context=self.context,
+                    llm=self.llm,
+                    dpi=self.dpi,
+                    context=self.context,
+                    normalize_output=self.normalize_output,
                 )
                 result = await engine.extract(
                     state.document, schema, trace=state.trace,
@@ -374,7 +402,11 @@ class ExtractAuto:
         else:
             from docuflow.extraction.engine import ExtractionEngine
 
-            engine = ExtractionEngine(llm=self.llm, context=self.context)
+            engine = ExtractionEngine(
+                llm=self.llm,
+                context=self.context,
+                normalize_output=self.normalize_output,
+            )
             state.extraction_result = await engine.extract(
                 state.document, schema, trace=state.trace,
                 mode=self.mode, n_instances=self.n_instances,

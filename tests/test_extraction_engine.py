@@ -283,3 +283,18 @@ class TestPrompts:
         )
         assert "Page 0" in messages[1]["content"]
         assert "Page 1" in messages[1]["content"]
+
+    def test_build_extraction_prompt_preserves_source_text_by_default(self):
+        from docuflow.extraction.prompts import build_extraction_prompt
+
+        messages = build_extraction_prompt(Invoice, "Test document text")
+        assert "Preserve the exact source text" in messages[0]["content"]
+        assert "Do not convert dates to ISO" in messages[0]["content"]
+
+    def test_build_extraction_prompt_can_normalize_output(self):
+        from docuflow.extraction.prompts import build_extraction_prompt
+
+        messages = build_extraction_prompt(
+            Invoice, "Test document text", normalize_output=True
+        )
+        assert "you may normalize it to a canonical form" in messages[0]["content"]

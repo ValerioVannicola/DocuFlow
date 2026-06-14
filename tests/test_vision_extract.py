@@ -265,3 +265,17 @@ class TestVisionPrompt:
         image_parts = [p for p in user_content if p.get("type") == "image_url"]
         assert len(image_parts) == 2
         assert "base64img1" in image_parts[0]["image_url"]["url"]
+
+    def test_build_vision_prompt_preserves_source_text_by_default(self):
+        from docuflow.extraction.prompts import build_vision_extraction_prompt
+
+        messages = build_vision_extraction_prompt(Invoice, ["base64img1"])
+        assert "Preserve the exact source text" in messages[0]["content"]
+
+    def test_build_vision_prompt_can_normalize_output(self):
+        from docuflow.extraction.prompts import build_vision_extraction_prompt
+
+        messages = build_vision_extraction_prompt(
+            Invoice, ["base64img1"], normalize_output=True
+        )
+        assert "you may normalize it to a canonical form" in messages[0]["content"]

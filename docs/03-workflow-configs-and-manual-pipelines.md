@@ -68,6 +68,7 @@ Model fields:
 | `temperatures` | `list[float] \| None` | `None` | Candidate temperatures for multi extraction. |
 | `vision_dpi` | `int \| None` | `None` | DPI override for rendered page images. |
 | `context` | `str \| None` | `None` | Domain instructions passed into extraction prompts. |
+| `normalize_output` | `bool` | `False` | Preserve the exact source text for textual fields by default. Set `true` to request canonicalized values such as ISO dates. |
 | `validation` | `list[dict]` | `[]` | Validation rules. |
 | `review` | `list[dict]` | `[]` | Review rules. |
 | `privacy` | `dict \| None` | `None` | Privacy policy config. |
@@ -134,6 +135,8 @@ Required/default behavior:
 - `required: false` with no `default` makes the field optional with default `None`.
 - `default` sets the Pydantic default.
 - `description` is passed to Pydantic `Field(description=...)` and the extraction prompt.
+
+By default, textual outputs preserve the exact source wording. If a workflow should canonicalize text values, add `normalize_output: true` to the workflow config.
 
 ### Parser Config
 
