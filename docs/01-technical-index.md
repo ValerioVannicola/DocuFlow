@@ -1,9 +1,9 @@
 # DocuFlow Technical Documentation
 
 This directory is the full user-facing technical documentation for DocuFlow. The root-level
-agent files (`AGENTS.md`, `CLAUDE.md`, `CODEX.md`, and similar integration notes) are quick
-references for AI coding agents; they should point agents back to this `docs/` directory for
-the complete public API, supported options, and examples.
+agent files (`AGENTS.md`, `CLAUDE.md`, and similar integration notes) are quick references
+for AI coding agents; they should point agents back to this `docs/` directory for the complete
+public API, supported options, and examples.
 
 ## Documentation Map
 
