@@ -2,9 +2,8 @@
   <img src="docs/assets/docuflow-logo.png" alt="DocuFlow logo" width="920">
 </p>
 
-# DocuFlow
 
-Extract structured data from documents using LLMs — with evidence, validation, review, and full audit trail.
+# Extract structured data from documents using LLMs — with evidence, validation, review, and full audit trail.
 
 ## Why DocuFlow?
 
