@@ -3,7 +3,7 @@
 </p>
 
 
-# DocuFlow turns unstructured documents into production-ready data. Unlike typical extraction tools that stop at raw JSON, DocuFlow adds evidence, consensus, verification, validation, and auditability so you can trust, review, and ship the result.
+### DocuFlow turns unstructured documents into production-ready data. Unlike typical extraction tools that stop at raw JSON, DocuFlow adds evidence, consensus, verification, validation, and auditability so you can trust, review, and ship the result.
 
 ## Why DocuFlow?
 
