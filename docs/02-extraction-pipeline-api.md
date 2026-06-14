@@ -422,6 +422,19 @@ pipeline.run_sync(
 
 Same parameters and return type as async `run()`.
 
+The returned `ExtractionResult` is the full final document payload, not just the flat
+`data` dict. It includes:
+
+- `document_id`, `schema_name`, `data`, `fields`
+- `confidence`, `ocr`, `usage`
+- `escalated`, `escalation_reason`
+- `needs_review`, `review_status`, `reviewed_by`, `reviewed_at`, `rejection_reason`
+- `review_reasons`, `review_verdicts`, `corrections`, `validation_errors`
+- `trace_id`, `model_name`, `parser_name`, `raw_text`
+
+For the per-field contract, trust model, provenance, and serialization details, see
+`06-results-and-data-models.md`.
+
 ## Practical Recipes
 
 Native PDF:

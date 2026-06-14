@@ -205,6 +205,8 @@ class Strategy(Protocol):
 ```
 
 Use this to package a custom extraction strategy behind one `execute()` method.
+The returned object should be the full `ExtractionResult` contract documented in
+`06-results-and-data-models.md`, including field metadata, review state, and runtime metadata.
 
 ## Local Ingestion
 

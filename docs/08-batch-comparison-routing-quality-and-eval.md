@@ -91,7 +91,7 @@ Fields:
 | `top_review_reasons` | `dict[str, int]` | `{}` | Top review reasons and counts. |
 | `field_names` | `list[str]` | `[]` | Union of field names seen in results, ordered by first appearance. |
 | `documents` | `list[DocumentSummary]` | `[]` | Per-file summaries. |
-| `results` | `list[ExtractionResult]` | `[]` | Successful extraction results. |
+| `results` | `list[ExtractionResult]` | `[]` | Successful extraction results. Each one is the full final result object with fields, evidence, confidence, review state, corrections, provenance metadata, and runtime metadata. |
 
 Methods:
 
@@ -351,7 +351,7 @@ Runs classification and then matching extraction workflow for each document.
 | `classification_reason` | `str` | `""` | Classifier reason. |
 | `success` | `bool` | `False` | Extraction success. |
 | `error` | `str` | `""` | Extraction error. |
-| `result` | `ExtractionResult \| None` | `None` | Extraction result. |
+| `result` | `ExtractionResult \| None` | `None` | Full extraction result for the routed document. |
 
 #### `RoutedReport`
 

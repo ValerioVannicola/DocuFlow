@@ -3,6 +3,10 @@
 This file documents the public data models users interact with after ingestion, parsing,
 extraction, validation, review, correction, search, and storage.
 
+The main contract is `ExtractionResult`. It is the final object users get back from
+high-level APIs, and it carries both the extracted values and the metadata needed to audit
+how those values were produced.
+
 Most models are Pydantic models and can be serialized with:
 
 ```python
@@ -50,6 +54,33 @@ Fields:
 | `trace_id` | `str` | `""` | Trace identifier. |
 | `model_name` | `str` | `""` | Model used for extraction. |
 | `parser_name` | `str` | `""` | Parser used for extraction. |
+| `raw_text` | `str` | `""` | Full extracted document text. |
+| `trace` | `Trace \| None` | `None` | In-memory workflow trace. Excluded from JSON serialization. |
+
+### What the final result gives you
+
+When you inspect the final result, think in layers:
+
+- `result.data` is the simple field-value payload for APIs, CSV, and downstream business logic.
+- `result.fields[...]` is the rich per-field payload. Each field can carry:
+  - `value` and `original_value`
+  - `confidence`
+  - `trust`
+  - `ocr`
+  - `consensus`
+  - `verification`
+  - `evidence`
+  - `validation_status` and `errors`
+- `result.usage` aggregates token usage and cost across extraction, retries, deciders, and reviewers.
+- `result.review_status`, `result.needs_review`, `result.review_reasons`, `result.review_verdicts`,
+  `result.reviewed_by`, `result.reviewed_at`, and `result.rejection_reason` describe human/LLM review state.
+- `result.corrections` records human edits applied after extraction.
+- `result.validation_errors` stores document-level validation problems.
+- `result.escalated` and `result.escalation_reason` explain auto escalation to vision or hybrid modes.
+- `result.trace_id`, `result.trace`, `result.model_name`, `result.parser_name`, and `result.raw_text`
+  capture runtime and provenance metadata.
+
+`trace` is intentionally excluded from `model_dump()` / `model_dump_json()` so serialized results stay portable.
 
 ## Result Methods
 
@@ -487,9 +518,17 @@ available, falling back to names like `col_0`.
 result.data["total"]
 result.fields["total"].value
 result.fields["total"].confidence
+result.fields["total"].trust.score if result.fields["total"].trust else None
+result.fields["total"].ocr.score if result.fields["total"].ocr else None
+result.fields["total"].consensus.agreement if result.fields["total"].consensus else None
+result.fields["total"].verification.verified if result.fields["total"].verification else None
 result.fields["total"].evidence[0].text
 result.fields["total"].evidence[0].bbox
 result.usage.total_tokens if result.usage else None
+result.review_status
+result.review_reasons
+result.corrections
+result.raw_text[:200]
 result.provenance("total")["total"]
 ```
 

@@ -457,6 +457,15 @@ pipeline_result = pipeline.run_sync()
 result = pipeline_result.state.extraction_result
 ```
 
+`result` is the same full `ExtractionResult` returned by `extract()` and `DocumentPipeline`.
+Use it for:
+
+- `result.data` for flat extracted values
+- `result.fields[...]` for confidence, evidence, trust, OCR, consensus, verification, and validation
+- `result.usage`, `result.review_status`, `result.review_reasons`, `result.review_verdicts`
+- `result.corrections`, `result.validation_errors`, `result.escalated`, `result.raw_text`
+- `result.provenance(field_name)` for audit-style field history
+
 ## `Pipeline`
 
 Import:

@@ -17,7 +17,7 @@ the complete public API, supported options, and examples.
 - `05-parsers-ocr-rendering-and-search.md` — parser choices and constructor options, OCR behavior,
   coordinate conventions, screenshots, field highlights, text search, and text location.
 - `06-results-and-data-models.md` — `ExtractionResult`, fields, evidence, confidence, trust,
-  provenance, document/page/block/table models, and token usage.
+  review/validation metadata, provenance, document/page/block/table models, and token usage.
 - `07-validation-review-privacy-and-storage.md` — validators, review rules, LLM reviewers, privacy
   policy/anonymization, mapping stores, and local document storage.
 - `08-batch-comparison-routing-quality-and-eval.md` — batch processing, document comparison, workflow
@@ -121,6 +121,7 @@ These are the most common selectable values across the high-level APIs.
 | Storage | `storage` | `None`, `"local"`, `{"type": "local", "path": "..."}`, or a storage object. |
 | Privacy mode | `PrivacyPolicy.mode` | `"redact"`, `"mask"`, `"pseudonymize"`, `"hash"`. |
 | Review status | `ExtractionResult.review_status` | `"pending"`, `"approved"`, `"rejected"`. |
+| Final result metadata | `ExtractionResult` | `data`, `fields`, `usage`, `ocr`, `escalated`, `review_*`, `validation_errors`, `trace_id`, `model_name`, `parser_name`, `raw_text`, and more. |
 | Local store query status | `LocalDocumentStore.get_by_status()` | `"pending_review"`, `"approved"`, `"rejected"`, `"pending"`. |
 | Highlight color | `highlight_fields(color=...)` | `None`, `"auto"`, CSS color string, RGB tuple, RGBA tuple. |
 | Screenshot/highlight format | `format` | Usually `"png"` or `"jpeg"`, depending on Pillow support. |

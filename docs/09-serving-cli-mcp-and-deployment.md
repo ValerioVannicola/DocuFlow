@@ -94,7 +94,9 @@ Behavior:
 - Runs synchronous extraction.
 - Deletes the temporary file.
 - Runs `quality_report(result)`.
-- Returns full extraction result JSON plus:
+- Returns the full final `ExtractionResult` JSON, including `data`, `fields`, `confidence`,
+  `ocr`, `usage`, `escalated`, `review_status`, `validation_errors`, `corrections`,
+  `trace_id`, `model_name`, `parser_name`, and `raw_text`, plus:
   - `quality_score`
   - `quality_ok`
 
@@ -414,7 +416,7 @@ extract_document(
 ) -> str
 ```
 
-Returns extraction result JSON.
+Returns the full extraction result JSON payload described in `06-results-and-data-models.md`.
 
 ### `extract_with_vision`
 
@@ -429,7 +431,8 @@ extract_with_vision(
 ) -> str
 ```
 
-Uses `DocumentPipeline(parser=None, extraction_type="vision")`.
+Uses `DocumentPipeline(parser=None, extraction_type="vision")` and returns the same full final
+result payload.
 
 ### `discover_schema`
 
@@ -475,6 +478,8 @@ process_batch(
 ```
 
 Returns summary JSON with totals, average confidence, review reasons, and document summaries.
+Each successful document summary can be correlated with the full `ExtractionResult` stored in
+`result` when using the Python API or retrieved later with `get_extraction_result()`.
 
 ### `list_templates`
 
@@ -522,7 +527,7 @@ get_extraction_result(
 ) -> str
 ```
 
-Returns stored extraction result JSON or an error JSON object.
+Returns stored full extraction result JSON or an error JSON object.
 
 ### `correct_field`
 

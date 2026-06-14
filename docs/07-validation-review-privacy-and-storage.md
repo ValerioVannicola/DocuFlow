@@ -185,8 +185,13 @@ Review updates:
 
 ```python
 result.needs_review
+result.review_status
 result.review_reasons
 result.review_verdicts
+result.reviewed_by
+result.reviewed_at
+result.rejection_reason
+result.corrections
 ```
 
 ## Review Rule Protocol
