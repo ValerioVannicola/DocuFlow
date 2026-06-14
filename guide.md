@@ -970,6 +970,27 @@ After parsing, the extraction engine sends the document content to an LLM and ge
 
 DocuFlow has 3 extraction types, each using a different approach to read the document.
 
+### Choosing the right PDF strategy
+
+Pick the simplest strategy that matches the document quality, then add more machinery only when the input justifies it:
+
+- **Digital PDFs with clean text**: use `parser="pdfplumber"` and `extraction_type="text"`. This is the fastest and usually the most accurate when the text layer is reliable.
+- **Scanned PDFs or image-heavy pages**: use `parser="tesseract"` or a cloud OCR parser. OCR gives you confidence scores and works when there is no text layer.
+- **Mixed document streams**: use `parser="smart"`. It reads native text where possible and falls back to OCR only on pages that need it.
+- **Visually complex documents**: use `parser=None` with `extraction_type="vision"`. The model reads page images directly and can interpret layout, stamps, tables, and visual context.
+- **Very ambiguous or high-value documents**: use `extraction_type="hybrid"` to combine text and vision candidates, then let a decider choose the strongest field values.
+- **Variable-quality batches**: use `extraction_type="auto"` with `parser="smart"`. Start cheap and escalate to vision only when OCR quality is poor.
+- **Important documents**: add `extraction_mode="multi"` so independent candidates can agree or disagree before a final answer is accepted.
+- **Weak fields**: enable `verification` so low-confidence values get a zoomed re-read instead of relying on the original extraction alone.
+
+Rule of thumb:
+
+- clean digital PDF -> `pdfplumber`
+- scanned PDF -> `tesseract` or cloud OCR
+- mixed batch -> `smart`
+- complex layout -> `vision` or `hybrid`
+- highest accuracy -> `multi` + `verification`
+
 #### Text Extraction (`extraction_type="text"`)
 
 The parser produces text → the LLM reads that text. This is the default.
