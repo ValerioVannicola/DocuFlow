@@ -52,7 +52,7 @@ DocuFlow is a Python library that extracts structured data from business documen
 
 - **Extracted values** matching your schema
 - **Evidence** linking each value to its source text, page number, and bounding box
-- **Two confidence scores** — OCR confidence (did we read the page correctly?) and LLM consensus (did independent runs interpret it the same way?) — never the LLM's self-reported confidence
+- **Two confidence scores** — OCR confidence (did we read the page correctly?) and LLM consensus (did independent runs interpret it the same way?) 
 - **Validation results** against your business rules
 - **Review verdicts** from configurable rules and LLM-powered reviewers
 - **Full audit trail** of corrections, approvals, and processing history
