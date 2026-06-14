@@ -2,7 +2,7 @@
   <img src="docs/assets/docuflow-logo.png" alt="DocuFlow logo" width="920">
 </p>
 
-# DocuFlow — Complete User Guide
+# Complete User Guide
 
 > This guide is the practical user guide. The deeper technical library documentation,
 > including public APIs, parameters, selectable options, data models, deployment,
