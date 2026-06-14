@@ -38,6 +38,8 @@ Fields:
 | `data` | `dict` | `{}` | Plain extracted values keyed by field name. |
 | `fields` | `dict[str, ExtractedField]` | `{}` | Full field objects with value, confidence, evidence, trust, and validation. |
 | `confidence` | `float` | `0.0` | Overall extraction confidence/trust score. |
+| `confidence_score` | `float \| None` | `None` | OCR-based confidence score for the final result. Prefers `result.ocr.score`, then falls back to the mean of available field OCR scores. |
+| `consensus_score` | `float \| None` | `None` | Multi-instance consensus score for the final result. Average of available field agreement ratios. |
 | `ocr` | `OCRDocumentConfidence \| None` | `None` | Document-level OCR confidence when OCR ran. |
 | `usage` | `TokenUsage \| None` | `None` | Aggregated LLM token usage and cost. |
 | `escalated` | `bool` | `False` | True when auto mode escalated to vision/hybrid. |
@@ -72,6 +74,8 @@ When you inspect the final result, think in layers:
   - `evidence`
   - `validation_status` and `errors`
 - `result.usage` aggregates token usage and cost across extraction, retries, deciders, and reviewers.
+- `result.confidence_score` is the OCR-based score for the final result. It is `None` when OCR is unavailable.
+- `result.consensus_score` is the multi-instance agreement score. It is `None` when no consensus data exists.
 - `result.review_status`, `result.needs_review`, `result.review_reasons`, `result.review_verdicts`,
   `result.reviewed_by`, `result.reviewed_at`, and `result.rejection_reason` describe human/LLM review state.
 - `result.corrections` records human edits applied after extraction.
@@ -518,6 +522,8 @@ available, falling back to names like `col_0`.
 result.data["total"]
 result.fields["total"].value
 result.fields["total"].confidence
+result.confidence_score
+result.consensus_score
 result.fields["total"].trust.score if result.fields["total"].trust else None
 result.fields["total"].ocr.score if result.fields["total"].ocr else None
 result.fields["total"].consensus.agreement if result.fields["total"].consensus else None

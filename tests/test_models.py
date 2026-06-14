@@ -12,7 +12,13 @@ from docuflow.documents.models import (
     DocumentMetadata,
     Page,
 )
-from docuflow.extraction.models import ExtractedField, ExtractionResult
+from docuflow.extraction.models import (
+    ExtractedField,
+    ExtractionResult,
+    FieldConsensus,
+    OCRDocumentConfidence,
+    OCRFieldConfidence,
+)
 from docuflow.observability.traces import TraceEvent, create_trace
 
 
@@ -134,12 +140,35 @@ class TestExtractionResult:
         assert sample_extraction_result.confidence == 0.92
         assert not sample_extraction_result.needs_review
         assert "total" in sample_extraction_result.fields
+        assert sample_extraction_result.confidence_score is None
+        assert sample_extraction_result.consensus_score is None
+
+    def test_confidence_and_consensus_scores(self, sample_document, sample_evidence):
+        result = ExtractionResult(
+            document_id=sample_document.id,
+            schema_name="Invoice",
+            data={"total": 1234.56},
+            fields={
+                "total": ExtractedField(
+                    value=1234.56,
+                    evidence=[sample_evidence],
+                    ocr=OCRFieldConfidence(score=0.88),
+                    consensus=FieldConsensus(agreement_ratio=0.75),
+                ),
+            },
+            ocr=OCRDocumentConfidence(score=0.91),
+        )
+
+        assert result.confidence_score == 0.91
+        assert result.consensus_score == 0.75
 
     def test_json_roundtrip(self, sample_extraction_result):
         data = sample_extraction_result.model_dump_json()
         restored = ExtractionResult.model_validate_json(data)
         assert restored.document_id == sample_extraction_result.document_id
         assert restored.schema_name == sample_extraction_result.schema_name
+        assert "confidence_score" in restored.model_dump()
+        assert "consensus_score" in restored.model_dump()
 
     def test_defaults(self):
         result = ExtractionResult(document_id="doc-1", schema_name="Test")
@@ -147,6 +176,8 @@ class TestExtractionResult:
         assert result.fields == {}
         assert result.confidence == 0.0
         assert not result.needs_review
+        assert result.confidence_score is None
+        assert result.consensus_score is None
 
 
 class TestTrace:

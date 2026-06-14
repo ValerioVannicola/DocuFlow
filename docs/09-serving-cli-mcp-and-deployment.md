@@ -95,7 +95,7 @@ Behavior:
 - Deletes the temporary file.
 - Runs `quality_report(result)`.
 - Returns the full final `ExtractionResult` JSON, including `data`, `fields`, `confidence`,
-  `ocr`, `usage`, `escalated`, `review_status`, `validation_errors`, `corrections`,
+  `confidence_score`, `consensus_score`, `ocr`, `usage`, `escalated`, `review_status`, `validation_errors`, `corrections`,
   `trace_id`, `model_name`, `parser_name`, and `raw_text`, plus:
   - `quality_score`
   - `quality_ok`

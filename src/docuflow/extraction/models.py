@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Generic, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from docuflow.documents.evidence import Evidence
 from docuflow.documents.models import BoundingBox, PageRect
@@ -212,6 +212,46 @@ class ExtractionResult(BaseModel):
     parser_name: str = ""
     raw_text: str = ""
     trace: Trace | None = Field(default=None, exclude=True)
+
+    @computed_field(return_type=float | None)
+    @property
+    def confidence_score(self) -> float | None:
+        """OCR-based confidence score for the final result.
+
+        Prefers the document-level OCR score, and falls back to the mean of
+        available field-level OCR scores when a document-level score is not
+        present. Returns None when OCR did not run or produced no usable
+        confidence values.
+        """
+        if self.ocr is not None and self.ocr.score is not None:
+            return self.ocr.score
+
+        field_scores = [
+            field.ocr.score
+            for field in self.fields.values()
+            if field.ocr is not None and field.ocr.score is not None
+        ]
+        if not field_scores:
+            return None
+        return round(sum(field_scores) / len(field_scores), 4)
+
+    @computed_field(return_type=float | None)
+    @property
+    def consensus_score(self) -> float | None:
+        """Multi-instance consensus score for the final result.
+
+        Returns the average agreement ratio across fields that carry
+        consensus data, or None when the extraction was single-instance or
+        no field consensus data is available.
+        """
+        ratios = [
+            field.consensus.agreement_ratio
+            for field in self.fields.values()
+            if field.consensus is not None
+        ]
+        if not ratios:
+            return None
+        return round(sum(ratios) / len(ratios), 4)
 
     def correct_field(
         self,
