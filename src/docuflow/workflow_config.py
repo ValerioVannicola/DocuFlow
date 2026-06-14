@@ -37,7 +37,6 @@ class WorkflowConfig(BaseModel):
     n_instances: int = 5
     temperatures: list[float] | None = None
     vision_dpi: int | None = None
-    scoring: str = "qualitative"
     context: str | None = None
 
     validation: list[dict[str, Any]] = Field(default_factory=list)
@@ -169,7 +168,6 @@ class WorkflowConfig(BaseModel):
             "verification": self.verification,
             "schema_shards": self.schema_shards,
             "n_instances": self.n_instances,
-            "scoring": self.scoring,
             "validators": self.build_validators() or None,
             "review_rules": self.build_review_rules() or None,
         }
@@ -390,7 +388,6 @@ def export_config(
     if getattr(pipeline, "_schema_shards", None):
         config["schema_shards"] = pipeline._schema_shards
     config["n_instances"] = pipeline._n_instances
-    config["scoring"] = pipeline._scoring
 
     if pipeline._temperatures:
         config["temperatures"] = pipeline._temperatures

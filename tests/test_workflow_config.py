@@ -45,7 +45,6 @@ FULL_YAML = {
     "extraction_type": "text",
     "extraction_mode": "multi",
     "n_instances": 3,
-    "scoring": "quantitative",
     "context": "You are processing pharmaceutical invoices.",
     "validation": [
         {"required_fields": ["supplier_name", "total"]},
@@ -80,7 +79,6 @@ class TestLoadConfig:
         assert cfg.model == "openai/gpt-4o-mini"
         assert cfg.extraction_mode == "multi"
         assert cfg.n_instances == 3
-        assert cfg.scoring == "quantitative"
         assert cfg.context == "You are processing pharmaceutical invoices."
         assert len(cfg.validation) == 2
         assert len(cfg.review) == 2
@@ -283,7 +281,6 @@ class TestBuildPipeline:
         assert pipeline._parser == "smart"
         assert pipeline._extraction_mode == "multi"
         assert pipeline._n_instances == 3
-        assert pipeline._scoring == "quantitative"
         assert pipeline._context == "You are processing pharmaceutical invoices."
         assert len(pipeline._validators) == 2
         assert len(pipeline._review_rules) == 2
@@ -423,7 +420,6 @@ class TestRoundtrip:
             model="openai/gpt-4o-mini",
             extraction_mode="multi",
             n_instances=3,
-            scoring="quantitative",
             context="pharma invoices",
             validators=[RequiredFields(["supplier", "total"])],
             review_rules=[OverallConfidenceBelow(0.8)],

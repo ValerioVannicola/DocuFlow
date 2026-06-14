@@ -118,7 +118,6 @@ DocumentPipeline(
     temperatures: list[float] | None = None,
     vision_dpi: int = DEFAULT_DPI,
     context: str | None = None,
-    scoring: str = "qualitative",
     escalation: dict | None = None,
     verification: dict | None = None,
     schema_shards: int | None = None,
@@ -143,7 +142,6 @@ DocumentPipeline(
 | `temperatures` | `None` | Optional list of temperatures for multi-instance candidates. If omitted, engines choose their defaults. |
 | `vision_dpi` | `DEFAULT_DPI` | DPI for rendering PDF pages when using vision, hybrid, auto escalation, or field verification. |
 | `context` | `None` | Domain instructions appended to extraction prompts, such as policy-number formats or business rules. |
-| `scoring` | `"qualitative"` | `"qualitative"` or `"quantitative"` trust scoring. |
 | `escalation` | `None` | Dict configuring auto-mode vision escalation. |
 | `verification` | `None` | Dict enabling zoom-and-verify for weak fields. |
 | `schema_shards` | `None` | Number of text-only schema shards for wide schemas. |
@@ -214,13 +212,6 @@ Related parameters:
 
 - `n_instances`: number of candidate calls in multi mode.
 - `temperatures`: optional list of floats. Use to control candidate diversity.
-- `scoring`: affects trust score calculation, not the schema.
-
-### Scoring
-
-`scoring="qualitative"` uses binary source verification/auto-accept behavior.
-
-`scoring="quantitative"` asks scoring logic to express confidence/trust as a percentage-like score where supported.
 
 In both modes, DocuFlow does not trust LLM self-reported confidence. It combines agreement, source verification, validation, evidence, and OCR signals when available.
 

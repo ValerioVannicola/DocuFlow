@@ -429,7 +429,6 @@ def _build_result(
     model_name: str,
     trace: Trace | None,
     candidates: list[dict] | None = None,
-    scoring: str = "qualitative",
     n_instances: int = 1,
     usage: TokenUsage | None = None,
 ) -> ExtractionResult:
@@ -516,17 +515,8 @@ def _build_result(
         is_unanimous = agreement_ratio == 1.0 if has_consensus else False
         auto_accept = is_unanimous and found_in_source and is_valid if has_consensus else found_in_source and is_valid
 
-        if scoring == "quantitative":
-            source_bonus = 0.5 if found_in_source else 0.0
-            valid_bonus = 0.1 if is_valid else 0.0
-            if has_consensus:
-                score = round(agreement_ratio * 0.4 + source_bonus + valid_bonus, 4)
-            else:
-                score = round(source_bonus + valid_bonus, 4)
-            confidence = score
-        else:
-            score = 1.0 if auto_accept else 0.0
-            confidence = 1.0 if auto_accept else 0.5 if found_in_source else 0.2
+        score = 1.0 if auto_accept else 0.0
+        confidence = 1.0 if auto_accept else 0.5 if found_in_source else 0.2
 
         explanation_parts: list[str] = []
         if has_consensus:
@@ -534,9 +524,7 @@ def _build_result(
         else:
             explanation_parts.append("Single agent (no consensus)")
         explanation_parts.append(f"Found in source: {found_in_source}")
-        if scoring == "quantitative":
-            explanation_parts.append(f"Score: {score:.0%}")
-        elif auto_accept:
+        if auto_accept:
             explanation_parts.append("Auto-accept: yes")
         else:
             if has_consensus and not is_unanimous:
@@ -630,7 +618,6 @@ async def _run_multi(
     start: float,
     n_instances: int,
     temperatures: list[float] | None,
-    scoring: str = "qualitative",
     pre_build: asyncio.Task | None = None,
 ) -> ExtractionResult:
     import time
@@ -680,7 +667,7 @@ async def _run_multi(
         )
         return _build_result(
             document, schema, parsed, first_model, trace,
-            scoring=scoring, usage=_usage_of(llm),
+            usage=_usage_of(llm),
         )
 
     if _candidates_unanimous(candidates):
@@ -697,7 +684,7 @@ async def _run_multi(
         )
         return _build_result(
             document, schema, parsed, first_model, trace,
-            candidates=candidates, scoring=scoring, n_instances=n_instances,
+            candidates=candidates, n_instances=n_instances,
             usage=_usage_of(llm),
         )
 
@@ -727,7 +714,7 @@ async def _run_multi(
     )
     return _build_result(
         document, schema, decider_parsed, decider_response.model, trace,
-        candidates=candidates, scoring=scoring, n_instances=n_instances,
+        candidates=candidates, n_instances=n_instances,
         usage=_usage_of(llm),
     )
 
@@ -747,7 +734,6 @@ class ExtractionEngine:
         mode: str = "single",
         n_instances: int = 5,
         temperatures: list[float] | None = None,
-        scoring: str = "qualitative",
         shards: int | None = None,
     ) -> ExtractionResult:
         import time
@@ -769,7 +755,6 @@ class ExtractionEngine:
                     self.extract(
                         document, sub, trace=trace, mode=mode,
                         n_instances=n_instances, temperatures=temperatures,
-                        scoring=scoring,
                     )
                     for sub in sub_schemas
                 ))
@@ -786,7 +771,6 @@ class ExtractionEngine:
             return await _run_multi(
                 llm, document, schema, messages, trace, start,
                 n_instances=n_instances, temperatures=temperatures,
-                scoring=scoring,
             )
 
         try:
@@ -809,7 +793,7 @@ class ExtractionEngine:
         )
         return _build_result(
             document, schema, parsed, response.model, trace,
-            scoring=scoring, usage=llm.total(),
+            usage=llm.total(),
         )
 
 
@@ -874,7 +858,6 @@ class VisionExtractionEngine:
         mode: str = "single",
         n_instances: int = 5,
         temperatures: list[float] | None = None,
-        scoring: str = "qualitative",
     ) -> ExtractionResult:
         import time
 
@@ -919,7 +902,7 @@ class VisionExtractionEngine:
                 result = await _run_multi(
                     llm, document, schema, messages, trace, start,
                     n_instances=n_instances, temperatures=temperatures,
-                    scoring=scoring, pre_build=enrich_task,
+                    pre_build=enrich_task,
                 )
             finally:
                 if not enrich_task.done():
@@ -952,7 +935,7 @@ class VisionExtractionEngine:
 
         return _build_result(
             document, schema, parsed, response.model, trace,
-            scoring=scoring, usage=llm.total(),
+            usage=llm.total(),
         )
 
 
@@ -1035,7 +1018,6 @@ class HybridExtractionEngine:
         trace: Trace | None = None,
         n_instances: int = 5,
         temperatures: list[float] | None = None,
-        scoring: str = "qualitative",
     ) -> ExtractionResult:
         import time
 
@@ -1134,7 +1116,7 @@ class HybridExtractionEngine:
             )
             return _build_result(
                 document, schema, parsed, first_model, trace,
-                scoring=scoring, usage=llm.total(),
+                usage=llm.total(),
             )
 
         if _candidates_unanimous(candidates):
@@ -1152,7 +1134,7 @@ class HybridExtractionEngine:
             )
             return _build_result(
                 document, schema, parsed, first_model, trace,
-                candidates=candidates, scoring=scoring,
+                candidates=candidates,
                 n_instances=n_instances * 2, usage=llm.total(),
             )
 
@@ -1185,6 +1167,6 @@ class HybridExtractionEngine:
 
         return _build_result(
             document, schema, decider_parsed, decider_response.model, trace,
-            candidates=candidates, scoring=scoring, n_instances=n_instances * 2,
+            candidates=candidates, n_instances=n_instances * 2,
             usage=llm.total(),
         )

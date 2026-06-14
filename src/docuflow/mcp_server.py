@@ -26,7 +26,6 @@ async def extract_document(
     extraction_mode: str = "single",
     n_instances: int = 5,
     context: str = "",
-    scoring: str = "qualitative",
 ) -> str:
     """Extract structured data from a document using a schema.
 
@@ -38,7 +37,6 @@ async def extract_document(
         extraction_mode: single (1 call) or multi (N calls + decider)
         n_instances: Number of parallel agents for multi mode
         context: Domain context for the LLM (e.g. "You work in insurance")
-        scoring: qualitative (binary skip/review) or quantitative (percentage)
 
     Returns:
         JSON with extracted data, per-field evidence, trust scores, and confidence
@@ -53,7 +51,6 @@ async def extract_document(
         extraction_mode=extraction_mode,
         n_instances=n_instances,
         context=context or None,
-        scoring=scoring,
     )
     result = await pipeline.run(file_path, schema)
     return result.model_dump_json(indent=2)
@@ -66,7 +63,6 @@ async def extract_with_vision(
     model: str = "openai/gpt-4o",
     extraction_mode: str = "single",
     n_instances: int = 5,
-    scoring: str = "qualitative",
 ) -> str:
     """Extract data by sending page images directly to a vision LLM. No parser needed.
 
@@ -78,7 +74,6 @@ async def extract_with_vision(
         model: Vision-capable LLM model
         extraction_mode: single or multi
         n_instances: Number of parallel agents for multi mode
-        scoring: qualitative or quantitative
 
     Returns:
         JSON with extracted data, evidence, and trust scores
@@ -93,7 +88,6 @@ async def extract_with_vision(
         model=model,
         extraction_mode=extraction_mode,
         n_instances=n_instances,
-        scoring=scoring,
     )
     result = await pipeline.run(file_path, schema)
     return result.model_dump_json(indent=2)

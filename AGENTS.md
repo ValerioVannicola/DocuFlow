@@ -664,10 +664,10 @@ field.trust.agreement        # "4/5" (multi mode) or "" (single mode)
 field.trust.agreement_ratio  # 0.8 (multi) or 0.0 (single — no consensus)
 field.trust.found_in_source  # True/False
 field.trust.auto_accept      # True = skip review, False = needs review
-field.trust.score            # quantitative score (0-1)
+field.trust.score            # internal trust score (0-1)
 
-# Scoring parameter: "qualitative" (binary) or "quantitative" (percentage)
-pipeline = DocumentPipeline(scoring="quantitative")
+# Fixed trust behavior. Use result.confidence_score / result.consensus_score for the final result.
+pipeline = DocumentPipeline()
 ```
 
 Single agent: no consensus score, trust based on source verification only.

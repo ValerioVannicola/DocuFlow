@@ -2326,7 +2326,6 @@ docuflow run invoice.yaml invoice.pdf --output result.json
 | `extraction_type` | str | `"text"` | `"text"` \| `"vision"` \| `"hybrid"` \| `"auto"` |
 | `extraction_mode` | str | `"single"` | `"single"` \| `"multi"` |
 | `n_instances` | int | `5` | Parallel instances for multi mode |
-| `scoring` | str | `"qualitative"` | `"qualitative"` \| `"quantitative"` |
 | `escalation` | dict | null | Auto-mode thresholds: `min_ocr_score`, `max_low_confidence_ratio`, `min_chars_per_page`, `escalate_to` |
 | `verification` | dict | null | Zoom-and-verify: `trigger_consensus_below`, `trigger_ocr_below`, `max_fields`, `dpi`, `apply_corrections` |
 | `schema_shards` | int | null | Split wide schemas into K parallel extractions (text only) |

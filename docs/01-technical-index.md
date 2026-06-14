@@ -9,7 +9,7 @@ the complete public API, supported options, and examples.
 
 - `01-technical-index.md` — installation extras, API conventions, and a map of the library.
 - `02-extraction-pipeline-api.md` — `extract()`, `extract_async()`, `DocumentPipeline`, extraction
-  types, extraction modes, scoring, escalation, verification, sharding, and LLM options.
+  types, extraction modes, escalation, verification, sharding, and LLM options.
 - `03-workflow-configs-and-manual-pipelines.md` — YAML workflows, `WorkflowConfig`, `run_workflow()`,
   export helpers, `Pipeline`, and workflow steps.
 - `04-schemas-templates-and-discovery.md` — Pydantic schemas, YAML templates, template registry,
@@ -117,7 +117,6 @@ These are the most common selectable values across the high-level APIs.
 | Parser | `parser` | `"pdfplumber"`, `"tesseract"`, `"docling"`, `"smart"`, `"azure-di"`, `"textract"`, `"google-docai"`, `"none"`/`None` for direct vision modes. |
 | Extraction type | `extraction_type` | `"text"`, `"vision"`, `"hybrid"`, `"auto"`. |
 | Extraction mode | `extraction_mode` / `mode` | `"single"`, `"multi"`. |
-| Scoring | `scoring` | `"qualitative"`, `"quantitative"`. |
 | Storage | `storage` | `None`, `"local"`, `{"type": "local", "path": "..."}`, or a storage object. |
 | Privacy mode | `PrivacyPolicy.mode` | `"redact"`, `"mask"`, `"pseudonymize"`, `"hash"`. |
 | Review status | `ExtractionResult.review_status` | `"pending"`, `"approved"`, `"rejected"`. |

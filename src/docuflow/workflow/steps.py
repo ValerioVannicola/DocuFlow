@@ -133,7 +133,6 @@ class Extract:
         n_instances: int = 5,
         temperatures: list[float] | None = None,
         context: str | None = None,
-        scoring: str = "qualitative",
         schema_shards: int | None = None,
     ):
         self._schema = schema
@@ -142,7 +141,6 @@ class Extract:
         self.n_instances = n_instances
         self.temperatures = temperatures
         self.context = context
-        self.scoring = scoring
         self.schema_shards = schema_shards
 
     async def execute(self, state: PipelineState) -> PipelineState:
@@ -164,7 +162,7 @@ class Extract:
         state.extraction_result = await engine.extract(
             state.document, schema, trace=state.trace,
             mode=self.mode, n_instances=self.n_instances,
-            temperatures=self.temperatures, scoring=self.scoring,
+            temperatures=self.temperatures,
             shards=self.schema_shards,
         )
         duration = (time.monotonic() - start) * 1000
@@ -184,7 +182,6 @@ class ExtractVision:
         temperatures: list[float] | None = None,
         dpi: int = DEFAULT_DPI,
         context: str | None = None,
-        scoring: str = "qualitative",
     ):
         self._schema = schema
         self.llm = llm
@@ -193,7 +190,6 @@ class ExtractVision:
         self.temperatures = temperatures
         self.dpi = dpi
         self.context = context
-        self.scoring = scoring
 
     async def execute(self, state: PipelineState) -> PipelineState:
         if state.document is None:
@@ -223,7 +219,7 @@ class ExtractVision:
         state.extraction_result = await engine.extract(
             state.document, schema, trace=state.trace,
             mode=self.mode, n_instances=self.n_instances,
-            temperatures=self.temperatures, scoring=self.scoring,
+            temperatures=self.temperatures,
         )
         duration = (time.monotonic() - start) * 1000
         state.trace.add_event("extract_vision", step_name=self.name, duration_ms=duration)
@@ -241,7 +237,6 @@ class ExtractHybrid:
         temperatures: list[float] | None = None,
         dpi: int = DEFAULT_DPI,
         context: str | None = None,
-        scoring: str = "qualitative",
     ):
         self._schema = schema
         self.llm = llm
@@ -249,7 +244,6 @@ class ExtractHybrid:
         self.temperatures = temperatures
         self.dpi = dpi
         self.context = context
-        self.scoring = scoring
 
     async def execute(self, state: PipelineState) -> PipelineState:
         if state.document is None:
@@ -279,7 +273,7 @@ class ExtractHybrid:
         state.extraction_result = await engine.extract(
             state.document, schema, trace=state.trace,
             n_instances=self.n_instances,
-            temperatures=self.temperatures, scoring=self.scoring,
+            temperatures=self.temperatures,
         )
         duration = (time.monotonic() - start) * 1000
         state.trace.add_event("extract_hybrid", step_name=self.name, duration_ms=duration)
@@ -310,7 +304,6 @@ class ExtractAuto:
         temperatures: list[float] | None = None,
         dpi: int = DEFAULT_DPI,
         context: str | None = None,
-        scoring: str = "qualitative",
         policy: Any = None,
         allow_escalation: bool = True,
     ):
@@ -321,7 +314,6 @@ class ExtractAuto:
         self.temperatures = temperatures
         self.dpi = dpi
         self.context = context
-        self.scoring = scoring
         self.policy = policy
         self.allow_escalation = allow_escalation
 
@@ -363,7 +355,7 @@ class ExtractAuto:
                 result = await engine.extract(
                     state.document, schema, trace=state.trace,
                     n_instances=self.n_instances,
-                    temperatures=self.temperatures, scoring=self.scoring,
+                    temperatures=self.temperatures,
                 )
             else:
                 from docuflow.extraction.engine import VisionExtractionEngine
@@ -374,7 +366,7 @@ class ExtractAuto:
                 result = await engine.extract(
                     state.document, schema, trace=state.trace,
                     mode=self.mode, n_instances=self.n_instances,
-                    temperatures=self.temperatures, scoring=self.scoring,
+                    temperatures=self.temperatures,
                 )
             result.escalated = True
             result.escalation_reason = reason
@@ -386,7 +378,7 @@ class ExtractAuto:
             state.extraction_result = await engine.extract(
                 state.document, schema, trace=state.trace,
                 mode=self.mode, n_instances=self.n_instances,
-                temperatures=self.temperatures, scoring=self.scoring,
+                temperatures=self.temperatures,
             )
 
         duration = (time.monotonic() - start) * 1000

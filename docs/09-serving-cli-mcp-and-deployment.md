@@ -412,7 +412,6 @@ extract_document(
     extraction_mode: str = "single",
     n_instances: int = 5,
     context: str = "",
-    scoring: str = "qualitative",
 ) -> str
 ```
 
@@ -427,7 +426,6 @@ extract_with_vision(
     model: str = "openai/gpt-4o",
     extraction_mode: str = "single",
     n_instances: int = 5,
-    scoring: str = "qualitative",
 ) -> str
 ```
 

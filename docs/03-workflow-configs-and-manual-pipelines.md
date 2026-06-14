@@ -67,7 +67,6 @@ Model fields:
 | `n_instances` | `int` | `5` | Candidate count for multi extraction. |
 | `temperatures` | `list[float] \| None` | `None` | Candidate temperatures for multi extraction. |
 | `vision_dpi` | `int \| None` | `None` | DPI override for rendered page images. |
-| `scoring` | `str` | `"qualitative"` | `"qualitative"` or `"quantitative"`. |
 | `context` | `str \| None` | `None` | Domain instructions passed into extraction prompts. |
 | `validation` | `list[dict]` | `[]` | Validation rules. |
 | `review` | `list[dict]` | `[]` | Review rules. |
@@ -432,7 +431,7 @@ Export coverage:
 - Schema scalar fields.
 - Parser strings/configs where recognized.
 - Model, extraction type/mode, escalation, verification, sharding.
-- `n_instances`, `temperatures`, `context`, `scoring`.
+- `n_instances`, `temperatures`, `context`.
 - `RequiredFields`, `EvidenceRequired`.
 - Built-in review rules except LLM reviewers.
 - LLM kwargs and local storage config.
@@ -574,7 +573,6 @@ Extract(
     n_instances: int = 5,
     temperatures: list[float] | None = None,
     context: str | None = None,
-    scoring: str = "qualitative",
     schema_shards: int | None = None,
 )
 ```
@@ -587,7 +585,6 @@ Extract(
 | `n_instances` | Number of candidate calls in multi mode. |
 | `temperatures` | Candidate temperatures. |
 | `context` | Domain instructions. |
-| `scoring` | `"qualitative"` or `"quantitative"`. |
 | `schema_shards` | Number of schema shards for text extraction. |
 
 Requires a parsed document.
@@ -603,7 +600,6 @@ ExtractVision(
     temperatures: list[float] | None = None,
     dpi: int = DEFAULT_DPI,
     context: str | None = None,
-    scoring: str = "qualitative",
 )
 ```
 
@@ -619,7 +615,6 @@ ExtractHybrid(
     temperatures: list[float] | None = None,
     dpi: int = DEFAULT_DPI,
     context: str | None = None,
-    scoring: str = "qualitative",
 )
 ```
 
@@ -636,7 +631,6 @@ ExtractAuto(
     temperatures: list[float] | None = None,
     dpi: int = DEFAULT_DPI,
     context: str | None = None,
-    scoring: str = "qualitative",
     policy: Any = None,
     allow_escalation: bool = True,
 )

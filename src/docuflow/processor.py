@@ -25,7 +25,6 @@ class DocumentPipeline:
         temperatures: list[float] | None = None,
         vision_dpi: int = DEFAULT_DPI,
         context: str | None = None,
-        scoring: str = "qualitative",
         escalation: dict | None = None,
         verification: dict | None = None,
         schema_shards: int | None = None,
@@ -44,7 +43,6 @@ class DocumentPipeline:
         self._temperatures = temperatures
         self._vision_dpi = vision_dpi
         self._context = context
-        self._scoring = scoring
         self._escalation = escalation
         self._verification = verification
         self._schema_shards = schema_shards
@@ -242,7 +240,6 @@ class DocumentPipeline:
                     temperatures=self._temperatures,
                     dpi=self._vision_dpi,
                     context=self._context,
-                    scoring=self._scoring,
                 )
             )
         elif self._extraction_type == "hybrid":
@@ -257,7 +254,6 @@ class DocumentPipeline:
                     temperatures=self._temperatures,
                     dpi=self._vision_dpi,
                     context=self._context,
-                    scoring=self._scoring,
                 )
             )
         elif self._extraction_type == "auto":
@@ -287,7 +283,6 @@ class DocumentPipeline:
                     temperatures=self._temperatures,
                     dpi=self._vision_dpi,
                     context=self._context,
-                    scoring=self._scoring,
                     policy=EscalationPolicy(**(self._escalation or {})),
                     # Vision sends raw page images to the LLM, bypassing
                     # anonymization — never escalate when privacy is on.
@@ -308,7 +303,6 @@ class DocumentPipeline:
                     n_instances=self._n_instances,
                     temperatures=self._temperatures,
                     context=self._context,
-                    scoring=self._scoring,
                     schema_shards=self._schema_shards,
                 )
             )
