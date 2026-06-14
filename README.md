@@ -3,13 +3,13 @@
 </p>
 
 
-# Extract structured data from documents using LLMs — with evidence, validation, review, and full audit trail.
+# DocuFlow turns unstructured documents into production-ready data. Unlike typical extraction tools that stop at raw JSON, DocuFlow adds evidence, consensus, verification, validation, and auditability so you can trust, review, and ship the result.
 
 ## Why DocuFlow?
 
-Most document extraction tools focus on one part of the problem: parsing a PDF, running OCR, or calling an LLM. In real workflows, that is rarely enough. Teams also need schemas, evidence, confidence scores, validation, privacy controls, review steps, corrections, storage, and an audit trail they can trust.
+Most document extraction tools focus on one part of the problem: parsing a PDF, running OCR, or calling an LLM. In real workflows, that is rarely enough. Teams also need schemas, evidence, trust signals, validation, privacy controls, review steps, corrections, storage, and an audit trail they can rely on.
 
-DocuFlow was built as a workflow runtime for document extraction. It lets you combine parsers, OCR, LLMs, validation rules, review logic, and deployment options into one reproducible pipeline, so extracted data can move from messy documents into production systems with traceability and control.
+DocuFlow is a workflow runtime for document extraction. It combines parsers, OCR, LLMs, validation rules, review logic, consensus, verification, and deployment options into one reproducible pipeline, so extracted data can move from messy documents into production systems with traceability and control.
 
 ## Installation
 

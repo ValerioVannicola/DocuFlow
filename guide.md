@@ -8,7 +8,7 @@
 > including public APIs, parameters, selectable options, data models, deployment,
 > extension points, and error handling, lives under [`docs/`](docs/).
 
-> Extract structured data from documents using LLMs — with evidence, validation, review, and full audit trail.
+> DocuFlow turns unstructured documents into production-ready data. Unlike typical extraction tools that stop at raw JSON, DocuFlow adds evidence, consensus, verification, validation, and auditability so you can trust, review, and ship the result.
 
 ---
 
