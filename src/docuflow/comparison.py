@@ -15,7 +15,7 @@ class ComparisonCell(BaseModel):
     document_id: str
     file_name: str
     value: Any = None
-    confidence: float = 0.0
+    trust_gate: bool = False
     evidence: list[Evidence] = Field(default_factory=list)
 
 
@@ -106,7 +106,7 @@ async def compare_documents(
                     document_id=r.document_id,
                     file_name=file_name,
                     value=field.value,
-                    confidence=field.confidence,
+                    trust_gate=field.trust.trust_gate if field.trust else False,
                     evidence=field.evidence,
                 ))
             else:

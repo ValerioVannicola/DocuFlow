@@ -16,7 +16,7 @@ the complete public API, supported options, and examples.
   and LLM schema discovery.
 - `05-parsers-ocr-rendering-and-search.md` — parser choices and constructor options, OCR behavior,
   coordinate conventions, screenshots, field highlights, text search, and text location.
-- `06-results-and-data-models.md` — `ExtractionResult`, fields, evidence, confidence, trust,
+- `06-results-and-data-models.md` — `ExtractionResult`, fields, evidence, trust gate, trust,
   review/validation metadata, provenance, document/page/block/table models, and token usage.
 - `07-validation-review-privacy-and-storage.md` — validators, review rules, LLM reviewers, privacy
   policy/anonymization, mapping stores, and local document storage.

@@ -513,10 +513,7 @@ def _build_result(
             agreement_ratio = 0.0
 
         is_unanimous = agreement_ratio == 1.0 if has_consensus else False
-        auto_accept = is_unanimous and found_in_source and is_valid if has_consensus else found_in_source and is_valid
-
-        score = 1.0 if auto_accept else 0.0
-        confidence = 1.0 if auto_accept else 0.5 if found_in_source else 0.2
+        trust_gate = is_unanimous and found_in_source and is_valid if has_consensus else found_in_source and is_valid
 
         explanation_parts: list[str] = []
         if has_consensus:
@@ -524,7 +521,7 @@ def _build_result(
         else:
             explanation_parts.append("Single agent (no consensus)")
         explanation_parts.append(f"Found in source: {found_in_source}")
-        if auto_accept:
+        if trust_gate:
             explanation_parts.append("Auto-accept: yes")
         else:
             if has_consensus and not is_unanimous:
@@ -537,14 +534,12 @@ def _build_result(
             agreement_ratio=agreement_ratio,
             found_in_source=found_in_source,
             valid=is_valid,
-            auto_accept=auto_accept,
-            score=score,
+            trust_gate=trust_gate,
             explanation="; ".join(explanation_parts),
         )
 
         fields[field_name] = ExtractedField(
             value=value,
-            confidence=confidence,
             trust=trust,
             ocr=field_ocr,
             consensus=field_consensus,
@@ -553,7 +548,8 @@ def _build_result(
         )
 
     overall_conf = (
-        sum(f.confidence for f in fields.values()) / len(fields) if fields else 0.0
+        sum(1.0 if (f.trust.trust_gate if f.trust else False) else 0.0 for f in fields.values()) / len(fields)
+        if fields else 0.0
     )
 
     return ExtractionResult(

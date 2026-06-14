@@ -6,7 +6,7 @@ import json
 from unittest.mock import AsyncMock
 
 from docuflow.batch import BatchReport, process_batch
-from docuflow.extraction.models import ExtractedField, ExtractionResult
+from docuflow.extraction.models import ExtractedField, ExtractionResult, FieldTrust
 
 
 def _make_result(
@@ -18,8 +18,8 @@ def _make_result(
         schema_name="Invoice",
         data={"supplier_name": supplier, "total": total},
         fields={
-            "supplier_name": ExtractedField(value=supplier, confidence=conf),
-            "total": ExtractedField(value=total, confidence=conf),
+            "supplier_name": ExtractedField(value=supplier, trust=FieldTrust(found_in_source=True, trust_gate=True)),
+            "total": ExtractedField(value=total, trust=FieldTrust(found_in_source=True, trust_gate=True)),
         },
         confidence=conf,
         needs_review=needs_review,

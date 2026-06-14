@@ -12,10 +12,9 @@ from docuflow.extraction.models import ExtractionResult
 
 
 class FieldQuality(BaseModel):
-    confidence: float = 0.0
     found_in_source: bool = False
     has_evidence: bool = False
-    auto_accept: bool = False
+    trust_gate: bool = False
     corrected: bool = False
     missing: bool = False
     warning: str = ""
@@ -67,17 +66,17 @@ def _single_report(result: ExtractionResult, threshold: float) -> QualityReport:
         trust = field.trust
         found = trust.found_in_source if trust else False
         has_ev = len(field.evidence) > 0
-        auto = trust.auto_accept if trust else False
+        gate = trust.trust_gate if trust else False
 
         if found:
             grounded += 1
         if has_ev:
             evidenced += 1
-        if auto:
+        if gate:
             accepted += 1
         if field.corrected:
             corrected += 1
-        conf_sum += field.confidence
+        conf_sum += 1.0 if gate else 0.0
 
         warning = ""
         if not has_ev:
@@ -86,11 +85,11 @@ def _single_report(result: ExtractionResult, threshold: float) -> QualityReport:
         elif not found:
             warning = "value not found in source text"
             warnings.append(f"Field '{fname}': value not found in source text")
-        elif not auto and trust:
+        elif not gate and trust:
             if trust.agreement and trust.agreement_ratio < 1.0 and trust.agreement_ratio > 0.0:
                 warning = "agent disagreement"
                 warnings.append(f"Field '{fname}': not auto-accepted (agent disagreement)")
-            elif not auto:
+            elif not gate:
                 warning = "needs review"
                 warnings.append(f"Field '{fname}': not auto-accepted")
 
@@ -98,10 +97,9 @@ def _single_report(result: ExtractionResult, threshold: float) -> QualityReport:
             warnings.append(f"Field '{fname}': human-corrected")
 
         fq = FieldQuality(
-            confidence=field.confidence,
             found_in_source=found,
             has_evidence=has_ev,
-            auto_accept=auto,
+            trust_gate=gate,
             corrected=field.corrected,
             warning=warning,
         )
@@ -109,8 +107,7 @@ def _single_report(result: ExtractionResult, threshold: float) -> QualityReport:
         field_scores[fname] = (
             (0.3 * (1.0 if has_ev else 0.0))
             + (0.3 * (1.0 if found else 0.0))
-            + (0.2 * field.confidence)
-            + (0.2 * (1.0 if auto else 0.0))
+            + (0.4 * (1.0 if gate else 0.0))
         )
 
     completeness_rate = present / n
@@ -184,8 +181,7 @@ def quality_report(
             fs = (
                 0.3 * (1.0 if fq.has_evidence else 0.0)
                 + 0.3 * (1.0 if fq.found_in_source else 0.0)
-                + 0.2 * fq.confidence
-                + 0.2 * (1.0 if fq.auto_accept else 0.0)
+                + 0.4 * (1.0 if fq.trust_gate else 0.0)
             )
             field_score_sums[fname].append(fs)
 

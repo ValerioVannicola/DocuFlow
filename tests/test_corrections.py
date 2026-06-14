@@ -8,6 +8,7 @@ from docuflow.documents.evidence import Evidence
 from docuflow.extraction.models import (
     ExtractedField,
     ExtractionResult,
+    FieldTrust,
 )
 
 
@@ -18,11 +19,11 @@ def _make_result() -> ExtractionResult:
         data={"supplier_name": "Acme Corp", "total": 1234.56},
         fields={
             "supplier_name": ExtractedField(
-                value="Acme Corp", confidence=0.9,
+                value="Acme Corp", trust=FieldTrust(found_in_source=True, trust_gate=True),
                 evidence=[Evidence(document_id="d", page_number=0, text="Acme Corp")],
             ),
             "total": ExtractedField(
-                value=1234.56, confidence=0.8,
+                value=1234.56, trust=FieldTrust(found_in_source=True, trust_gate=True),
                 evidence=[Evidence(document_id="d", page_number=0, text="1234.56")],
             ),
         },

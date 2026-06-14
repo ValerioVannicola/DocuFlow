@@ -178,10 +178,10 @@ This is where the LLM reads the document and produces structured data. The extra
 
 5. **Grounds the evidence**. For each field, `attach_evidence()` searches ALL pages for the LLM's quoted text (not trusting the LLM's reported page number). If the text matches a block, the evidence gets that block's bounding box and confidence. If found in page text but not a specific block, it gets the page number without a bbox.
 
-6. **Computes trust scores**:
+6. **Computes trust gates**:
    - In **single mode**: trust is based on whether the value was found in the source text
    - In **multi mode**: N parallel LLM calls run at different temperatures. A decider LLM reviews all candidates and picks the best value per field. Trust is based on how many agents agreed (consensus) plus source verification
-   - `auto_accept = True` only when all agents agree AND the value exists in the source text
+   - `trust_gate = True` only when all agents agree AND the value exists in the source text
 
 7. **Returns an `ExtractionResult`** with the extracted data, per-field details (value, trust, evidence, validation status), and overall confidence.
 
@@ -384,10 +384,10 @@ print(result.data)
 for name, field in result.fields.items():
     print(f"\n{name}:")
     print(f"  Value: {field.value}")
-    print(f"  Confidence: {field.confidence:.2f}")
+    print(f"  Trust gate: {field.trust_gate}")
     if field.trust:
         print(f"  Trust: {field.trust.agreement} agreed, found_in_source={field.trust.found_in_source}")
-        print(f"  Auto-accept: {field.trust.auto_accept}")
+        print(f"  Gate: {field.trust.trust_gate}")
     print(f"  Validation: {field.validation_status}")
     for ev in field.evidence:
         print(f"  Evidence: page {ev.page_number}, text={ev.text!r}")
@@ -512,8 +512,8 @@ The complete output of the extraction pipeline. Contains the extracted data, per
 
 Key fields:
 - `data` — extracted values as a dict
-- `fields` — dict of `ExtractedField` objects with confidence, evidence, validation status
-- `confidence` — overall confidence (average of field confidences)
+- `fields` — dict of `ExtractedField` objects with trust gate, evidence, validation status
+- `confidence` — overall acceptance ratio (average of field trust gates)
 - `ocr` — document-level OCR confidence (`None` when no OCR ran)
 - `usage` — aggregated LLM token usage and cost (`None` when not reported)
 - `needs_review` — True if any review rule flagged this document
@@ -1115,10 +1115,9 @@ f.verification.original_value  # always preserved when changed
 
 Outcomes:
 
-- **Confirmed** (`agrees=True`): the zoomed re-read matches → field confidence rises to ≥ 0.9.
+- **Confirmed** (`agrees=True`): the zoomed re-read matches → the field trust gate is opened and the value may be accepted.
 - **Corrected** (`changed=True`): the re-read differs *and* the new value passes schema
-  validation → value replaced, original preserved, confidence capped at 0.6 so review
-  rules still see it.
+  validation → value replaced, original preserved, and the trust gate stays aligned with the verified value.
 - **Rejected**: a correction that fails schema validation is recorded but never applied.
 - **Unreadable**: the model couldn't read the region → field untouched, `verified=False`.
 
@@ -1260,24 +1259,26 @@ majority here, look closely."
 | vision (no parser) | Yes (internal OCR enrichment) | Per mode |
 | hybrid (no parser) | Yes (internal OCR enrichment) | Yes (always multi) |
 
-### Legacy Trust Object
+### Trust Gate
 
-The earlier `trust` object remains for backward compatibility — a near-binary
-accept/review decision combining agreement with **source verification** (does the
-extracted value exist in the document text at all — the hallucination check). Every field gets a `trust` object:
+The field-level `trust` object carries the accept/review decision combining agreement
+with **source verification** (does the extracted value exist in the document text at
+all — the hallucination check). Every field gets a `trust` object and a direct boolean
+`trust_gate` convenience property:
 
 ```python
 field = result.fields["total"]
 field.trust.agreement        # "3/3" — all runs agreed
 field.trust.found_in_source  # True — value exists in document text
 field.trust.valid            # True — passes basic checks
-field.trust.auto_accept      # True — safe to skip review
+field.trust.trust_gate       # True — safe to skip review
+field.trust_gate             # same boolean gate on the field itself
 field.trust.explanation      # "Agreement: 3/3; Found in source: True; Auto-accept: yes"
 ```
 
 **The decision is nearly binary:**
-- **Auto-accept** (`trust.auto_accept = True`): all runs agree AND value found in source AND valid → skip review
-- **Needs review** (`trust.auto_accept = False`): anything else → human should look
+- **Passes trust gate** (`trust_gate = True`): all runs agree AND value found in source AND valid → skip review
+- **Fails trust gate** (`trust_gate = False`): anything else → human should look
 
 | Extraction mode | What agreement looks like |
 |----------------|--------------------------|
@@ -1285,7 +1286,7 @@ field.trust.explanation      # "Agreement: 3/3; Found in source: True; Auto-acce
 | multi (3 calls) | "3/3" (unanimous), "2/3" (split), "1/3" (all different) |
 | hybrid (2+2 calls) | "4/4", "3/4", etc. — cross-approach agreement is the strongest signal |
 
-The `confidence` float (0-1) also remains for backward compatibility: 1.0 = auto-accept, 0.5 = found in source but not unanimous, 0.2 = not found in source. For new code, prefer the explicit `field.ocr` and `field.consensus` scores described above.
+For new code, prefer the explicit `field.ocr` and `field.consensus` scores described above, and use `field.trust_gate` for the accept/review decision.
 
 ### JSON Reliability
 
@@ -1762,7 +1763,7 @@ for field_name, p in prov.items():
     print(f"Page: {p.page}")
     print(f"BBox: {p.bbox}")
     print(f"Block ID: {p.block_id}")
-    print(f"Confidence: {p.confidence}")
+    print(f"Trust gate: {p.trust_gate}")
     print(f"Evidence confidence: {p.evidence_confidence}")
     print(f"Parser: {p.parser_name}")
     print(f"Model: {p.model_name}")
@@ -2193,10 +2194,9 @@ report.warnings
 
 ```python
 fq = report.field_details["total"]
-fq.confidence       # 0.88
 fq.found_in_source  # True
 fq.has_evidence     # True
-fq.auto_accept      # False
+fq.trust_gate       # False
 fq.corrected        # True
 fq.missing          # False (True if value is None)
 fq.warning          # "agent disagreement"

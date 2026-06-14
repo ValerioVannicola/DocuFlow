@@ -280,12 +280,8 @@ async def verify_result(
             reason=reason,
             page_number=page_number,
         )
-        # confidence reflects the outcome: confirmed values gain trust,
-        # corrected values stay review-worthy
-        if agrees:
-            field.confidence = max(field.confidence, 0.9)
-        elif applied:
-            field.confidence = min(field.confidence, 0.6)
+        if field.trust is not None and (agrees or applied):
+            field.trust.trust_gate = True
 
         if trace:
             trace.add_event(
@@ -297,7 +293,8 @@ async def verify_result(
 
     if result.fields:
         result.confidence = sum(
-            f.confidence for f in result.fields.values()
+            1.0 if (f.trust.trust_gate if f.trust else False) else 0.0
+            for f in result.fields.values()
         ) / len(result.fields)
 
     return n_verified

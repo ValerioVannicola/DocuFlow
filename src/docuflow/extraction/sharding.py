@@ -61,6 +61,7 @@ def merge_shard_results(
 
     if merged.fields:
         merged.confidence = sum(
-            f.confidence for f in merged.fields.values()
+            1.0 if (f.trust.trust_gate if f.trust else False) else 0.0
+            for f in merged.fields.values()
         ) / len(merged.fields)
     return merged

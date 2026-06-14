@@ -16,6 +16,7 @@ from docuflow.extraction.models import (
     ExtractedField,
     ExtractionResult,
     FieldConsensus,
+    FieldTrust,
     OCRDocumentConfidence,
     OCRFieldConfidence,
 )
@@ -117,20 +118,24 @@ class TestEvidence:
 class TestExtractedField:
     def test_create(self, sample_extracted_field):
         assert sample_extracted_field.value == 1234.56
-        assert sample_extracted_field.confidence == 0.92
+        assert sample_extracted_field.trust is not None
+        assert sample_extracted_field.trust.trust_gate is True
         assert len(sample_extracted_field.evidence) == 1
         assert sample_extracted_field.validation_status == "valid"
 
     def test_defaults(self):
         field = ExtractedField()
         assert field.value is None
-        assert field.confidence == 0.0
+        assert field.trust is None
         assert field.evidence == []
         assert field.validation_status == "pending"
         assert field.errors == []
 
     def test_string_value(self):
-        field = ExtractedField(value="Acme Corp", confidence=0.88)
+        field = ExtractedField(
+            value="Acme Corp",
+            trust=FieldTrust(found_in_source=True, trust_gate=True),
+        )
         assert field.value == "Acme Corp"
 
 
@@ -154,6 +159,7 @@ class TestExtractionResult:
                     evidence=[sample_evidence],
                     ocr=OCRFieldConfidence(score=0.88),
                     consensus=FieldConsensus(agreement_ratio=0.75),
+                    trust=FieldTrust(found_in_source=True, trust_gate=True),
                 ),
             },
             ocr=OCRDocumentConfidence(score=0.91),

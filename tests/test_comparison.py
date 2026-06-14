@@ -10,7 +10,7 @@ from docuflow.comparison import (
     compare_documents,
 )
 from docuflow.documents.evidence import Evidence
-from docuflow.extraction.models import ExtractedField, ExtractionResult
+from docuflow.extraction.models import ExtractedField, ExtractionResult, FieldTrust
 
 
 def _make_result(
@@ -22,13 +22,13 @@ def _make_result(
         data={"supplier_name": supplier, "total": total},
         fields={
             "supplier_name": ExtractedField(
-                value=supplier, confidence=conf,
+                value=supplier, trust=FieldTrust(found_in_source=True, trust_gate=True),
                 evidence=[Evidence(
                     document_id=doc_id, page_number=0, text=supplier,
                 )],
             ),
             "total": ExtractedField(
-                value=total, confidence=conf,
+                value=total, trust=FieldTrust(found_in_source=True, trust_gate=True),
                 evidence=[Evidence(
                     document_id=doc_id, page_number=0, text=str(total),
                 )],
@@ -159,15 +159,15 @@ class TestCompareDocuments:
             document_id="d1", schema_name="Invoice",
             data={"name": "Acme", "total": 100},
             fields={
-                "name": ExtractedField(value="Acme", confidence=0.9),
-                "total": ExtractedField(value=100, confidence=0.8),
+                "name": ExtractedField(value="Acme", trust=FieldTrust(found_in_source=True, trust_gate=True)),
+                "total": ExtractedField(value=100, trust=FieldTrust(found_in_source=True, trust_gate=True)),
             },
         )
         r2 = ExtractionResult(
             document_id="d2", schema_name="Invoice",
             data={"name": "Beta"},
             fields={
-                "name": ExtractedField(value="Beta", confidence=0.9),
+                "name": ExtractedField(value="Beta", trust=FieldTrust(found_in_source=True, trust_gate=True)),
             },
         )
         mock_pipeline = AsyncMock()

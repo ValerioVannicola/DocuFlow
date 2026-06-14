@@ -14,8 +14,8 @@ def _make_result(
     extracted = {}
     data = {}
     for fname, (value, found) in fields.items():
-        trust = FieldTrust(found_in_source=found, agreement="1/1", auto_accept=found)
-        ef = ExtractedField(value=value, confidence=0.8, trust=trust)
+        trust = FieldTrust(found_in_source=found, agreement="1/1", trust_gate=found)
+        ef = ExtractedField(value=value, trust=trust)
         extracted[fname] = ef
         data[fname] = value
 

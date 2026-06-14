@@ -16,6 +16,7 @@ from docuflow.extraction.models import (
     ExtractedField,
     ExtractionResult,
     FieldConsensus,
+    FieldTrust,
     OCRFieldConfidence,
     TokenUsage,
 )
@@ -39,7 +40,7 @@ def _field(
     ocr_method: str = "exact_block",
     bbox: BoundingBox | None = None,
 ) -> ExtractedField:
-    f = ExtractedField(value=value, confidence=0.5)
+    f = ExtractedField(value=value, trust=FieldTrust(found_in_source=True, trust_gate=True))
     if consensus_ratio is not None:
         f.consensus = FieldConsensus(
             n_instances=3, n_succeeded=3,
@@ -144,7 +145,7 @@ class TestVerifyResult:
         assert n == 1
         v = result.fields["total"].verification
         assert v.verified and v.agrees and not v.changed
-        assert result.fields["total"].confidence >= 0.9
+        assert result.fields["total"].trust_gate is True
         assert result.data["total"] == 1234.56  # unchanged
 
     async def test_differing_value_applied_with_audit(self):
@@ -166,7 +167,7 @@ class TestVerifyResult:
         assert f.verification.original_value == 1234.56
         assert f.value == 7234.56
         assert result.data["total"] == 7234.56
-        assert f.confidence <= 0.6
+        assert f.trust_gate is True
 
     async def test_schema_invalid_correction_not_applied(self):
         fields = {"total": _field(1234.56, ocr_score=0.4)}

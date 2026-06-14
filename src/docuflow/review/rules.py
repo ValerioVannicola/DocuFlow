@@ -34,10 +34,10 @@ class FieldConfidenceBelow:
         for field_name, threshold in self.fields.items():
             if field_name in result.fields:
                 field = result.fields[field_name]
-                if field.confidence < threshold:
+                gate = field.trust.trust_gate if field.trust else False
+                if threshold > 0 and not gate:
                     reasons.append(
-                        f"Field '{field_name}' confidence {field.confidence:.2f} "
-                        f"is below threshold {threshold}"
+                        f"Field '{field_name}' trust gate is false"
                     )
         return "; ".join(reasons) if reasons else None
 
@@ -48,10 +48,10 @@ class AnyFieldConfidenceBelow:
 
     def check(self, result: ExtractionResult) -> str | None:
         for field_name, field in result.fields.items():
-            if field.confidence < self.threshold:
+            gate = field.trust.trust_gate if field.trust else False
+            if not gate:
                 return (
-                    f"Field '{field_name}' confidence {field.confidence:.2f} "
-                    f"is below threshold {self.threshold}"
+                    f"Field '{field_name}' trust gate is false"
                 )
         return None
 

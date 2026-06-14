@@ -36,7 +36,7 @@ Fields:
 | `document_id` | `str` | Required | Document UUID/id from ingestion. |
 | `schema_name` | `str` | Required | Name of the schema class used for extraction. |
 | `data` | `dict` | `{}` | Plain extracted values keyed by field name. |
-| `fields` | `dict[str, ExtractedField]` | `{}` | Full field objects with value, confidence, evidence, trust, and validation. |
+| `fields` | `dict[str, ExtractedField]` | `{}` | Full field objects with value, trust gate, evidence, OCR/consensus data, and validation. |
 | `confidence` | `float` | `0.0` | Overall extraction confidence/trust score. |
 | `confidence_score` | `float \| None` | `None` | OCR-based confidence score for the final result. Prefers `result.ocr.score`, then falls back to the mean of available field OCR scores. |
 | `consensus_score` | `float \| None` | `None` | Multi-instance consensus score for the final result. Average of available field agreement ratios. |
@@ -66,7 +66,7 @@ When you inspect the final result, think in layers:
 - `result.data` is the simple field-value payload for APIs, CSV, and downstream business logic.
 - `result.fields[...]` is the rich per-field payload. Each field can carry:
   - `value` and `original_value`
-  - `confidence`
+  - `trust_gate`
   - `trust`
   - `ocr`
   - `consensus`
@@ -160,8 +160,8 @@ Fields:
 | `value` | `Any` | `None` | Final extracted value. |
 | `original_value` | `Any` | `None` | Value before correction or verification change. |
 | `corrected` | `bool` | `False` | True after human correction. |
-| `confidence` | `float` | `0.0` | Field-level confidence/trust score. |
-| `trust` | `FieldTrust \| None` | `None` | Agreement/source/auto-accept trust data. |
+| `trust_gate` | `bool` | `False` | Whether the field passed the internal trust gate. |
+| `trust` | `FieldTrust \| None` | `None` | Agreement/source/trust-gate data. |
 | `ocr` | `OCRFieldConfidence \| None` | `None` | OCR match confidence for this field. |
 | `consensus` | `FieldConsensus \| None` | `None` | Multi-instance agreement data. |
 | `verification` | `FieldVerification \| None` | `None` | Zoom-and-verify result. |
@@ -179,8 +179,7 @@ Fields:
 | `agreement_ratio` | `float` | `0.0` | Agreement with final value. |
 | `found_in_source` | `bool` | `False` | Whether the value was found in source text. |
 | `valid` | `bool` | `True` | Whether validation passed. |
-| `auto_accept` | `bool` | `False` | Whether the field can skip review. |
-| `score` | `float` | `0.0` | Quantitative trust score. |
+| `trust_gate` | `bool` | `False` | Whether the field passed the trust gate. |
 | `explanation` | `str` | `""` | Human-readable trust explanation. |
 
 ### `FieldConsensus`
@@ -521,10 +520,10 @@ available, falling back to names like `col_0`.
 ```python
 result.data["total"]
 result.fields["total"].value
-result.fields["total"].confidence
+result.fields["total"].trust_gate
 result.confidence_score
 result.consensus_score
-result.fields["total"].trust.score if result.fields["total"].trust else None
+result.fields["total"].trust.trust_gate if result.fields["total"].trust else None
 result.fields["total"].ocr.score if result.fields["total"].ocr else None
 result.fields["total"].consensus.agreement if result.fields["total"].consensus else None
 result.fields["total"].verification.verified if result.fields["total"].verification else None

@@ -194,7 +194,7 @@ Behavior:
 | `document_id` | `str` | Required | Source document id. |
 | `file_name` | `str` | Required | Source file name. |
 | `value` | `Any` | `None` | Field value. |
-| `confidence` | `float` | `0.0` | Field confidence. |
+| `trust_gate` | `bool` | `False` | Whether the field passed the trust gate. |
 | `evidence` | `list[Evidence]` | `[]` | Field evidence. |
 
 ### `FieldDifference`
@@ -432,10 +432,9 @@ Single-result score formula:
 
 | Field | Type | Default | Description |
 | --- | --- | --- | --- |
-| `confidence` | `float` | `0.0` | Field confidence. |
 | `found_in_source` | `bool` | `False` | Trust source-found flag. |
 | `has_evidence` | `bool` | `False` | Field has evidence. |
-| `auto_accept` | `bool` | `False` | Trust auto-accept flag. |
+| `trust_gate` | `bool` | `False` | Trust gate flag. |
 | `corrected` | `bool` | `False` | Field corrected. |
 | `missing` | `bool` | `False` | Field value is missing. |
 | `warning` | `str` | `""` | Per-field warning label. |

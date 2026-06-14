@@ -13,7 +13,7 @@ from docuflow.documents.models import (
     DocumentMetadata,
     Page,
 )
-from docuflow.extraction.models import ExtractedField, ExtractionResult
+from docuflow.extraction.models import ExtractedField, ExtractionResult, FieldTrust
 
 _PAGE_SIZE = (595, 842)
 
@@ -100,7 +100,7 @@ def sample_evidence(sample_document: Document, sample_bbox: BoundingBox) -> Evid
 def sample_extracted_field(sample_evidence: Evidence) -> ExtractedField:
     return ExtractedField(
         value=1234.56,
-        confidence=0.92,
+        trust=FieldTrust(found_in_source=True, trust_gate=True),
         evidence=[sample_evidence],
         validation_status="valid",
     )

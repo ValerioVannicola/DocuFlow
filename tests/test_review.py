@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from docuflow.documents.evidence import Evidence
-from docuflow.extraction.models import ExtractedField, ExtractionResult
+from docuflow.extraction.models import ExtractedField, ExtractionResult, FieldTrust
 from docuflow.review.rules import (
     AnyFieldConfidenceBelow,
     FieldConfidenceBelow,
@@ -23,11 +23,11 @@ def _make_result(
     if fields is None:
         fields = {
             "supplier_name": ExtractedField(
-                value="Acme Corp", confidence=0.9,
+                value="Acme Corp", trust=FieldTrust(found_in_source=True, trust_gate=True),
                 evidence=[Evidence(document_id="d", page_number=0, text="Acme Corp")],
             ),
             "total": ExtractedField(
-                value=1234.56, confidence=0.7,
+                value=1234.56, trust=FieldTrust(found_in_source=True, trust_gate=True),
                 evidence=[Evidence(document_id="d", page_number=0, text="1234.56")],
             ),
         }
@@ -64,7 +64,18 @@ class TestFieldConfidenceBelow:
         assert rule.check(result) is None
 
     def test_flags_specific_field(self):
-        result = _make_result()
+        result = _make_result(
+            fields={
+                "supplier_name": ExtractedField(
+                    value="Acme Corp", trust=FieldTrust(found_in_source=True, trust_gate=True),
+                    evidence=[Evidence(document_id="d", page_number=0, text="Acme Corp")],
+                ),
+                "total": ExtractedField(
+                    value=1234.56, trust=FieldTrust(found_in_source=True, trust_gate=False),
+                    evidence=[Evidence(document_id="d", page_number=0, text="1234.56")],
+                ),
+            }
+        )
         rule = FieldConfidenceBelow({"total": 0.8})
         reason = rule.check(result)
         assert reason is not None
@@ -82,7 +93,18 @@ class TestAnyFieldConfidenceBelow:
         assert AnyFieldConfidenceBelow(0.5).check(result) is None
 
     def test_flags_lowest_field(self):
-        result = _make_result()
+        result = _make_result(
+            fields={
+                "supplier_name": ExtractedField(
+                    value="Acme Corp", trust=FieldTrust(found_in_source=True, trust_gate=True),
+                    evidence=[Evidence(document_id="d", page_number=0, text="Acme Corp")],
+                ),
+                "total": ExtractedField(
+                    value=1234.56, trust=FieldTrust(found_in_source=True, trust_gate=False),
+                    evidence=[Evidence(document_id="d", page_number=0, text="1234.56")],
+                ),
+            }
+        )
         reason = AnyFieldConfidenceBelow(0.8).check(result)
         assert reason is not None
         assert "total" in reason
@@ -115,7 +137,7 @@ class TestFieldMissing:
 
     def test_flags_none_value(self):
         fields = {
-            "total": ExtractedField(value=None, confidence=0.0),
+            "total": ExtractedField(value=None, trust=FieldTrust(found_in_source=True, trust_gate=True)),
         }
         result = _make_result(fields=fields)
         reason = FieldMissing(["total"]).check(result)
@@ -130,7 +152,7 @@ class TestNoEvidence:
 
     def test_flags_no_evidence(self):
         fields = {
-            "total": ExtractedField(value=1234.56, confidence=0.7, evidence=[]),
+            "total": ExtractedField(value=1234.56, trust=FieldTrust(found_in_source=True, trust_gate=True), evidence=[]),
         }
         result = _make_result(fields=fields)
         reason = NoEvidence().check(result)
@@ -139,9 +161,9 @@ class TestNoEvidence:
 
     def test_checks_specific_fields(self):
         fields = {
-            "name": ExtractedField(value="Acme", confidence=0.9, evidence=[]),
+            "name": ExtractedField(value="Acme", trust=FieldTrust(found_in_source=True, trust_gate=True), evidence=[]),
             "total": ExtractedField(
-                value=100, confidence=0.8,
+                value=100, trust=FieldTrust(found_in_source=True, trust_gate=True),
                 evidence=[Evidence(document_id="d", page_number=0, text="100")],
             ),
         }
@@ -172,7 +194,7 @@ class TestReviewStep:
 
     async def test_multiple_rules(self):
         fields = {
-            "total": ExtractedField(value=None, confidence=0.2, evidence=[]),
+            "total": ExtractedField(value=None, trust=FieldTrust(found_in_source=True, trust_gate=True), evidence=[]),
         }
         state = PipelineState()
         state.extraction_result = _make_result(confidence=0.2, fields=fields)

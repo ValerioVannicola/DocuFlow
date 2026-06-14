@@ -8,6 +8,7 @@ from docuflow.extraction.models import (
     ExtractedField,
     ExtractionResult,
     FieldProvenance,
+    FieldTrust,
     ReviewVerdict,
 )
 
@@ -20,7 +21,7 @@ def _make_result() -> ExtractionResult:
         data={"supplier_name": "Acme Corp", "total": 1234.56},
         fields={
             "supplier_name": ExtractedField(
-                value="Acme Corp", confidence=0.9,
+                value="Acme Corp", trust=FieldTrust(found_in_source=True, trust_gate=True),
                 evidence=[Evidence(
                     document_id="doc-1", page_number=0,
                     text="Acme Corp", bbox=bbox, block_id="b1",
@@ -29,7 +30,7 @@ def _make_result() -> ExtractionResult:
                 validation_status="valid",
             ),
             "total": ExtractedField(
-                value=1234.56, confidence=0.7,
+                value=1234.56, trust=FieldTrust(found_in_source=True, trust_gate=True),
                 evidence=[Evidence(
                     document_id="doc-1", page_number=1,
                     text="1234.56", confidence=0.85,
@@ -58,7 +59,7 @@ class TestProvenance:
 
         p = prov["supplier_name"]
         assert p.value == "Acme Corp"
-        assert p.confidence == 0.9
+        assert p.trust_gate is True
         assert p.source_text == "Acme Corp"
         assert p.page == 0
         assert p.bbox is not None
@@ -112,7 +113,7 @@ class TestProvenance:
             document_id="doc-1",
             schema_name="Test",
             data={"name": "value"},
-            fields={"name": ExtractedField(value="value", confidence=0.5)},
+            fields={"name": ExtractedField(value="value", trust=FieldTrust(found_in_source=True, trust_gate=True))},
         )
         prov = result.provenance()
         p = prov["name"]

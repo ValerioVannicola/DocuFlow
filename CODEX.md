@@ -202,7 +202,7 @@ result = pipeline.run_sync("invoice.pdf", schema=Invoice)
 
 result.data                          # {"supplier_name": "Acme", "total": 1234.56}
 result.fields["total"].value         # 1234.56
-result.fields["total"].confidence    # 0.92
+result.fields["total"].trust_gate    # True/False
 result.fields["total"].evidence[0].text        # "1234.56"
 result.fields["total"].evidence[0].page_number # 0
 result.fields["total"].evidence[0].bbox        # BoundingBox(x0=72, y0=130, x1=200, y1=148)
@@ -214,7 +214,7 @@ result.usage.total_tokens
 result.usage.n_llm_calls             # how many LLM calls produced this result
 result.usage.cost_usd                # litellm-priced cost (None if model unknown)
 result.needs_review                  # True/False
-result.review_reasons                # ["Field 'total' confidence below 0.8"]
+result.review_reasons                # ["Field 'total' trust gate false"]
 result.review_verdicts               # [ReviewVerdict(reviewer="auditor", verdict="Approved")]
 result.model_dump_json()             # full JSON serialization
 ```
@@ -286,7 +286,7 @@ result.review_status                   # "approved"
 prov = result.provenance("total")
 p = prov["total"]
 p.value, p.original_value, p.source_text, p.page, p.bbox
-p.model_name, p.parser_name, p.confidence, p.evidence_confidence
+p.model_name, p.parser_name, p.trust_gate, p.evidence_confidence
 p.validation_status, p.review_status, p.reviewed_by
 p.corrected, p.corrected_by, p.correction_reason
 ```
@@ -663,8 +663,8 @@ DocuFlow uses agreement + source verification, NOT LLM self-reported confidence:
 field.trust.agreement        # "4/5" (multi mode) or "" (single mode)
 field.trust.agreement_ratio  # 0.8 (multi) or 0.0 (single — no consensus)
 field.trust.found_in_source  # True/False
-field.trust.auto_accept      # True = skip review, False = needs review
-field.trust.score            # internal trust score (0-1)
+field.trust.trust_gate       # True = skip review, False = needs review
+field.trust_gate             # same boolean gate on the field itself
 
 # Fixed trust behavior. Use result.confidence_score / result.consensus_score for the final result.
 pipeline = DocumentPipeline()

@@ -43,7 +43,7 @@ class LLMReviewer:
         for field_name, field in result.fields.items():
             evidence_summary[field_name] = {
                 "value": field.value,
-                "confidence": field.confidence,
+                "trust_gate": field.trust.trust_gate if field.trust else False,
                 "evidence": [
                     {"page": e.page_number, "text": e.text}
                     for e in field.evidence

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from docuflow.documents.evidence import Evidence
-from docuflow.extraction.models import ExtractedField, ExtractionResult
+from docuflow.extraction.models import ExtractedField, ExtractionResult, FieldTrust
 from docuflow.validation.base import ValidationError, Validator
 from docuflow.validation.engine import validate
 from docuflow.validation.validators import (
@@ -18,7 +18,7 @@ def _make_result(**field_kwargs) -> ExtractionResult:
         if isinstance(val, dict):
             fields[name] = ExtractedField(**val)
         else:
-            fields[name] = ExtractedField(value=val, confidence=0.8)
+            fields[name] = ExtractedField(value=val, trust=FieldTrust(found_in_source=True, trust_gate=True))
     return ExtractionResult(
         document_id="doc-1",
         schema_name="Test",

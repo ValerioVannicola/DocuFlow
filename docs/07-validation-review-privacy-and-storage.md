@@ -226,7 +226,7 @@ Parameters:
 | --- | --- |
 | `fields` | Mapping of field name to minimum confidence threshold. |
 
-Flags any named field whose `field.confidence` is below its threshold.
+Flags any named field whose `trust_gate` is `False`.
 
 ### `AnyFieldConfidenceBelow`
 
@@ -234,7 +234,7 @@ Flags any named field whose `field.confidence` is below its threshold.
 AnyFieldConfidenceBelow(threshold: float = 0.6)
 ```
 
-Flags the first field with confidence below the shared threshold.
+Flags the first field whose trust gate is `False`.
 
 ### `HasValidationErrors`
 

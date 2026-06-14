@@ -9,9 +9,8 @@ from docuflow.quality import FieldQuality, QualityReport, quality_report
 
 def _field(
     value,
-    confidence=0.9,
+    trust_gate=True,
     found_in_source=True,
-    auto_accept=True,
     agreement="5/5",
     agreement_ratio=1.0,
     evidence_text="some text",
@@ -21,8 +20,7 @@ def _field(
         agreement=agreement,
         agreement_ratio=agreement_ratio,
         found_in_source=found_in_source,
-        auto_accept=auto_accept,
-        score=confidence,
+        trust_gate=trust_gate,
     )
     evidence = (
         [Evidence(document_id="d", page_number=0, text=evidence_text)]
@@ -30,7 +28,7 @@ def _field(
         else []
     )
     ef = ExtractedField(
-        value=value, confidence=confidence, trust=trust, evidence=evidence,
+        value=value, trust=trust, evidence=evidence,
     )
     if corrected:
         ef.original_value = "old"
@@ -63,8 +61,8 @@ class TestSingleResult:
         assert report.grounding_rate == 1.0
         assert report.evidence_coverage == 1.0
         assert report.auto_accept_rate == 1.0
-        assert report.mean_confidence == 0.9
-        assert report.score == 0.98
+        assert report.mean_confidence == 1.0
+        assert report.score == 1.0
         assert report.correction_rate == 0.0
         assert report.field_count == 2
         assert report.n_results == 1
@@ -96,7 +94,7 @@ class TestSingleResult:
         fields = {
             "total": _field(
                 1234.56,
-                auto_accept=False,
+                trust_gate=False,
                 agreement="3/5",
                 agreement_ratio=0.6,
             ),
@@ -105,7 +103,7 @@ class TestSingleResult:
 
         assert report.auto_accept_rate == 0.0
         assert "disagreement" in report.warnings[0]
-        assert report.field_details["total"].auto_accept is False
+        assert report.field_details["total"].trust_gate is False
 
     def test_corrected_field(self):
         fields = {
@@ -122,9 +120,8 @@ class TestSingleResult:
             "supplier": _field("Acme Corp"),
             "total": _field(
                 1234.56,
-                confidence=0.6,
+                trust_gate=False,
                 found_in_source=False,
-                auto_accept=False,
                 agreement="2/5",
                 agreement_ratio=0.4,
             ),
@@ -165,7 +162,7 @@ class TestSingleResult:
 
     def test_ok_threshold(self):
         fields = {
-            "a": _field(1, confidence=0.3, found_in_source=False, auto_accept=False),
+            "a": _field(1, trust_gate=False, found_in_source=False),
         }
         report = quality_report(_make_result(fields), threshold=0.5)
         assert report.ok is False
@@ -181,7 +178,7 @@ class TestSingleResult:
     def test_missing_field(self):
         fields = {
             "supplier": _field("Acme Corp"),
-            "total": ExtractedField(value=None, confidence=0.0),
+            "total": ExtractedField(value=None, trust=FieldTrust(found_in_source=True, trust_gate=True)),
         }
         report = quality_report(_make_result(fields))
 
@@ -228,7 +225,7 @@ class TestBatchResults:
         report = quality_report([r1, r2, r3])
 
         assert report.n_results == 3
-        assert report.score == 0.98
+        assert report.score == 1.0
         assert report.field_count == 6
         assert report.ok is True
 
@@ -242,7 +239,7 @@ class TestBatchResults:
     def test_batch_averages(self):
         r_good = _make_result({"a": _field("x")})
         r_bad = _make_result({
-            "a": _field("x", confidence=0.2, found_in_source=False, auto_accept=False, evidence_text=""),
+            "a": _field("x", trust_gate=False, found_in_source=False, evidence_text=""),
         })
 
         report = quality_report([r_good, r_bad])
@@ -254,11 +251,11 @@ class TestBatchResults:
     def test_worst_fields_across_batch(self):
         r1 = _make_result({
             "good": _field("x"),
-            "bad": _field("y", confidence=0.1, found_in_source=False, auto_accept=False, evidence_text=""),
+            "bad": _field("y", trust_gate=False, found_in_source=False, evidence_text=""),
         })
         r2 = _make_result({
             "good": _field("x"),
-            "bad": _field("y", confidence=0.1, found_in_source=False, auto_accept=False, evidence_text=""),
+            "bad": _field("y", trust_gate=False, found_in_source=False, evidence_text=""),
         })
 
         report = quality_report([r1, r2])
@@ -312,13 +309,12 @@ class TestSerialization:
 
     def test_field_quality_model(self):
         fq = FieldQuality(
-            confidence=0.9,
             found_in_source=True,
             has_evidence=True,
-            auto_accept=True,
+            trust_gate=True,
             corrected=False,
             warning="",
         )
         data = json.loads(fq.model_dump_json())
-        assert data["confidence"] == 0.9
+        assert data["trust_gate"] is True
         assert data["corrected"] is False

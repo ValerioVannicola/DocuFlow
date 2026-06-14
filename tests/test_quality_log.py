@@ -10,17 +10,16 @@ from docuflow.extraction.models import ExtractedField, ExtractionResult, FieldTr
 from docuflow.quality import QualityLog, QualitySnapshot, quality_report
 
 
-def _field(value, confidence=0.9, found_in_source=True, auto_accept=True):
+def _field(value, trust_gate=True, found_in_source=True):
     trust = FieldTrust(
         agreement="5/5",
         agreement_ratio=1.0,
         found_in_source=found_in_source,
-        auto_accept=auto_accept,
-        score=confidence,
+        trust_gate=trust_gate,
     )
     evidence = [Evidence(document_id="d", page_number=0, text="some text")]
     return ExtractedField(
-        value=value, confidence=confidence, trust=trust, evidence=evidence,
+        value=value, trust=trust, evidence=evidence,
     )
 
 

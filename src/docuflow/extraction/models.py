@@ -128,8 +128,7 @@ class FieldTrust(BaseModel):
     agreement_ratio: float = 0.0
     found_in_source: bool = False
     valid: bool = True
-    auto_accept: bool = False
-    score: float = 0.0
+    trust_gate: bool = False
     explanation: str = ""
 
 
@@ -139,7 +138,6 @@ class ExtractedField(BaseModel, Generic[T]):
     value: Any = None
     original_value: Any = None
     corrected: bool = False
-    confidence: float = 0.0
     trust: FieldTrust | None = None
     ocr: OCRFieldConfidence | None = None
     consensus: FieldConsensus | None = None
@@ -147,6 +145,11 @@ class ExtractedField(BaseModel, Generic[T]):
     evidence: list[Evidence] = Field(default_factory=list)
     validation_status: str = "pending"
     errors: list[str] = Field(default_factory=list)
+
+    @computed_field(return_type=bool)
+    @property
+    def trust_gate(self) -> bool:
+        return self.trust.trust_gate if self.trust is not None else False
 
 
 class FieldCorrection(BaseModel):
@@ -170,7 +173,7 @@ class FieldProvenance(BaseModel):
     value: Any = None
     original_value: Any = None
     corrected: bool = False
-    confidence: float = 0.0
+    trust_gate: bool = False
     source_text: str = ""
     page: int | None = None
     bbox: Any = None
@@ -342,7 +345,7 @@ class ExtractionResult(BaseModel):
                 value=field.value,
                 original_value=field.original_value,
                 corrected=field.corrected,
-                confidence=field.confidence,
+                trust_gate=field.trust.trust_gate if field.trust else False,
                 source_text=source_text,
                 page=page,
                 bbox=bbox,
