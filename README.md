@@ -149,4 +149,4 @@ docuflow templates list
 
 ## Documentation
 
-See the [Complete User Guide](docs/guide.md) for in-depth documentation of every feature, with code examples.
+See the [Complete User Guide](guide.md) for in-depth documentation of every feature, with code examples.
