@@ -36,7 +36,7 @@ extract(
     path: str,
     schema: type[pydantic.BaseModel],
     model: str = "openai/gpt-4o",
-    parser: str = "pdfplumber",
+    parser: str = "auto",
     storage: str | None = None,
     privacy: Any = None,
     **kwargs: Any,
@@ -47,10 +47,10 @@ Parameters:
 
 | Parameter | Type | Default | Description |
 | --- | --- | --- | --- |
-| `path` | `str` | Required | Path to the document file. Usually a PDF, scan, or image-like document supported by the chosen parser. |
+| `path` | `str` | Required | Path to the document file. PDFs, images, and text-like files are handled directly; Office/spreadsheet files use parser support such as Docling. |
 | `schema` | `type[BaseModel]` | Required | Pydantic schema class that defines fields to extract. |
 | `model` | `str` | `"openai/gpt-4o"` | LiteLLM model string. `provider/model` and `provider:model` forms are accepted by the LiteLLM adapter. |
-| `parser` | `str` | `"pdfplumber"` | Parser name. See parser options below. |
+| `parser` | `str` | `"auto"` | Parser selector. `"auto"` chooses from the input type: text-like files skip parsing, images use Tesseract OCR for text extraction, PDFs use pdfplumber/smart depending on mode, and Office/spreadsheet files use Docling. |
 | `storage` | `str \| None` | `None` | Storage backend. `None` disables storage; `"local"` stores under `./.docuflow_store`. |
 | `privacy` | `Any` | `None` | Usually a `PrivacyPolicy`. When set, parsed text is anonymized before extraction. |
 | `**kwargs` | `Any` | `{}` | Forwarded directly to `DocumentPipeline`. Use for `extraction_type`, `extraction_mode`, `n_instances`, `normalize_output`, `review_rules`, etc. |
@@ -74,7 +74,7 @@ await extract_async(
     path: str,
     schema: type[pydantic.BaseModel],
     model: str = "openai/gpt-4o",
-    parser: str = "pdfplumber",
+    parser: str = "auto",
     storage: str | None = None,
     privacy: Any = None,
     **kwargs: Any,
@@ -105,7 +105,7 @@ Constructor signature:
 
 ```python
 DocumentPipeline(
-    parser: Any | str | dict | None = "pdfplumber",
+    parser: Any | str | dict | None = "auto",
     ocr: Any | str | None = None,
     model: str = "openai/gpt-4o",
     storage: Any | str | dict | None = None,
@@ -130,7 +130,7 @@ DocumentPipeline(
 
 | Parameter | Default | Description |
 | --- | --- | --- |
-| `parser` | `"pdfplumber"` | Parser selector, parser config dict, parser object, `None`, or `"none"`. `None`/`"none"` is required for direct `vision` and `hybrid` extraction. |
+| `parser` | `"auto"` | Parser selector, parser config dict, parser object, `None`, or `"none"`. `"auto"` is source-aware. `None`/`"none"` disables parsing; with text extraction this only works for text-like inputs already normalized by ingestion, and with vision/hybrid it works for PDF/image inputs. |
 | `ocr` | `None` | Reserved/accepted for compatibility. The current high-level pipeline resolves OCR through parser choices. |
 | `model` | `"openai/gpt-4o"` | LiteLLM model string used by the default `LiteLLMAdapter`. |
 | `storage` | `None` | Storage backend selector/config/object. See storage options below. |
@@ -149,12 +149,25 @@ DocumentPipeline(
 | `schema_shards` | `None` | Number of text-only schema shards for wide schemas. |
 | `llm_kwargs` | `None` | Extra options passed to `LiteLLMAdapter`, including `api_key`, `max_retries`, `prompt_caching`, and provider-specific LiteLLM kwargs. |
 
+### Input Types
+
+Ingestion detects the source type before parser selection. Everything downstream still receives
+the standard DocuFlow `Document` model.
+
+| Input | Default behavior with `parser="auto"` |
+| --- | --- |
+| PDF | Text extraction uses `pdfplumber`; `extraction_type="auto"` uses `smart`; vision/hybrid render pages directly. |
+| Image (`png`, `jpg`, `tiff`, `webp`, etc.) | Text extraction uses Tesseract OCR; vision/hybrid sends the image directly. |
+| Text-like (`txt`, `md`, `html`, `csv`, `json`, `xml`, `eml`) | Ingestion builds a one-page parsed `Document`; no parser is required. |
+| Office/spreadsheet (`docx`, `xlsx`) | `parser="auto"` routes to Docling. Install `docuflow[docling]`. |
+
 ### Parser Options
 
 String values:
 
 | Value | Behavior | Install extra |
 | --- | --- | --- |
+| `"auto"` | Source-aware default parser selection. | Depends on input type. |
 | `"pdfplumber"` | Native PDF text layer extraction. Fast, no OCR confidence. | `docuflow[pdf]` |
 | `"tesseract"` | Render pages and run local Tesseract OCR. | `docuflow[ocr,pdf]` plus system `tesseract` |
 | `"docling"` | Docling layout parser with first-class tables. | `docuflow[docling]` |
@@ -192,14 +205,15 @@ async def parse(document: Document) -> Document
 
 | `extraction_type` | Pipeline shape | Parser requirement | Use when |
 | --- | --- | --- | --- |
-| `"text"` | Ingest -> Parse -> Extract -> Validate -> Verify? -> Review -> Store? | Parser required, defaults to `pdfplumber`. | Normal text-layer or OCR-backed extraction. |
-| `"vision"` | Ingest -> ExtractVision -> Validate -> Review -> Store? | `parser=None` or `"none"`. | A vision-capable LLM should read rendered page images directly. |
-| `"hybrid"` | Ingest -> ExtractHybrid -> Validate -> Review -> Store? | `parser=None` or `"none"`. | Vision and text agents should run together and a decider should select values. |
-| `"auto"` | Ingest -> Parse -> ExtractAuto -> Validate -> Verify? -> Review -> Store? | Usually `parser="smart"`. | Start with text/OCR; escalate to vision if OCR quality is poor. |
+| `"text"` | Ingest -> Parse? -> Extract -> Validate -> Verify? -> Review -> Store? | Defaults to `parser="auto"`. Text/email inputs skip parsing; other inputs use the source-aware parser. | Normal text-layer or OCR-backed extraction. |
+| `"vision"` | Ingest -> ExtractVision -> Validate -> Review -> Store? | `parser=None`, `"none"`, or default `"auto"`. | A vision-capable LLM should read rendered PDF/image pages directly. |
+| `"hybrid"` | Ingest -> ExtractHybrid -> Validate -> Review -> Store? | `parser=None`, `"none"`, or default `"auto"`. | Vision and text agents should run together and a decider should select values. |
+| `"auto"` | Ingest -> Parse? -> ExtractAuto/Extract -> Validate -> Verify? -> Review -> Store? | Defaults to `parser="auto"`. Text/email inputs skip parsing; PDF/image/Office inputs use a parser. | Start with text/OCR; escalate PDF/image inputs to vision if OCR quality is poor. |
 
 Important constraints:
 
-- `vision` and `hybrid` raise `ValueError` if `parser` is not `None` or `"none"`.
+- `vision` and `hybrid` support PDF and image inputs. They raise `ValueError` for text, email, Office, or spreadsheet inputs.
+- `vision` and `hybrid` raise `ValueError` if `parser` is an explicit non-parserless parser such as `"pdfplumber"`. Use `parser=None`, `"none"`, or the default `"auto"`.
 - `vision` and `hybrid` raise `ValueError` if `privacy` is configured because raw page images bypass text anonymization.
 - `auto` suppresses vision escalation when `privacy` is configured.
 

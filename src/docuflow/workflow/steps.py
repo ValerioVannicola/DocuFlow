@@ -55,6 +55,27 @@ class Parse:
         if parser is None or parser == "pdfplumber":
             from docuflow.parsing.pdfplumber_parser import PdfplumberParser
             parser = PdfplumberParser()
+        elif parser == "auto":
+            source_kind = state.document.metadata.extra.get("source_kind")
+            if source_kind in ("text", "email"):
+                state.trace.add_event("parse", step_name=self.name, duration_ms=0.0)
+                return state
+            if source_kind == "image":
+                from docuflow.parsing.tesseract_parser import TesseractParser
+                parser = TesseractParser()
+            elif source_kind == "pdf":
+                from docuflow.parsing.pdfplumber_parser import PdfplumberParser
+                parser = PdfplumberParser()
+            elif source_kind in ("office", "spreadsheet"):
+                from docuflow.parsing.docling_parser import DoclingParser
+                parser = DoclingParser()
+            else:
+                state.errors.append(
+                    "Cannot auto-select parser for document source kind "
+                    f"{source_kind!r}"
+                )
+                state.status = "failed"
+                return state
         elif parser == "tesseract":
             from docuflow.parsing.tesseract_parser import TesseractParser
             parser = TesseractParser()

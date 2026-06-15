@@ -30,6 +30,7 @@ confidence where available.
 
 | Parser | Best for | Confidence | Tables | Install |
 | --- | --- | --- | --- | --- |
+| `"auto"` | Source-aware default: text files skip parsing, images use OCR, PDFs use native/smart parsing, Office files use Docling. | Depends on selected path. | Depends on selected path. | Depends on input type. |
 | `"pdfplumber"` | Native/digital PDFs with text layers. | No OCR confidence. | No first-class tables. | `docuflow[pdf]` |
 | `"tesseract"` | Scanned PDFs/images using local OCR. | Word and line confidence. | No first-class tables. | `docuflow[pdf,ocr]` plus system `tesseract` |
 | `"docling"` | Complex layouts, headings, lists, tables. | OCR confidence when Docling OCR fires. | Yes. | `docuflow[docling]` |
@@ -37,7 +38,11 @@ confidence where available.
 | `"azure-di"` | Azure Document Intelligence cloud OCR. | Word and derived line confidence. | Current mapper emits text blocks. | `docuflow[azure]` |
 | `"textract"` | AWS Textract OCR. | Word and line confidence. | Current parser uses DetectDocumentText text output. | `docuflow[aws,pdf]` |
 | `"google-docai"` | Google Document AI OCR. | Token and line confidence. | Current mapper emits text blocks. | `docuflow[gcp]` |
-| `None` / `"none"` | Direct vision/hybrid extraction. | N/A. | N/A. | `docuflow[pdf,llm]` |
+| `None` / `"none"` | Parserless mode. Text-like inputs are already parsed by ingestion; PDF/image inputs can be read by vision/hybrid. | N/A. | N/A. | Depends on extraction type. |
+
+Text-like inputs (`txt`, `md`, `html`, `csv`, `json`, `xml`, `eml`) are normalized during
+ingestion into a one-page `Document` with `status="parsed"`, so no parser is required for
+text extraction. Image inputs can be rendered as one-page documents for vision or OCR.
 
 ## Parser Config Dicts
 
@@ -52,6 +57,7 @@ pipeline = DocumentPipeline(
 Supported configs:
 
 ```python
+{"type": "auto"}
 {"type": "pdfplumber"}
 {"type": "tesseract", "languages": ["eng"], "dpi": 300, "preprocess": []}
 {"type": "docling"}

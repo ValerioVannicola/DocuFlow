@@ -27,7 +27,7 @@ class WorkflowConfig(BaseModel):
 
     schema_: dict[str, Any] = Field(default_factory=dict, alias="schema")
 
-    parser: str | dict[str, Any] = "pdfplumber"
+    parser: str | dict[str, Any] = "auto"
     model: str = "openai/gpt-4o"
     extraction_type: str = "text"
     extraction_mode: str = "single"
@@ -53,7 +53,7 @@ class WorkflowConfig(BaseModel):
     @property
     def parser_type(self) -> str:
         if isinstance(self.parser, dict):
-            return self.parser.get("type", "pdfplumber")
+            return self.parser.get("type", "auto")
         return self.parser
 
     def build_schema(self) -> type[BaseModel]:

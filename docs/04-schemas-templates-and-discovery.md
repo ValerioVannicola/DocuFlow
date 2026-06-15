@@ -380,7 +380,7 @@ discover_schema(
     path: str,
     llm: LLMAdapter | None = None,
     model: str = "openai/gpt-4o",
-    parser: str = "pdfplumber",
+    parser: str | dict | None = "auto",
 ) -> DiscoveryResult
 ```
 
@@ -399,7 +399,7 @@ await discover_schema_async(
     path: str,
     llm: LLMAdapter | None = None,
     model: str = "openai/gpt-4o",
-    parser: str = "pdfplumber",
+    parser: str | dict | None = "auto",
 ) -> DiscoveryResult
 ```
 
@@ -410,7 +410,7 @@ Parameters:
 | `path` | Required | Document path to inspect. |
 | `llm` | `None` | Optional LLM adapter. If omitted, uses `LiteLLMAdapter(model=model)`. |
 | `model` | `"openai/gpt-4o"` | Model for discovery when `llm` is not supplied. |
-| `parser` | `"pdfplumber"` | Parser for reading text before discovery. Supported directly: `"pdfplumber"`, `"tesseract"`, `"docling"`, `"smart"`. |
+| `parser` | `"auto"` | Parser for reading text before discovery. `"auto"` skips parsing for text/email files, uses pdfplumber for PDFs, Tesseract for images, and Docling for Office/spreadsheet files. Explicit parser strings and config dicts are also supported. |
 
 Discovery reads up to the first 8000 characters of parsed document text.
 

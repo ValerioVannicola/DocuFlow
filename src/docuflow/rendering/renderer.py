@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 from docuflow.constants import DEFAULT_DPI
 from docuflow.errors import ParsingError
+from docuflow.ingestion.mime import detect_source_kind
 
 if TYPE_CHECKING:
     from PIL.Image import Image
@@ -30,7 +31,27 @@ def _import_pdfium():
     return pdfium
 
 
+def _open_image_sync(file_path: str) -> Image:
+    try:
+        from PIL import Image
+    except ImportError as exc:
+        raise ImportError(
+            "Pillow is required for image rendering. Install with: pip install docuflow[ocr]"
+        ) from exc
+
+    try:
+        with Image.open(file_path) as image:
+            return image.convert("RGB").copy()
+    except Exception as exc:
+        raise ParsingError(f"Failed to open image: {file_path}") from exc
+
+
 def _render_page_sync(file_path: str, page_number: int, dpi: int) -> Image:
+    if detect_source_kind(Path(file_path)) == "image":
+        if page_number != 0:
+            raise ParsingError("Page 0 is the only page for image inputs")
+        return _open_image_sync(file_path)
+
     pdfium = _import_pdfium()
 
     with _PDFIUM_LOCK:
@@ -53,6 +74,9 @@ def _render_page_sync(file_path: str, page_number: int, dpi: int) -> Image:
 
 
 def _page_count_sync(file_path: str) -> int:
+    if detect_source_kind(Path(file_path)) == "image":
+        return 1
+
     pdfium = _import_pdfium()
 
     with _PDFIUM_LOCK:

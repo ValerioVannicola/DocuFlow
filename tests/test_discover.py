@@ -180,6 +180,21 @@ class TestDiscoverSchema:
         assert "Analyze this document" in call_messages[1]["content"]
         assert "Invoice from Acme" in call_messages[1]["content"]
 
+    async def test_discover_default_auto_reads_text_without_parser(self, tmp_path):
+        text_path = tmp_path / "invoice.md"
+        text_path.write_text("Plain invoice\nSupplier: Acme\nTotal: 1234.56", encoding="utf-8")
+
+        mock_llm = AsyncMock()
+        mock_llm.complete = AsyncMock(return_value=_make_llm_response())
+
+        with patch("docuflow.parsing.pdfplumber_parser.PdfplumberParser") as parser_cls:
+            result = await discover_schema(str(text_path), llm=mock_llm)
+
+        parser_cls.assert_not_called()
+        call_messages = mock_llm.complete.call_args[0][0]
+        assert result.document_type == "invoice"
+        assert "Plain invoice" in call_messages[1]["content"]
+
 
 def _set_parsed(doc):
     doc.raw_text = "Invoice from Acme Corp\nInvoice #: INV-001\nTotal: 1234.56"

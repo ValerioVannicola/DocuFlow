@@ -50,11 +50,12 @@ print(result.fields["total"].evidence[0])   # page 0, bbox, source text
 
 ### Parsing
 - **7 parsers**: pdfplumber (native PDFs), Tesseract OCR (scanned docs), Docling (tables/layout), Smart (auto per-page), Azure Document Intelligence, AWS Textract, Google Document AI
+- **Source-aware ingestion**: the default `parser="auto"` accepts PDFs, images, text/Markdown/HTML/CSV/JSON/XML/email files, and Docling-backed Office/spreadsheet documents while still normalizing everything to DocuFlow's `Document` model
 - **Permissive licensing throughout**: every dependency is MIT/BSD/Apache-2.0 — no copyleft (AGPL/GPL) anywhere in the tree
 - Every parser produces blocks with bounding boxes for evidence grounding
 
 ### Extraction
-- **3 extraction types**: text (parser → LLM), vision (images → vision LLM), hybrid (both in parallel)
+- **4 extraction types**: text (parser or parserless text → LLM), vision (PDF/image pages → vision LLM), hybrid (both in parallel), and auto (escalate weak OCR to vision)
 - **Single or multi-agent**: multi mode runs N parallel LLM calls at varied temperatures with a decider
 - **Domain context**: tell the LLM your industry for better extraction
 - **JSON reliability**: JSON mode, concrete examples, auto-retry on parse failure

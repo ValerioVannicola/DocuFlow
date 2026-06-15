@@ -57,7 +57,7 @@ Model fields:
 | `version` | `str` | `"1.0"` | Workflow version string. |
 | `description` | `str` | `""` | Human-readable description. Used by serving/router docs. |
 | `schema` | `dict[str, Any]` | `{}` | Field definitions used to build a Pydantic schema. Internally stored as `schema_`. |
-| `parser` | `str \| dict` | `"pdfplumber"` | Parser string or parser config dict. |
+| `parser` | `str \| dict` | `"auto"` | Parser string or parser config dict. `"auto"` selects from the input type. |
 | `model` | `str` | `"openai/gpt-4o"` | LiteLLM model string. |
 | `extraction_type` | `str` | `"text"` | `"text"`, `"vision"`, `"hybrid"`, or `"auto"`. |
 | `extraction_mode` | `str` | `"single"` | `"single"` or `"multi"`. |
@@ -160,6 +160,7 @@ Supported `type` values and keys:
 
 | `type` | Keys |
 | --- | --- |
+| `auto` | None. Source-aware default: text/email skip parsing, images use Tesseract, PDFs use pdfplumber or smart depending on extraction type, Office/spreadsheets use Docling. |
 | `pdfplumber` | None. |
 | `tesseract` | `languages`, `dpi`, `preprocess`. |
 | `docling` | None. |
@@ -350,7 +351,7 @@ Parameters:
 ### `parser_type`
 
 Property returning a string parser type. If `parser` is a dict, returns `parser["type"]`
-or `"pdfplumber"` if missing.
+or `"auto"` if missing.
 
 ### `build_schema()`
 
@@ -553,9 +554,9 @@ Parse(parser: Any = None)
 
 | Parameter | Description |
 | --- | --- |
-| `parser` | Parser object or parser string. `None` behaves like `"pdfplumber"`. |
+| `parser` | Parser object or parser string. `None` behaves like `"pdfplumber"` for backward compatibility. `"auto"` selects from the ingested document source type. |
 
-Supported strings: `"pdfplumber"`, `"tesseract"`, `"docling"`, `"smart"`, `"azure-di"`,
+Supported strings: `"auto"`, `"pdfplumber"`, `"tesseract"`, `"docling"`, `"smart"`, `"azure-di"`,
 `"textract"`, `"google-docai"`.
 
 ### `Anonymize`

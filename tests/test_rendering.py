@@ -6,6 +6,20 @@ import pytest
 
 
 class TestRendering:
+    async def test_render_all_pages_supports_image_input(self, tmp_path):
+        image_mod = pytest.importorskip("PIL.Image")
+        from docuflow.rendering.renderer import render_all_pages, render_page
+
+        image_path = tmp_path / "scan.png"
+        image_mod.new("RGB", (32, 16), "white").save(image_path)
+
+        images = await render_all_pages(image_path, dpi=100)
+        assert len(images) == 1
+        assert images[0].size == (32, 16)
+
+        page = await render_page(image_path, page_number=0, dpi=100)
+        assert page.size == (32, 16)
+
     @pytest.mark.integration
     async def test_render_page(self, tmp_path):
         from docuflow.rendering.renderer import render_page
