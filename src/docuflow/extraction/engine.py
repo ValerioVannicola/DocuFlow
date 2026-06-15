@@ -397,7 +397,7 @@ def _build_decider_prompt(
         parts.append(f"## Candidate {i + 1}\n```json\n{json.dumps(candidate, indent=2)}\n```\n")
 
     parts.append(
-        f"Verify each field against the document text above, then produce the single best "
+        "Verify each field against the document text above, then produce the single best "
         "extraction. Return JSON with 'data' and 'evidence' keys."
     )
 

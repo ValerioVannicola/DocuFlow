@@ -11,6 +11,13 @@ class SimpleSchema(BaseModel):
     value: float
 
 
+def test_public_all_exports_resolve():
+    import docuflow
+
+    for name in docuflow.__all__:
+        assert getattr(docuflow, name) is not None
+
+
 class TestDocumentPipeline:
     def test_init_with_defaults(self):
         pipeline = DocumentPipeline()

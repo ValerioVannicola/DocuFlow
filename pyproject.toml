@@ -42,7 +42,7 @@ azure = ["azure-ai-documentintelligence>=1.0"]
 aws = ["boto3>=1.34"]
 gcp = ["google-cloud-documentai>=2.30"]
 mcp = ["mcp[cli]>=1.20"]
-serve = ["fastapi>=0.115", "uvicorn[standard]>=0.30", "python-multipart>=0.0.9"]
+serve = ["fastapi>=0.115", "uvicorn[standard]>=0.30", "python-multipart>=0.0.9", "httpx>=0.28"]
 jupyter = ["nest_asyncio>=1.6"]
 all = ["docuflow[pdf,forms,ocr,llm,privacy,docling,azure,aws,gcp,mcp,serve,jupyter]"]
 dev = [

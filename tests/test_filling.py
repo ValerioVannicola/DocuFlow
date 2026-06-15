@@ -580,12 +580,16 @@ def _make_single_page_pdf(path: Path, page_width: float = 200, page_height: floa
 
 
 def test_wrap_text_splits_on_word_boundaries() -> None:
+    try:
+        from reportlab.pdfbase import pdfmetrics
+    except ImportError:
+        pytest.skip("reportlab not installed")
+
     from docuflow.filling.writer import _wrap_text
 
     lines = _wrap_text("one two three four five", "Helvetica", 10, 50)
-    # Each line must be shorter than 50pt; no word should be split mid-word.
-    for line in lines:
-        assert " " not in line or True  # just verify it runs and returns a list
+    assert all(pdfmetrics.stringWidth(line, "Helvetica", 10) <= 50 for line in lines)
+    assert " ".join(lines) == "one two three four five"
     assert len(lines) >= 1
     assert all(isinstance(ln, str) for ln in lines)
 
@@ -606,10 +610,11 @@ def test_draw_wrapped_clips_and_warns_by_default(tmp_path) -> None:
     except ImportError:
         pytest.skip("reportlab not installed")
 
-    from docuflow.documents.models import BoundingBox
-    from docuflow.filling.models import FilledField, FieldPlacement
-    from docuflow.filling.writer import _draw_wrapped
     import io
+
+    from docuflow.documents.models import BoundingBox
+    from docuflow.filling.models import FieldPlacement, FilledField
+    from docuflow.filling.writer import _draw_wrapped
 
     placement = FieldPlacement(
         bbox=BoundingBox(x0=0, y0=0, x1=200, y1=30),  # only ~2 lines at 10pt
@@ -636,10 +641,11 @@ def test_draw_wrapped_returns_overflow_lines_for_page_policy(tmp_path) -> None:
     except ImportError:
         pytest.skip("reportlab not installed")
 
-    from docuflow.documents.models import BoundingBox
-    from docuflow.filling.models import FilledField, FieldPlacement
-    from docuflow.filling.writer import _draw_wrapped
     import io
+
+    from docuflow.documents.models import BoundingBox
+    from docuflow.filling.models import FieldPlacement, FilledField
+    from docuflow.filling.writer import _draw_wrapped
 
     placement = FieldPlacement(
         bbox=BoundingBox(x0=0, y0=0, x1=200, y1=30),
@@ -667,10 +673,11 @@ def test_draw_wrapped_raises_on_overflow_error_policy() -> None:
     except ImportError:
         pytest.skip("reportlab not installed")
 
-    from docuflow.documents.models import BoundingBox
-    from docuflow.filling.models import FilledField, FieldPlacement
-    from docuflow.filling.writer import _draw_wrapped
     import io
+
+    from docuflow.documents.models import BoundingBox
+    from docuflow.filling.models import FieldPlacement, FilledField
+    from docuflow.filling.writer import _draw_wrapped
 
     placement = FieldPlacement(
         bbox=BoundingBox(x0=0, y0=0, x1=200, y1=20),
@@ -723,3 +730,37 @@ def test_write_overlay_appends_pages_on_overflow(tmp_path) -> None:
     reader = PdfReader(str(dst))
     assert reader.get_num_pages() > 1, "Expected continuation pages to be appended"
     assert any("appended" in w for w in filled_field.warnings)
+
+
+def test_write_overlay_raises_on_single_line_error_overflow(tmp_path) -> None:
+    """overflow='error' must also protect non-multiline placements."""
+    pytest.importorskip("pypdf")
+
+    from docuflow.documents.models import BoundingBox
+    from docuflow.filling.models import FieldPlacement, FilledField, FillPlan
+    from docuflow.filling.writer import write_overlay
+
+    src = tmp_path / "src.pdf"
+    dst = tmp_path / "dst.pdf"
+    _make_single_page_pdf(src, page_width=200, page_height=100)
+
+    long_value = "This value is intentionally too long for the target box"
+    plan = FillPlan(
+        strategy="overlay",
+        fields={
+            "name": FilledField(
+                field_name="name",
+                value=long_value,
+                formatted_value=long_value,
+            )
+        },
+        placements={
+            "name": FieldPlacement(
+                bbox=BoundingBox(x0=10, y0=10, x1=40, y1=24),
+                font_size=10,
+            )
+        },
+    )
+
+    with pytest.raises(ValueError, match="name"):
+        write_overlay(src, dst, plan, overflow="error")

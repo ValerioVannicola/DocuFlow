@@ -351,6 +351,7 @@ class TestDocxMetadata:
 
         assert len(result.highlights) >= 1
         assert any(h.color == "#ffff00" for h in result.highlights)
+        assert any(h.text == "important text" for h in result.highlights)
 
     def test_no_comments_part(self, tmp_path):
         """DOCX without comments.xml returns empty comments gracefully."""

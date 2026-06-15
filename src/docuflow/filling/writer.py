@@ -71,8 +71,8 @@ def write_overlay(
     page_sizes: list[tuple[float, float]] = []
 
     # Pending overflow: list of (page_size, placement, remaining_lines, filled_field, field_name)
-    _OverflowPending = tuple[tuple[float, float], FieldPlacement, list[str], FilledField, str]
-    pending_overflow: list[_OverflowPending] = []
+    overflow_pending_type = tuple[tuple[float, float], FieldPlacement, list[str], FilledField, str]
+    pending_overflow: list[overflow_pending_type] = []
 
     for page_number, page in enumerate(reader.pages):
         page_width = float(page.mediabox.right) - float(page.mediabox.left)
@@ -98,6 +98,10 @@ def write_overlay(
                             field_name,
                         ))
                 else:
+                    if overflow == "error" and _text_width(value, placement) > placement.bbox.width:
+                        raise ValueError(
+                            f"Field '{field_name}': text does not fit in the bounding box."
+                        )
                     font_size = _fit_font_size(value, placement, overflow=overflow)
                     if font_size != placement.font_size:
                         plan.fields[field_name].warnings.append(
@@ -136,7 +140,7 @@ def write_overlay(
         page_range = (
             f"page {page_num_start}"
             if page_num_start == page_num_end
-            else f"pages {page_num_start}–{page_num_end}"
+            else f"pages {page_num_start}-{page_num_end}"
         )
         filled_field.warnings.append(
             f"Content overflowed; continued on appended {page_range}."
@@ -198,10 +202,19 @@ def _fit_font_size(
     return max(6.0, placement.font_size * placement.bbox.width / estimated_width)
 
 
+def _text_width(value: str, placement: FieldPlacement) -> float:
+    try:
+        from reportlab.pdfbase import pdfmetrics
+
+        return float(pdfmetrics.stringWidth(value, placement.font_name, placement.font_size))
+    except ImportError:
+        return len(value) * placement.font_size * 0.5
+
+
 def _wrap_text(value: str, font_name: str, font_size: float, max_width: float) -> list[str]:
     """Word-wrap value into lines no wider than max_width. Respects explicit newlines."""
     try:
-        from reportlab.pdfbase.pdfmetrics import stringWidth as _sw
+        from reportlab.pdfbase import pdfmetrics
     except ImportError:
         return [value]
 
@@ -214,7 +227,7 @@ def _wrap_text(value: str, font_name: str, font_size: float, max_width: float) -
         current = ""
         for word in words:
             test = (current + " " + word).strip()
-            if _sw(test, font_name, font_size) <= max_width:
+            if pdfmetrics.stringWidth(test, font_name, font_size) <= max_width:
                 current = test
             else:
                 if current:
@@ -235,12 +248,6 @@ def _draw_wrapped(
     overflow: OverflowPolicy,
 ) -> list[str]:
     """Draw word-wrapped text inside placement bbox. Returns lines that did not fit."""
-    try:
-        from reportlab.pdfbase.pdfmetrics import stringWidth as _sw  # noqa: F401
-    except ImportError:
-        canvas.drawString(placement.bbox.x0, page_height - placement.bbox.y1, value)
-        return []
-
     font_name = placement.font_name
     font_size = placement.font_size
     line_height = font_size * 1.2

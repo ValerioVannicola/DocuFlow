@@ -1,10 +1,8 @@
 """Tests for DOCX form filling (content_controls and template strategies)."""
 from __future__ import annotations
 
-import asyncio
 import io
 from pathlib import Path
-from typing import Any
 
 import pytest
 from pydantic import BaseModel, Field
@@ -25,26 +23,26 @@ def _make_content_controls_docx(fields: dict[str, str]) -> bytes:
     for name, default in fields.items():
         sdt = OxmlElement("w:sdt")
         # Properties
-        sdtPr = OxmlElement("w:sdtPr")
+        sdt_pr = OxmlElement("w:sdtPr")
         tag_el = OxmlElement("w:tag")
         tag_el.set(qn("w:val"), name)
         alias_el = OxmlElement("w:alias")
         alias_el.set(qn("w:val"), name)
         text_el = OxmlElement("w:text")
-        sdtPr.append(tag_el)
-        sdtPr.append(alias_el)
-        sdtPr.append(text_el)
-        sdt.append(sdtPr)
+        sdt_pr.append(tag_el)
+        sdt_pr.append(alias_el)
+        sdt_pr.append(text_el)
+        sdt.append(sdt_pr)
         # Content
-        sdtContent = OxmlElement("w:sdtContent")
+        sdt_content = OxmlElement("w:sdtContent")
         para = OxmlElement("w:p")
         run = OxmlElement("w:r")
         t = OxmlElement("w:t")
         t.text = default
         run.append(t)
         para.append(run)
-        sdtContent.append(para)
-        sdt.append(sdtContent)
+        sdt_content.append(para)
+        sdt.append(sdt_content)
         body.append(sdt)
 
     buf = io.BytesIO()
@@ -59,31 +57,31 @@ def _make_checkbox_docx(name: str, checked: bool = False) -> bytes:
     from docx.oxml.ns import qn
     from lxml import etree
 
-    W14 = "http://schemas.microsoft.com/office/word/2010/wordml"
+    w14 = "http://schemas.microsoft.com/office/word/2010/wordml"
 
     doc = Document()
     body = doc.element.body
 
     sdt = OxmlElement("w:sdt")
-    sdtPr = OxmlElement("w:sdtPr")
+    sdt_pr = OxmlElement("w:sdtPr")
     tag_el = OxmlElement("w:tag")
     tag_el.set(qn("w:val"), name)
-    sdtPr.append(tag_el)
+    sdt_pr.append(tag_el)
     # Use lxml directly for the w14 namespace (not registered in python-docx)
-    cb14 = etree.SubElement(sdtPr, f"{{{W14}}}checkbox")
-    checked_el = etree.SubElement(cb14, f"{{{W14}}}checked")
-    checked_el.set(f"{{{W14}}}val", "1" if checked else "0")
-    sdt.append(sdtPr)
+    cb14 = etree.SubElement(sdt_pr, f"{{{w14}}}checkbox")
+    checked_el = etree.SubElement(cb14, f"{{{w14}}}checked")
+    checked_el.set(f"{{{w14}}}val", "1" if checked else "0")
+    sdt.append(sdt_pr)
 
-    sdtContent = OxmlElement("w:sdtContent")
+    sdt_content = OxmlElement("w:sdtContent")
     para = OxmlElement("w:p")
     run = OxmlElement("w:r")
     t = OxmlElement("w:t")
     t.text = "☑" if checked else "☐"
     run.append(t)
     para.append(run)
-    sdtContent.append(para)
-    sdt.append(sdtContent)
+    sdt_content.append(para)
+    sdt.append(sdt_content)
     body.append(sdt)
 
     buf = io.BytesIO()
@@ -245,16 +243,16 @@ def test_write_content_controls_checkbox_true(tmp_path):
     from docx import Document
     from docx.oxml.ns import qn
 
-    W14 = "http://schemas.microsoft.com/office/word/2010/wordml"
+    w14 = "http://schemas.microsoft.com/office/word/2010/wordml"
     doc = Document(str(out))
     for sdt in doc.element.iter(qn("w:sdt")):
         props = sdt.find(qn("w:sdtPr"))
         if props is None:
             continue
-        cb14 = props.find(f"{{{W14}}}checkbox")
+        cb14 = props.find(f"{{{w14}}}checkbox")
         if cb14 is not None:
-            checked_el = cb14.find(f"{{{W14}}}checked")
-            assert checked_el.get(f"{{{W14}}}val") == "1"
+            checked_el = cb14.find(f"{{{w14}}}checked")
+            assert checked_el.get(f"{{{w14}}}val") == "1"
 
 
 def test_write_template(tmp_path):

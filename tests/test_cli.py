@@ -72,8 +72,17 @@ class TestCLIUtils:
         with pytest.raises(ValueError):
             load_schema("totally_nonexistent_schema")
 
-    def test_load_dotted_path(self):
+    def test_load_dotted_path(self, tmp_path, monkeypatch):
         from docuflow.cli.utils import load_schema
 
-        schema = load_schema("examples.schemas.invoice.Invoice")
+        schema_file = tmp_path / "test_schema_module.py"
+        schema_file.write_text(
+            "from pydantic import BaseModel\n\n"
+            "class Invoice(BaseModel):\n"
+            "    total: float\n",
+            encoding="utf-8",
+        )
+        monkeypatch.syspath_prepend(str(tmp_path))
+
+        schema = load_schema("test_schema_module.Invoice")
         assert schema.__name__ == "Invoice"

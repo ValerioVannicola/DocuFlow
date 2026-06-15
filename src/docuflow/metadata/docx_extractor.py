@@ -131,7 +131,10 @@ def _extract_revisions(root: object, result: DocumentMetadataResult) -> None:
 
 
 def _extract_highlights(root: object, result: DocumentMetadataResult) -> None:
-    for rpr in root.iter(f"{{{_W}}}rPr"):  # type: ignore[union-attr]
+    for run in root.iter(f"{{{_W}}}r"):  # type: ignore[union-attr]
+        rpr = run.find(f"{{{_W}}}rPr")
+        if rpr is None:
+            continue
         hl_el = rpr.find(f"{{{_W}}}highlight")
         if hl_el is None:
             continue
@@ -139,11 +142,8 @@ def _extract_highlights(root: object, result: DocumentMetadataResult) -> None:
         color_hex = _WML_COLORS.get(color_name, color_name)
         if not color_hex:
             continue
-        # The parent of rPr is a w:r (run); collect its text.
-        run = rpr.getparent() if hasattr(rpr, "getparent") else None
-        text = _collect_text(run) if run is not None else ""
         result.highlights.append(Highlight(
             subtype="Highlight",
             color=color_hex,
-            text=text,
+            text=_collect_text(run),
         ))

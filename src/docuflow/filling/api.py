@@ -439,9 +439,9 @@ async def fill_docx_form_async(
     """Fill a DOCX form (content controls or Jinja2 template) and return a FillingResult.
 
     Strategies:
-    - ``"auto"`` – inspect the file: content controls first, then template variables.
-    - ``"content_controls"`` – Word SDT form fields (text, checkbox, dropdown, date).
-    - ``"template"`` – Jinja2 ``{{ field }}`` placeholders rendered via docxtpl.
+    - ``"auto"`` - inspect the file: content controls first, then template variables.
+    - ``"content_controls"`` - Word SDT form fields (text, checkbox, dropdown, date).
+    - ``"template"`` - Jinja2 ``{{ field }}`` placeholders rendered via docxtpl.
 
     Pass ``review=True`` to defer the write: inspect, plan, and populate the result
     without writing the output file.  Use :func:`commit_fill` after approving.

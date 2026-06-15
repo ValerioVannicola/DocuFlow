@@ -4,13 +4,11 @@ from __future__ import annotations
 import io
 import json
 from pathlib import Path
-from typing import Any
 
 import pytest
 from pydantic import BaseModel, Field
 
-from docuflow.splitting.models import DocumentSection, SplitResult
-
+from docuflow.splitting.models import DocumentSection
 
 # ---------------------------------------------------------------------------
 # Helper — minimal PDF with N pages of text
@@ -112,6 +110,39 @@ def test_build_messages_no_overlap_note():
         "", allow_overlap=False, deep=False,
     )
     assert "exactly one section" in msgs[-1]["content"]
+
+
+@pytest.mark.asyncio
+async def test_call_llm_forwards_kwargs_to_custom_adapter():
+    from docuflow.splitting.api import _call_llm, _SimpleSplitResponse
+
+    class Response:
+        def __init__(self) -> None:
+            self.content = '{"sections": {}}'
+            self.usage = {"total_tokens": 1}
+
+    class FakeLLM:
+        def __init__(self) -> None:
+            self.kwargs = {}
+
+        async def complete(self, messages, **kwargs):
+            self.kwargs = kwargs
+            return Response()
+
+    llm = FakeLLM()
+    raw, usage = await _call_llm(
+        [],
+        response_format=_SimpleSplitResponse,
+        model="unused",
+        llm=llm,
+        llm_kwargs={"temperature": 0.2, "metadata": {"source": "test"}},
+    )
+
+    assert raw == '{"sections": {}}'
+    assert usage == {"total_tokens": 1}
+    assert llm.kwargs["response_format"] is _SimpleSplitResponse
+    assert llm.kwargs["temperature"] == 0.2
+    assert llm.kwargs["metadata"] == {"source": "test"}
 
 
 # ---------------------------------------------------------------------------

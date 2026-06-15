@@ -1029,6 +1029,7 @@ all = [
     { name = "docxtpl" },
     { name = "fastapi" },
     { name = "google-cloud-documentai" },
+    { name = "httpx" },
     { name = "litellm" },
     { name = "mcp", extra = ["cli"] },
     { name = "nest-asyncio" },
@@ -1093,6 +1094,7 @@ privacy = [
 ]
 serve = [
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "python-multipart" },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -1108,6 +1110,7 @@ requires-dist = [
     { name = "docxtpl", marker = "extra == 'forms'", specifier = ">=0.17" },
     { name = "fastapi", marker = "extra == 'serve'", specifier = ">=0.115" },
     { name = "google-cloud-documentai", marker = "extra == 'gcp'", specifier = ">=2.30" },
+    { name = "httpx", marker = "extra == 'serve'", specifier = ">=0.28" },
     { name = "litellm", marker = "extra == 'llm'", specifier = ">=1.40" },
     { name = "mcp", extras = ["cli"], marker = "extra == 'mcp'", specifier = ">=1.20" },
     { name = "nest-asyncio", marker = "extra == 'jupyter'", specifier = ">=1.6" },

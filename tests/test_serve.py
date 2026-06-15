@@ -5,10 +5,15 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 import pytest
-from fastapi.testclient import TestClient
 
-from docuflow.serve import create_app
 from docuflow.workflow_config import WorkflowConfig
+
+fastapi_testclient = pytest.importorskip(
+    "fastapi.testclient", reason="serve tests require docuflow[serve]"
+)
+TestClient = fastapi_testclient.TestClient
+serve_module = pytest.importorskip("docuflow.serve", reason="serve tests require docuflow[serve]")
+create_app = serve_module.create_app
 
 
 @pytest.fixture()

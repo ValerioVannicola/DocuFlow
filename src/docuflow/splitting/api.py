@@ -259,7 +259,7 @@ async def _call_llm(
 ) -> tuple[str, dict[str, Any]]:
     """Call the LLM and return (raw_content, usage_dict)."""
     if llm is not None:
-        resp = await llm.complete(messages, response_format=response_format)
+        resp = await llm.complete(messages, response_format=response_format, **llm_kwargs)
         return resp.content, resp.usage if hasattr(resp, "usage") else {}
 
     try:
