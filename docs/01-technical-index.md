@@ -27,7 +27,9 @@ public API, supported options, and examples.
 - `10-extension-points-tracing-and-errors.md` — custom adapters/providers, ingestion, rendering,
   tracing, strategy protocol, and exceptions.
 - `11-pdf-form-filling.md` — `fill_pdf_form()`, `FillingResult`, AcroForm filling, static overlay
-  placements, opt-in blank detection, and the `FillForm` workflow step.
+  placements, opt-in blank detection, the opt-in review/approval workflow
+  (`edit_field()`, `approve()`/`reject()`, `commit_fill()`, `preview_fill()`), and the
+  `FillForm` workflow step.
 
 ## Installation Extras
 
@@ -74,6 +76,8 @@ Most high-level APIs have async and sync entry points:
 | --- | --- |
 | `docuflow.extract()` | `docuflow.extract_async()` |
 | `docuflow.fill_pdf_form()` | `docuflow.fill_pdf_form_async()` |
+| `docuflow.commit_fill()` | `docuflow.commit_fill_async()` |
+| `docuflow.preview_fill()` | `docuflow.preview_fill_async()` |
 | `DocumentPipeline.run_sync()` | `DocumentPipeline.run()` |
 | `run_workflow()` | `run_workflow_async()` |
 | `process_batch()` | `process_batch_async()` |
@@ -92,10 +96,12 @@ from docuflow import (
     Pipeline,
     PrivacyPolicy,
     WorkflowRouter,
+    commit_fill,
     compare_documents,
     discover_schema,
     extract,
     fill_pdf_form,
+    preview_fill,
     process_batch,
     quality_report,
     run_workflow,
@@ -132,6 +138,8 @@ These are the most common selectable values across the high-level APIs.
 | Highlight color | `highlight_fields(color=...)` | `None`, `"auto"`, CSS color string, RGB tuple, RGBA tuple. |
 | Screenshot/highlight format | `format` | Usually `"png"` or `"jpeg"`, depending on Pillow support. |
 | PDF form filling strategy | `strategy` | `"auto"`, `"acroform"`, `"overlay"`. |
+| Fill review status | `FillingResult.review_status` | `"pending"`, `"approved"`, `"rejected"` (only when `review=True`). |
+| Local store fill query status | `LocalDocumentStore.get_fills_by_status()` | `"pending_review"`, `"approved"`, `"rejected"`, `"committed"`. |
 | PDF form field matching | `match_by` | `"auto"`, `"name"`, `"alias"`, `"manual"`, `"label"`, `"llm"`. |
 | PDF form unmatched policy | `unmatched` | `"error"`, `"warn"`, `"ignore"`. |
 | PDF blank detection | `detect_blank_spaces` | `False` by default; set `True` to opt into heuristic static blank detection. |

@@ -2610,7 +2610,7 @@ result = fill_pdf_form(
     strategy="overlay",
     detect_blank_spaces=True,
     blank_detection_mode="llm",    # "heuristic" | "llm" | "hybrid"
-    model="openai/gpt-4o",
+    model="gemini/gemini-2.5-flash",
 )
 
 result.fields["claimant_name"].method  # "llm_detected_blank"
@@ -2627,6 +2627,46 @@ highlights before writing the PDF.
 Use `blank_detection_mode="hybrid"` to run heuristic detection first and ask the LLM only
 for fields the heuristic detector did not map.
 
+### Review & Approval before saving (opt-in)
+
+Because filling writes data *into* a file, any human review has to happen **before** the PDF
+is saved. Pass `review=True` to **prepare** a fill without writing it: the plan is built and
+review heuristics run, but `output_path` is not touched until you approve and commit. This is
+off by default — `review=False` writes the PDF immediately, exactly as before.
+
+```python
+from docuflow import fill_pdf_form, preview_fill, commit_fill
+
+# 1. Prepare — nothing is written yet
+result = fill_pdf_form("claim-form.pdf", data, output_path="filled.pdf", review=True)
+result.review_status        # "pending"
+result.needs_review         # True when a heuristic flags the fill
+result.review_reasons       # why it was flagged (low confidence, auto-detected blank, ...)
+result.committed            # False
+
+# 2. Show it — render each affected page with planned values overlaid (UI backend)
+images = preview_fill(result, output_dir="./preview")   # -> list of PNG paths
+
+# 3. Correct values and/or placements; originals are preserved and every edit is logged
+result.edit_field("claimant_name", value="Maria Bianchi", corrected_by="alice", reason="typo")
+result.edit_field("claimant_name", bbox={"x0": 100, "y0": 200, "x1": 300, "y1": 220})
+result.corrections          # [FillCorrection(...)] full audit trail
+
+# 4. Decide, then commit
+result.approve(approved_by="alice")     # or result.reject(rejected_by="alice", reason="...")
+commit_fill(result)                     # writes filled.pdf (requires approval, or force=True)
+result.committed            # True
+```
+
+`edit_field()` is unified: pass `value=` to change what is written, and/or
+`bbox` / `page_number` / `font_size` / `align` to change where/how (overlay). `commit_fill`
+refuses a rejected result and refuses a pending one unless `force=True`; a result commits
+only once. `preview_fill` highlights edited/warned fields in amber and clean ones in green;
+no PDF is written. The `LocalDocumentStore` persists fills (`get_pending_fills()`,
+`load_filling_result()`), the `FillForm` step takes `review=True`, and MCP exposes
+`get_pending_fills` / `edit_fill_field` / `approve_fill` / `reject_fill`. Async variants:
+`fill_pdf_form_async`, `preview_fill_async`, `commit_fill_async`.
+
 ### `FillingResult`
 
 Important fields:
@@ -2640,6 +2680,9 @@ Important fields:
 - `pdf_fields` — discovered AcroForm fields
 - `unmapped_model_fields`, `unmapped_pdf_fields`
 - `warnings`, `errors`, `trace_id`
+- `committed` — whether the PDF has actually been written (relevant with `review=True`)
+- `needs_review`, `review_status`, `reviewed_by`, `reviewed_at`, `rejection_reason`, `review_reasons`
+- `corrections` — `FillCorrection` audit log of reviewer edits (value and/or placement)
 
 Manual pipelines can use `FillForm`:
 

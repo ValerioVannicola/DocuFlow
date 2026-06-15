@@ -570,6 +570,65 @@ reject_document(
 
 Loads a stored result, rejects it, saves it, and returns review status JSON.
 
+### `get_pending_fills`
+
+```python
+get_pending_fills(store_path: str = "./.docuflow_store") -> str
+```
+
+Returns a JSON list of document ids whose PDF form fill was prepared with `review=True`
+and still awaits human approval before the output PDF is written. See the
+"Review & Approval" section of `11-pdf-form-filling.md`.
+
+### `edit_fill_field`
+
+```python
+edit_fill_field(
+    document_id: str,
+    field_name: str,
+    new_value: str,
+    corrected_by: str = "",
+    reason: str = "",
+    store_path: str = "./.docuflow_store",
+) -> str
+```
+
+Loads a stored `FillingResult`, applies `FillingResult.edit_field(value=...)` to change a
+planned fill value before the PDF is committed, saves it, and returns JSON with the field's
+old value, new value, and correction record.
+
+Note: `new_value` is passed as a string by this MCP tool. Only value edits are supported here;
+placement edits (`bbox`, `page_number`, `font_size`, `align`) use the Python API.
+
+### `approve_fill`
+
+```python
+approve_fill(
+    document_id: str,
+    approved_by: str = "",
+    commit: bool = True,
+    store_path: str = "./.docuflow_store",
+) -> str
+```
+
+Loads a stored result, approves it, and — when `commit` is True (the default) — writes the
+output PDF via `commit_fill_async()`. Saves the result and returns JSON with the review
+status, the `committed` flag, and the `output_path`.
+
+### `reject_fill`
+
+```python
+reject_fill(
+    document_id: str,
+    rejected_by: str = "",
+    reason: str = "",
+    store_path: str = "./.docuflow_store",
+) -> str
+```
+
+Loads a stored result, rejects it, saves it, and returns review status JSON. The output PDF
+is not written.
+
 ### `screenshot_document`
 
 ```python
