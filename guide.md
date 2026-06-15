@@ -47,20 +47,6 @@
 
 ## 1. Introduction
 
-### What It Can Process
-
-DocuFlow accepts these source types today:
-
-- PDF: `.pdf`
-- Images: `.png`, `.jpg`, `.jpeg`, `.tiff`, `.tif`, `.bmp`, `.gif`, `.webp`
-- Text-like files: `.txt`, `.md`, `.html`, `.htm`, `.csv`, `.json`, `.xml`
-- Office documents: `.docx`
-- Spreadsheets: `.xlsx`
-- Email: `.eml`
-
-With `parser="auto"`, DocuFlow routes each source to the right path and still normalizes
-everything to the same internal `Document` model.
-
 ### What DocuFlow Does
 
 DocuFlow is a Python library that extracts structured data from business documents — invoices, contracts, receipts, claims, KYC forms — using LLMs. You define what fields you want (as a Pydantic model), point it at a PDF, and get back:
@@ -82,6 +68,20 @@ Most extraction tools stop at "here's your JSON." DocuFlow covers what happens a
 - **Privacy-first**: anonymize PII before it reaches the LLM
 - **Production tooling**: batch processing, document comparison, CSV export, token/cost accounting
 - **Self-containerizing**: any workflow exports to YAML and deploys itself as a Docker microservice
+
+### What It Can Process
+
+DocuFlow accepts these source types today:
+
+- PDF: `.pdf`
+- Images: `.png`, `.jpg`, `.jpeg`, `.tiff`, `.tif`, `.bmp`, `.gif`, `.webp`
+- Text-like files: `.txt`, `.md`, `.html`, `.htm`, `.csv`, `.json`, `.xml`
+- Office documents: `.docx`
+- Spreadsheets: `.xlsx`
+- Email: `.eml`
+
+With `parser="auto"`, DocuFlow routes each source to the right path and still normalizes
+everything to the same internal `Document` model.
 
 ### Three Ways to Use DocuFlow
 
