@@ -23,9 +23,6 @@ DocuFlow accepts these source types today:
 - Spreadsheets: `.xlsx`
 - Email: `.eml`
 
-With `parser="auto"`, DocuFlow routes each source to the right path and still normalizes
-everything to the same internal `Document` model.
-
 ## Installation
 
 ```bash
