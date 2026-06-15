@@ -33,6 +33,7 @@ dependencies = [
 
 [project.optional-dependencies]
 pdf = ["pdfplumber>=0.11", "pypdfium2>=4.30"]
+forms = ["pypdf>=5.0", "reportlab>=4.0", "pdfplumber>=0.11"]
 ocr = ["pytesseract>=0.3.10", "Pillow>=10.0"]
 llm = ["litellm>=1.40"]
 privacy = ["presidio-analyzer>=2.2", "presidio-anonymizer>=2.2"]
@@ -43,7 +44,7 @@ gcp = ["google-cloud-documentai>=2.30"]
 mcp = ["mcp[cli]>=1.20"]
 serve = ["fastapi>=0.115", "uvicorn[standard]>=0.30", "python-multipart>=0.0.9"]
 jupyter = ["nest_asyncio>=1.6"]
-all = ["docuflow[pdf,ocr,llm,privacy,docling,azure,aws,gcp,mcp,serve,jupyter]"]
+all = ["docuflow[pdf,forms,ocr,llm,privacy,docling,azure,aws,gcp,mcp,serve,jupyter]"]
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.24",

@@ -528,6 +528,11 @@ All steps implement:
 async def execute(state: PipelineState) -> PipelineState
 ```
 
+`PipelineState` can carry both read and write-back results:
+
+- `state.extraction_result` — populated by extraction steps.
+- `state.filling_result` — populated by `FillForm`.
+
 ### `Ingest`
 
 ```python
@@ -657,6 +662,55 @@ VerifyFields(
 ```
 
 Runs zoom-and-verify after extraction and before review.
+
+### `FillForm`
+
+```python
+FillForm(
+    data: Any = None,
+    output_path: str | None = None,
+    strategy: str = "auto",
+    match_by: str = "auto",
+    field_map: dict[str, Any] | None = None,
+    formats: dict[str, Any] | None = None,
+    flatten: bool = False,
+    detect_blank_spaces: bool = False,
+    blank_detection_mode: str = "heuristic",
+    llm: Any = None,
+    model: str = "openai/gpt-4o",
+    llm_kwargs: dict[str, Any] | None = None,
+    vision_dpi: int = DEFAULT_DPI,
+    min_detection_confidence: float = 0.5,
+    skip_none: bool = True,
+    unmatched: str = "warn",
+    overflow: str = "shrink",
+)
+```
+
+Writes trusted data into a PDF and populates `state.filling_result` with a
+`FillingResult`. This step does not use `ExtractionResult`.
+
+| Parameter | Description |
+| --- | --- |
+| `data` | Pydantic model instance or mapping. If omitted, reads `state.metadata["fill_data"]` or `state.metadata["data"]`. |
+| `output_path` | Output PDF path. If omitted, reads `state.metadata["output_path"]`, then falls back to `<input-stem>-filled.pdf`. |
+| `strategy` | `"auto"`, `"acroform"`, or `"overlay"`. |
+| `match_by` | `"auto"`, `"name"`, `"alias"`, `"manual"`, `"label"`, or `"llm"`. |
+| `field_map` | Explicit PDF field map or static overlay placements. |
+| `formats` | Per-field format strings or callables. |
+| `flatten` | Request flattened AcroForm output when supported by the backend. |
+| `detect_blank_spaces` | Opt-in static PDF blank detection. Defaults to `False` and only affects overlay filling. |
+| `blank_detection_mode` | `"heuristic"`, `"llm"`, or `"hybrid"`. LLM mode uses relative 0-1 coordinates and converts them to standard `BoundingBox` page coordinates. |
+| `llm` | Optional LLM adapter for LLM blank detection. |
+| `model` | LiteLLM model string for LLM blank detection when no `llm` is supplied. |
+| `llm_kwargs` | Extra kwargs for the default `LiteLLMAdapter`. |
+| `vision_dpi` | Render DPI for LLM blank detection page images. |
+| `min_detection_confidence` | Ignore LLM placements below this confidence. |
+| `skip_none` | Skip `None` values. |
+| `unmatched` | `"error"`, `"warn"`, or `"ignore"` for unmapped model fields. |
+| `overflow` | `"error"`, `"shrink"`, or `"wrap"` for overlay overflow handling. |
+
+See `11-pdf-form-filling.md` for the full API and result model.
 
 ### `Validate`
 

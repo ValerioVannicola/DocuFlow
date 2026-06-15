@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from docuflow.documents.models import Document, DocumentMetadata
 from docuflow.extraction.models import ExtractionResult
+from docuflow.filling.models import FillingResult
 from docuflow.observability.traces import create_trace
 from docuflow.storage.base import Storage
 from docuflow.storage.local import LocalDocumentStore
@@ -54,6 +55,20 @@ class TestLocalDocumentStore:
         await store.save_trace(trace)
         trace_path = tmp_path / "store" / "test-doc-1" / "trace.json"
         assert trace_path.is_file()
+
+    async def test_save_filling_result(self, tmp_path):
+        store = LocalDocumentStore(str(tmp_path / "store"))
+        result = FillingResult(
+            input_path="blank.pdf",
+            document_id="test-doc-1",
+            output_path="filled.pdf",
+            strategy="acroform",
+            success=True,
+        )
+
+        await store.save_filling_result(result)
+        result_path = tmp_path / "store" / "test-doc-1" / "filling.json"
+        assert result_path.is_file()
 
     async def test_protocol_compliance(self, tmp_path):
         store = LocalDocumentStore(str(tmp_path / "store"))

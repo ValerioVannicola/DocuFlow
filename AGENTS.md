@@ -424,6 +424,46 @@ from docuflow.screenshots import screenshot_pages_sync
 shots = screenshot_pages_sync("doc.pdf", output_dir="./pages", dpi=200)
 ```
 
+## PDF Form Filling
+
+PDF write-back is separate from extraction and returns `FillingResult`, not `ExtractionResult`.
+
+```bash
+pip install docuflow[forms]
+```
+
+```python
+from docuflow import fill_pdf_form
+
+result = fill_pdf_form(
+    "blank-form.pdf",
+    data=form_data,              # Pydantic instance or mapping
+    output_path="filled-form.pdf",
+    strategy="auto",             # "auto" | "acroform" | "overlay"
+    match_by="auto",             # "auto" | "name" | "alias" | "manual" | "label" | "llm"
+    field_map=None,              # PDF field map or overlay placements
+    detect_blank_spaces=False,   # opt-in static blank detection; off by default
+    blank_detection_mode="heuristic",  # "heuristic" | "llm" | "hybrid"
+)
+
+result.success
+result.output_path
+result.strategy                  # "acroform" | "overlay"
+result.fields                    # dict[str, FilledField]
+result.unmapped_model_fields
+result.unmapped_pdf_fields
+result.warnings
+result.errors
+```
+
+`strategy="acroform"` writes existing PDF form fields. `strategy="overlay"` writes values at
+explicit `field_map` placements using DocuFlow top-left page coordinates. Automatic static
+blank-space detection exists only when `detect_blank_spaces=True`; it is heuristic and off
+by default. Use `blank_detection_mode="llm"` for a vision LLM placement planner, or
+`"hybrid"` to use heuristic placements first and LLM for missing fields. The LLM returns
+relative 0-1 top-left boxes, which DocuFlow converts to standard `BoundingBox` page
+coordinates before writing. Manual pipelines can use `FillForm`.
+
 ## Quality Report
 
 ```python
@@ -493,7 +533,7 @@ yaml_str = pipeline.export_yaml(Invoice, name="invoice")
 
 ```python
 pipeline = DocumentPipeline(storage="local")  # saves to .docuflow_store/
-# Saves: original.pdf, document.json, extraction.json, trace.json
+# Saves: original.pdf, document.json, extraction.json, filling.json, trace.json
 # On failure: partial state auto-saved if storage is configured
 ```
 
@@ -570,7 +610,7 @@ docuflow templates init invoice
 
 ```python
 # Top-level
-from docuflow import extract, DocumentPipeline, Pipeline, PrivacyPolicy
+from docuflow import extract, fill_pdf_form, DocumentPipeline, Pipeline, PrivacyPolicy
 from docuflow import process_batch, compare_documents
 
 # Parsing
@@ -603,13 +643,14 @@ from docuflow.extraction.llm.litellm_adapter import LiteLLMAdapter
 # Pipeline steps (for manual Pipeline)
 from docuflow.workflow import (
     Pipeline, Ingest, Parse, Extract, ExtractVision, ExtractHybrid,
-    Anonymize, Validate, Review, Store,
+    Anonymize, FillForm, Validate, Review, Store,
 )
 
 # Utilities
 from docuflow.search import search_document
 from docuflow.screenshots import screenshot_pages_sync
 from docuflow.quality import quality_report, QualityReport, QualitySnapshot, QualityLog
+from docuflow.filling import FillingResult, FilledField, FieldPlacement, FormField
 from docuflow.workflow_config import load_workflow_config, run_workflow, WorkflowConfig
 from docuflow.batch import process_batch, BatchReport
 from docuflow.comparison import compare_documents, ComparisonResult
@@ -797,6 +838,7 @@ src/docuflow/
   documents/           # Document, Page, Block, Evidence, Table, Cell
   extraction/          # ExtractionEngine, VisionExtractionEngine, HybridExtractionEngine
     llm/               # LLMAdapter protocol, LiteLLMAdapter
+  filling/             # fill_pdf_form, FillingResult, AcroForm and overlay writers
   parsing/             # Parser protocol, pdfplumber, Tesseract, Docling, Smart
   ocr/                 # OCREngine protocol, TesseractOCR, preprocessing
   rendering/           # PDF page to image rendering

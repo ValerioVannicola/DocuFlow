@@ -7,6 +7,7 @@ import aiofiles
 
 from docuflow.documents.models import Document
 from docuflow.extraction.models import ExtractionResult
+from docuflow.filling.models import FillingResult
 from docuflow.observability.traces import Trace
 
 
@@ -38,6 +39,13 @@ class LocalDocumentStore:
         async with aiofiles.open(doc_dir / "extraction.json", "w") as f:
             await f.write(result.model_dump_json(indent=2))
         return result.document_id
+
+    async def save_filling_result(self, result: FillingResult) -> str:
+        doc_id = result.document_id or result.trace_id or "unknown"
+        doc_dir = self._doc_dir(doc_id)
+        async with aiofiles.open(doc_dir / "filling.json", "w") as f:
+            await f.write(result.model_dump_json(indent=2))
+        return doc_id
 
     async def save_trace(self, trace: Trace) -> str:
         doc_id = trace.document_id or "unknown"

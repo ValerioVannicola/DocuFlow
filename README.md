@@ -9,7 +9,7 @@
 
 Most document extraction tools focus on one part of the problem: parsing a PDF, running OCR, or calling an LLM. In real workflows, that is rarely enough. Teams also need schemas, evidence, trust signals, validation, privacy controls, review steps, corrections, storage, and an audit trail they can rely on.
 
-DocuFlow is a workflow runtime for document extraction. It combines parsers, OCR, LLMs, validation rules, review logic, consensus, verification, and deployment options into one reproducible pipeline, so extracted data can move from messy documents into production systems with traceability and control.
+DocuFlow is a workflow runtime for document extraction and PDF write-back. It combines parsers, OCR, LLMs, validation rules, review logic, consensus, verification, form filling, and deployment options into one reproducible pipeline, so document data can move from messy PDFs into production systems, and trusted data can be written back into forms, with traceability and control.
 
 ## Installation
 
@@ -23,6 +23,7 @@ Or install only what you need:
 pip install docuflow[pdf,llm]      # pdfplumber parser + LLM extraction
 pip install docuflow[ocr,llm]      # Tesseract OCR + LLM extraction
 pip install docuflow[docling,llm]  # Docling parser (best quality) + LLM
+pip install docuflow[forms]        # PDF form filling
 pip install docuflow[privacy]      # PII anonymization via Presidio
 ```
 
@@ -41,7 +42,7 @@ class Invoice(BaseModel):
 
 result = extract("invoice.pdf", schema=Invoice)
 print(result.data)                          # {"supplier_name": "Acme", "total": 1234.56}
-print(result.fields["total"].confidence)    # 0.92
+print(result.fields["total"].trust_gate)     # True
 print(result.fields["total"].evidence[0])   # page 0, bbox, source text
 ```
 
@@ -57,6 +58,11 @@ print(result.fields["total"].evidence[0])   # page 0, bbox, source text
 - **Single or multi-agent**: multi mode runs N parallel LLM calls at varied temperatures with a decider
 - **Domain context**: tell the LLM your industry for better extraction
 - **JSON reliability**: JSON mode, concrete examples, auto-retry on parse failure
+
+### PDF Form Filling
+- **Dedicated write-back API**: `fill_pdf_form()` writes trusted Pydantic data into PDFs and returns `FillingResult`, separate from extraction
+- **AcroForm support**: fill existing PDF form fields by Pydantic alias, field name, normalized name, or explicit map
+- **Static overlay support**: write values into visual blanks with explicit page/bbox placements, or opt into heuristic/LLM blank detection with `detect_blank_spaces=True`
 
 ### Evidence & Confidence
 - Every field links to source text, page number, and word-precise bounding boxes (multi-line and cross-page highlights supported)

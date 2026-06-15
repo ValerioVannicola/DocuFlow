@@ -26,6 +26,8 @@ public API, supported options, and examples.
   tools, and deployment parameters.
 - `10-extension-points-tracing-and-errors.md` — custom adapters/providers, ingestion, rendering,
   tracing, strategy protocol, and exceptions.
+- `11-pdf-form-filling.md` — `fill_pdf_form()`, `FillingResult`, AcroForm filling, static overlay
+  placements, opt-in blank detection, and the `FillForm` workflow step.
 
 ## Installation Extras
 
@@ -40,6 +42,7 @@ Install smaller extras when you only need part of the stack:
 | Extra | Installs | Use when |
 | --- | --- | --- |
 | `pdf` | `pdfplumber`, `pypdfium2` | Native PDF text extraction and page rendering. |
+| `forms` | `pypdf`, `reportlab`, `pdfplumber` | Write values into AcroForm fields, explicit static-PDF overlay placements, and opt-in blank detection. |
 | `ocr` | `pytesseract`, `Pillow` | Local OCR through Tesseract. Requires the system `tesseract` binary. |
 | `llm` | `litellm` | LLM-backed extraction, review, schema discovery, routing. |
 | `privacy` | Presidio analyzer/anonymizer | Text anonymization before LLM calls. |
@@ -58,6 +61,7 @@ Common combinations:
 pip install docuflow[pdf,llm]
 pip install docuflow[ocr,llm]
 pip install docuflow[docling,llm]
+pip install docuflow[forms]
 pip install docuflow[serve]
 pip install docuflow[mcp]
 ```
@@ -69,6 +73,7 @@ Most high-level APIs have async and sync entry points:
 | Sync API | Async API |
 | --- | --- |
 | `docuflow.extract()` | `docuflow.extract_async()` |
+| `docuflow.fill_pdf_form()` | `docuflow.fill_pdf_form_async()` |
 | `DocumentPipeline.run_sync()` | `DocumentPipeline.run()` |
 | `run_workflow()` | `run_workflow_async()` |
 | `process_batch()` | `process_batch_async()` |
@@ -90,6 +95,7 @@ from docuflow import (
     compare_documents,
     discover_schema,
     extract,
+    fill_pdf_form,
     process_batch,
     quality_report,
     run_workflow,
@@ -125,6 +131,11 @@ These are the most common selectable values across the high-level APIs.
 | Local store query status | `LocalDocumentStore.get_by_status()` | `"pending_review"`, `"approved"`, `"rejected"`, `"pending"`. |
 | Highlight color | `highlight_fields(color=...)` | `None`, `"auto"`, CSS color string, RGB tuple, RGBA tuple. |
 | Screenshot/highlight format | `format` | Usually `"png"` or `"jpeg"`, depending on Pillow support. |
+| PDF form filling strategy | `strategy` | `"auto"`, `"acroform"`, `"overlay"`. |
+| PDF form field matching | `match_by` | `"auto"`, `"name"`, `"alias"`, `"manual"`, `"label"`, `"llm"`. |
+| PDF form unmatched policy | `unmatched` | `"error"`, `"warn"`, `"ignore"`. |
+| PDF blank detection | `detect_blank_spaces` | `False` by default; set `True` to opt into heuristic static blank detection. |
+| PDF blank detection mode | `blank_detection_mode` | `"heuristic"`, `"llm"`, `"hybrid"`. |
 
 ## Coordinate And Evidence Contract
 

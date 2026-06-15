@@ -860,110 +860,6 @@ wheels = [
 ]
 
 [[package]]
-name = "docuflow"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "aiofiles" },
-    { name = "click" },
-    { name = "pydantic" },
-    { name = "pyyaml" },
-    { name = "structlog" },
-]
-
-[package.optional-dependencies]
-all = [
-    { name = "azure-ai-documentintelligence" },
-    { name = "boto3" },
-    { name = "docling" },
-    { name = "fastapi" },
-    { name = "google-cloud-documentai" },
-    { name = "litellm" },
-    { name = "mcp", extra = ["cli"] },
-    { name = "pdfplumber" },
-    { name = "pillow" },
-    { name = "presidio-analyzer" },
-    { name = "presidio-anonymizer" },
-    { name = "pypdfium2" },
-    { name = "pytesseract" },
-    { name = "python-multipart" },
-    { name = "uvicorn", extra = ["standard"] },
-]
-aws = [
-    { name = "boto3" },
-]
-azure = [
-    { name = "azure-ai-documentintelligence" },
-]
-dev = [
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-cov" },
-    { name = "reportlab" },
-    { name = "ruff" },
-]
-docling = [
-    { name = "docling" },
-]
-gcp = [
-    { name = "google-cloud-documentai" },
-]
-llm = [
-    { name = "litellm" },
-]
-mcp = [
-    { name = "mcp", extra = ["cli"] },
-]
-ocr = [
-    { name = "pillow" },
-    { name = "pytesseract" },
-]
-pdf = [
-    { name = "pdfplumber" },
-    { name = "pypdfium2" },
-]
-privacy = [
-    { name = "presidio-analyzer" },
-    { name = "presidio-anonymizer" },
-]
-serve = [
-    { name = "fastapi" },
-    { name = "python-multipart" },
-    { name = "uvicorn", extra = ["standard"] },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "aiofiles", specifier = ">=24.0" },
-    { name = "azure-ai-documentintelligence", marker = "extra == 'azure'", specifier = ">=1.0" },
-    { name = "boto3", marker = "extra == 'aws'", specifier = ">=1.34" },
-    { name = "click", specifier = ">=8.0" },
-    { name = "docuflow", extras = ["pdf", "ocr", "llm", "privacy", "docling", "azure", "aws", "gcp", "mcp", "serve"], marker = "extra == 'all'" },
-    { name = "docling", marker = "extra == 'docling'", specifier = ">=2.90" },
-    { name = "fastapi", marker = "extra == 'serve'", specifier = ">=0.115" },
-    { name = "google-cloud-documentai", marker = "extra == 'gcp'", specifier = ">=2.30" },
-    { name = "litellm", marker = "extra == 'llm'", specifier = ">=1.40" },
-    { name = "mcp", extras = ["cli"], marker = "extra == 'mcp'", specifier = ">=1.20" },
-    { name = "pdfplumber", marker = "extra == 'pdf'", specifier = ">=0.11" },
-    { name = "pillow", marker = "extra == 'ocr'", specifier = ">=10.0" },
-    { name = "presidio-analyzer", marker = "extra == 'privacy'", specifier = ">=2.2" },
-    { name = "presidio-anonymizer", marker = "extra == 'privacy'", specifier = ">=2.2" },
-    { name = "pydantic", specifier = ">=2.0" },
-    { name = "pypdfium2", marker = "extra == 'pdf'", specifier = ">=4.30" },
-    { name = "pytesseract", marker = "extra == 'ocr'", specifier = ">=0.3.10" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
-    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.24" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0" },
-    { name = "python-multipart", marker = "extra == 'serve'", specifier = ">=0.0.9" },
-    { name = "pyyaml", specifier = ">=6.0" },
-    { name = "reportlab", marker = "extra == 'dev'", specifier = ">=4.0" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.5" },
-    { name = "structlog", specifier = ">=24.0" },
-    { name = "uvicorn", extras = ["standard"], marker = "extra == 'serve'", specifier = ">=0.30" },
-]
-provides-extras = ["pdf", "ocr", "llm", "privacy", "docling", "azure", "aws", "gcp", "mcp", "serve", "all", "dev"]
-
-[[package]]
 name = "docling"
 version = "2.96.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1112,6 +1008,125 @@ standard = [
     { name = "typer" },
     { name = "websockets" },
 ]
+
+[[package]]
+name = "docuflow"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "aiofiles" },
+    { name = "click" },
+    { name = "pydantic" },
+    { name = "pyyaml" },
+    { name = "structlog" },
+]
+
+[package.optional-dependencies]
+all = [
+    { name = "azure-ai-documentintelligence" },
+    { name = "boto3" },
+    { name = "docling" },
+    { name = "fastapi" },
+    { name = "google-cloud-documentai" },
+    { name = "litellm" },
+    { name = "mcp", extra = ["cli"] },
+    { name = "nest-asyncio" },
+    { name = "pdfplumber" },
+    { name = "pillow" },
+    { name = "presidio-analyzer" },
+    { name = "presidio-anonymizer" },
+    { name = "pypdf" },
+    { name = "pypdfium2" },
+    { name = "pytesseract" },
+    { name = "python-multipart" },
+    { name = "reportlab" },
+    { name = "uvicorn", extra = ["standard"] },
+]
+aws = [
+    { name = "boto3" },
+]
+azure = [
+    { name = "azure-ai-documentintelligence" },
+]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-cov" },
+    { name = "reportlab" },
+    { name = "ruff" },
+]
+docling = [
+    { name = "docling" },
+]
+forms = [
+    { name = "pdfplumber" },
+    { name = "pypdf" },
+    { name = "reportlab" },
+]
+gcp = [
+    { name = "google-cloud-documentai" },
+]
+jupyter = [
+    { name = "nest-asyncio" },
+]
+llm = [
+    { name = "litellm" },
+]
+mcp = [
+    { name = "mcp", extra = ["cli"] },
+]
+ocr = [
+    { name = "pillow" },
+    { name = "pytesseract" },
+]
+pdf = [
+    { name = "pdfplumber" },
+    { name = "pypdfium2" },
+]
+privacy = [
+    { name = "presidio-analyzer" },
+    { name = "presidio-anonymizer" },
+]
+serve = [
+    { name = "fastapi" },
+    { name = "python-multipart" },
+    { name = "uvicorn", extra = ["standard"] },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aiofiles", specifier = ">=24.0" },
+    { name = "azure-ai-documentintelligence", marker = "extra == 'azure'", specifier = ">=1.0" },
+    { name = "boto3", marker = "extra == 'aws'", specifier = ">=1.34" },
+    { name = "click", specifier = ">=8.0" },
+    { name = "docling", marker = "extra == 'docling'", specifier = ">=2.90" },
+    { name = "docuflow", extras = ["pdf", "forms", "ocr", "llm", "privacy", "docling", "azure", "aws", "gcp", "mcp", "serve", "jupyter"], marker = "extra == 'all'" },
+    { name = "fastapi", marker = "extra == 'serve'", specifier = ">=0.115" },
+    { name = "google-cloud-documentai", marker = "extra == 'gcp'", specifier = ">=2.30" },
+    { name = "litellm", marker = "extra == 'llm'", specifier = ">=1.40" },
+    { name = "mcp", extras = ["cli"], marker = "extra == 'mcp'", specifier = ">=1.20" },
+    { name = "nest-asyncio", marker = "extra == 'jupyter'", specifier = ">=1.6" },
+    { name = "pdfplumber", marker = "extra == 'forms'", specifier = ">=0.11" },
+    { name = "pdfplumber", marker = "extra == 'pdf'", specifier = ">=0.11" },
+    { name = "pillow", marker = "extra == 'ocr'", specifier = ">=10.0" },
+    { name = "presidio-analyzer", marker = "extra == 'privacy'", specifier = ">=2.2" },
+    { name = "presidio-anonymizer", marker = "extra == 'privacy'", specifier = ">=2.2" },
+    { name = "pydantic", specifier = ">=2.0" },
+    { name = "pypdf", marker = "extra == 'forms'", specifier = ">=5.0" },
+    { name = "pypdfium2", marker = "extra == 'pdf'", specifier = ">=4.30" },
+    { name = "pytesseract", marker = "extra == 'ocr'", specifier = ">=0.3.10" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
+    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.24" },
+    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0" },
+    { name = "python-multipart", marker = "extra == 'serve'", specifier = ">=0.0.9" },
+    { name = "pyyaml", specifier = ">=6.0" },
+    { name = "reportlab", marker = "extra == 'dev'", specifier = ">=4.0" },
+    { name = "reportlab", marker = "extra == 'forms'", specifier = ">=4.0" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.5" },
+    { name = "structlog", specifier = ">=24.0" },
+    { name = "uvicorn", extras = ["standard"], marker = "extra == 'serve'", specifier = ">=0.30" },
+]
+provides-extras = ["pdf", "forms", "ocr", "llm", "privacy", "docling", "azure", "aws", "gcp", "mcp", "serve", "jupyter", "all", "dev"]
 
 [[package]]
 name = "et-xmlfile"
@@ -2293,6 +2308,15 @@ wheels = [
 ]
 
 [[package]]
+name = "nest-asyncio"
+version = "1.6.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/83/f8/51569ac65d696c8ecbee95938f89d4abf00f47d58d48f6fbabfe8f0baefe/nest_asyncio-1.6.0.tar.gz", hash = "sha256:6f172d5449aca15afd6c646851f4e31e02c598d553a667e38cafa997cfec55fe", size = 7418, upload-time = "2024-01-21T14:25:19.227Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a0/c4/c2971a3ba4c6103a3d10c4b0f24f461ddc027f0f09763220cf35ca1401b3/nest_asyncio-1.6.0-py3-none-any.whl", hash = "sha256:87af6efd6b5e897c81050477ef65c62e2b2f35d51703cae01aff2905b1852e1c", size = 5195, upload-time = "2024-01-21T14:25:17.223Z" },
+]
+
+[[package]]
 name = "networkx"
 version = "3.6.1"
 source = { registry = "https://pypi.org/simple" }
@@ -3279,6 +3303,15 @@ name = "pylatexenc"
 version = "2.10"
 source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/5d/ab/34ec41718af73c00119d0351b7a2531d2ebddb51833a36448fc7b862be60/pylatexenc-2.10.tar.gz", hash = "sha256:3dd8fd84eb46dc30bee1e23eaab8d8fb5a7f507347b23e5f38ad9675c84f40d3", size = 162597, upload-time = "2021-04-06T07:56:07.854Z" }
+
+[[package]]
+name = "pypdf"
+version = "6.13.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/99/0a/48fe05c6bb3aa4bb4d2a4079a383d33c0dfec1edf613a642f07d8b8b5c2e/pypdf-6.13.2.tar.gz", hash = "sha256:5a96a17dbdfbf9c2ab24c0a13fa0aba182be22ba6f283098712c16fc242f509f", size = 6479250, upload-time = "2026-06-10T16:42:34.5Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/cb/17/378943705992f74e451a06de3401ce68e3213763c81e44d0614559c45599/pypdf-6.13.2-py3-none-any.whl", hash = "sha256:6eeb9e57693f29d41bd01255d02660cbbb41fd7fc818a982677389a35e4f2083", size = 346555, upload-time = "2026-06-10T16:42:32.37Z" },
+]
 
 [[package]]
 name = "pypdfium2"

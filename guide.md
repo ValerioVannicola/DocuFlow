@@ -36,6 +36,7 @@
 18. [Quality Report](#18-quality-report)
 18b. [Workflow Config](#18b-workflow-config)
 18c. [Serve & Dockerize (Deployment)](#18c-serve--dockerize-deployment)
+18d. [PDF Form Filling](#18d-pdf-form-filling)
 19. [Storage](#19-storage)
 20. [Observability & Traces](#20-observability--traces)
 21. [Error Handling](#21-error-handling)
@@ -236,6 +237,7 @@ If storage is configured (`storage="local"`), the Store step persists everything
 - `{document_id}/original.pdf` — copy of the source file
 - `{document_id}/document.json` — the parsed Document (pages, blocks, text, tables)
 - `{document_id}/extraction.json` — the ExtractionResult (data, fields, evidence, trust, review status, corrections)
+- `{document_id}/filling.json` — the FillingResult for PDF form filling workflows
 - `{document_id}/trace.json` — processing trace (every step's timing, model calls, errors)
 
 **On failure**: if the pipeline fails at any step and storage is configured, partial state is automatically saved. The trace shows exactly which step failed and why.
@@ -272,6 +274,7 @@ Install only what you need:
 pip install docuflow[pdf,llm]        # pdfplumber parser + LLM (lightweight)
 pip install docuflow[ocr,llm]        # Tesseract OCR + LLM
 pip install docuflow[docling,llm]    # Docling parser + LLM (best quality)
+pip install docuflow[forms]          # PDF form filling
 pip install docuflow[privacy]        # Presidio anonymization
 ```
 
@@ -280,6 +283,7 @@ pip install docuflow[privacy]        # Presidio anonymization
 | Group | Packages | Purpose |
 |-------|----------|---------|
 | `pdf` | pdfplumber, pypdfium2 | PDF text extraction (pdfplumber) and page rendering (pypdfium2) |
+| `forms` | pypdf, reportlab, pdfplumber | PDF form filling, explicit static-PDF overlays, and opt-in blank detection |
 | `ocr` | pytesseract, Pillow | OCR with Tesseract |
 | `llm` | litellm | LLM calls (OpenAI, Anthropic, Gemini, etc.) |
 | `privacy` | presidio-analyzer, presidio-anonymizer | PII detection and anonymization |
@@ -303,6 +307,7 @@ DocuFlow itself is ~3 MB. The dependencies vary significantly by what you instal
 | `docuflow[pdf]` | ~70 MB | + pdfplumber (~50 MB) — digital PDF parsing |
 | `docuflow[ocr]` | ~30 MB | + pytesseract + Pillow (~15 MB) — OCR (requires Tesseract binary) |
 | `docuflow[llm]` | ~80 MB | + litellm (~55 MB) + OpenAI/HTTP clients |
+| `docuflow[forms]` | ~20 MB | + pypdf + reportlab — write values into PDF forms |
 | `docuflow[pdf,llm]` | ~140 MB | pdfplumber + LLM — the lightweight production setup |
 | `docuflow[ocr,llm]` | ~110 MB | Tesseract + LLM — for scanned documents |
 | `docuflow[privacy]` | ~50 MB | + Presidio analyzer + anonymizer + spaCy model |
@@ -1523,6 +1528,7 @@ print(result.state.extraction_result.data)
 | `Extract(schema, llm, ...)` | extract | Send text to LLM, get structured data |
 | `ExtractVision(schema, llm, ...)` | extract_vision | Send page images to vision LLM |
 | `ExtractHybrid(schema, llm, ...)` | extract_hybrid | Vision + text agents in parallel |
+| `FillForm(data, output_path, ...)` | fill_form | Write trusted data into a PDF form, returning `FillingResult` |
 | `Validate(validators)` | validate | Check fields against rules |
 | `Review(rules)` | review | Flag documents for human review |
 | `Store(storage)` | store | Persist document, result, and trace |
@@ -2500,6 +2506,159 @@ are never baked into the image.
 
 ---
 
+## 18d. PDF Form Filling
+
+DocuFlow can also write trusted structured data into PDF forms. This is separate from
+extraction: filling returns a dedicated `FillingResult`, not an `ExtractionResult`.
+
+Install the writer dependencies:
+
+```bash
+pip install docuflow[forms]
+```
+
+### Fill an AcroForm PDF
+
+Use this when the PDF has real form fields.
+
+```python
+from pydantic import BaseModel, Field
+from docuflow import fill_pdf_form
+
+
+class ClaimForm(BaseModel):
+    claimant_name: str = Field(alias="claimant.name")
+    policy_number: str
+    accepted_terms: bool = False
+
+
+data = ClaimForm(
+    **{
+        "claimant.name": "Mario Rossi",
+        "policy_number": "POL-123456",
+        "accepted_terms": True,
+    }
+)
+
+result = fill_pdf_form(
+    "blank-claim-form.pdf",
+    data=data,
+    output_path="filled-claim-form.pdf",
+    strategy="auto",        # "auto" | "acroform" | "overlay"
+)
+
+result.success
+result.output_path
+result.strategy             # "acroform"
+result.fields["claimant_name"].target_name
+result.unmapped_model_fields
+result.warnings
+```
+
+`strategy="auto"` inspects existing PDF form fields first. Matching uses Pydantic aliases,
+field names, normalized names, or an explicit `field_map`.
+
+### Static PDF Overlay
+
+For PDFs with visual blanks but no real form fields, use `strategy="overlay"`. The default
+path uses explicit placements. Coordinates use DocuFlow's normal page geometry: top-left
+origin, usually PDF points.
+
+```python
+result = fill_pdf_form(
+    "static-claim-form.pdf",
+    data={"claimant_name": "Mario Rossi"},
+    output_path="static-claim-form-filled.pdf",
+    strategy="overlay",
+    field_map={
+        "claimant_name": {
+            "page_number": 0,
+            "bbox": {"x0": 72, "y0": 120, "x1": 260, "y1": 140},
+            "font_size": 10,
+        }
+    },
+)
+```
+
+Automatic blank-space detection exists but is **off by default**. Enable it explicitly
+when you want DocuFlow to infer labeled blank lines from PDF geometry:
+
+```python
+result = fill_pdf_form(
+    "static-claim-form.pdf",
+    data={"claimant_name": "Mario Rossi"},
+    output_path="static-claim-form-filled.pdf",
+    strategy="overlay",
+    detect_blank_spaces=True,  # opt-in, not active by default
+)
+
+result.fields["claimant_name"].method  # "auto_detected_blank"
+result.warnings                        # includes detection summary
+```
+
+This detector is heuristic. It handles labeled blank lines, simple boxes, and underscore
+blanks such as `Name: __________`. For high-stakes forms, explicit `field_map` placements
+remain the most reliable option.
+
+For harder static forms, use LLM-assisted detection:
+
+```python
+result = fill_pdf_form(
+    "static-claim-form.pdf",
+    data={"claimant_name": "Mario Rossi", "address": "Via Roma 1"},
+    output_path="static-claim-form-filled.pdf",
+    strategy="overlay",
+    detect_blank_spaces=True,
+    blank_detection_mode="llm",    # "heuristic" | "llm" | "hybrid"
+    model="openai/gpt-4o",
+)
+
+result.fields["claimant_name"].method  # "llm_detected_blank"
+result.fields["claimant_name"].placement.confidence
+result.fields["claimant_name"].placement.reason
+```
+
+The LLM is only a placement planner. It sees page images plus field names, aliases, and
+descriptions; it does not receive the values to write. The LLM returns page-relative
+coordinates (`0.0`–`1.0`, top-left origin), and DocuFlow converts them into the same
+`BoundingBox` coordinate system used by extraction evidence, search hits, OCR spans, and
+highlights before writing the PDF.
+
+Use `blank_detection_mode="hybrid"` to run heuristic detection first and ask the LLM only
+for fields the heuristic detector did not map.
+
+### `FillingResult`
+
+Important fields:
+
+- `success` — whether any fields were written without errors
+- `input_path`, `output_path` — source and generated PDF
+- `schema_name` — Pydantic model class name, or `"Mapping"`
+- `strategy` — `"acroform"` or `"overlay"`
+- `data` — values supplied by the user
+- `fields` — per-field `FilledField` objects with `value`, `formatted_value`, `target_name`, `page_number`, `bbox`, `method`, and warnings
+- `pdf_fields` — discovered AcroForm fields
+- `unmapped_model_fields`, `unmapped_pdf_fields`
+- `warnings`, `errors`, `trace_id`
+
+Manual pipelines can use `FillForm`:
+
+```python
+from docuflow.workflow import Pipeline, Ingest, FillForm
+
+pipeline = Pipeline([
+    Ingest(path="blank-form.pdf"),
+    FillForm(data=data, output_path="filled-form.pdf"),
+])
+
+pipeline_result = pipeline.run_sync()
+filling_result = pipeline_result.state.filling_result
+```
+
+For the full parameter reference, see [`docs/11-pdf-form-filling.md`](docs/11-pdf-form-filling.md).
+
+---
+
 ## 19. Storage
 
 Storage persists documents, extraction results, and traces to disk.
@@ -2515,6 +2674,7 @@ Files saved per document:
 - `original.pdf` — copy of the source file
 - `document.json` — parsed Document (pages, blocks, text, metadata)
 - `extraction.json` — ExtractionResult (fields, values, evidence, corrections, review status)
+- `filling.json` — FillingResult for PDF form filling workflows
 - `trace.json` — processing trace (events, timing)
 
 ### On Failure
@@ -2547,6 +2707,7 @@ from docuflow.storage.base import Storage
 class MyStorage:
     async def save_document(self, document: Document) -> str: ...
     async def save_result(self, result: ExtractionResult) -> str: ...
+    async def save_filling_result(self, result: FillingResult) -> str: ...
     async def save_trace(self, trace: Trace) -> str: ...
     async def load_result(self, document_id: str) -> ExtractionResult | None: ...
 
@@ -2574,7 +2735,7 @@ for event in pipeline_result.trace.events:
     print(f"{event.event_type}: {event.step_name} ({event.duration_ms:.0f}ms)")
 ```
 
-Event types include: `ingest`, `parse`, `anonymize`, `llm_call`, `vision_render`, `vision_ocr_enrichment`, `vision_llm_call`, `multi_extract_candidates`, `multi_extract_decider`, `hybrid_render`, `hybrid_candidates`, `hybrid_decider`, `validate`, `review`, `store`, `error`.
+Event types include: `ingest`, `parse`, `anonymize`, `llm_call`, `vision_render`, `vision_ocr_enrichment`, `vision_llm_call`, `multi_extract_candidates`, `multi_extract_decider`, `hybrid_render`, `hybrid_candidates`, `hybrid_decider`, `fill_plan`, `fill_form`, `validate`, `review`, `store`, `error`.
 
 ---
 
@@ -2701,7 +2862,7 @@ docuflow templates init invoice --dir ./my_templates
 ```python
 # Core
 from docuflow import extract, DocumentPipeline, Pipeline, PrivacyPolicy
-from docuflow import process_batch, compare_documents
+from docuflow import process_batch, compare_documents, fill_pdf_form
 
 # Parsers
 from docuflow.parsing.pdfplumber_parser import PdfplumberParser
@@ -2736,7 +2897,7 @@ from docuflow.extraction.llm.litellm_adapter import LiteLLMAdapter
 # Pipeline Steps
 from docuflow.workflow import (
     Pipeline, Ingest, Parse, Extract, ExtractVision, ExtractHybrid,
-    Anonymize, Validate, Review, Store,
+    Anonymize, FillForm, Validate, Review, Store,
 )
 
 # Utilities
@@ -2753,4 +2914,5 @@ from docuflow.extraction.models import (
     ExtractionResult, ExtractedField, FieldCorrection,
     ReviewVerdict, FieldProvenance,
 )
+from docuflow.filling import FillingResult, FilledField, FieldPlacement, FormField
 ```

@@ -609,6 +609,7 @@ Protocol:
 ```python
 async def save_document(document: Document) -> str
 async def save_result(result: ExtractionResult) -> str
+async def save_filling_result(result: FillingResult) -> str
 async def save_trace(trace: Trace) -> str
 async def load_result(document_id: str) -> ExtractionResult | None
 async def load_document(document_id: str) -> Document | None
@@ -641,6 +642,7 @@ base_path/
     original.pdf
     document.json
     extraction.json
+    filling.json
     trace.json
 ```
 
@@ -649,6 +651,7 @@ Methods:
 ```python
 await store.save_document(document: Document) -> str
 await store.save_result(result: ExtractionResult) -> str
+await store.save_filling_result(result: FillingResult) -> str
 await store.save_trace(trace: Trace) -> str
 await store.load_result(document_id: str) -> ExtractionResult | None
 await store.load_document(document_id: str) -> Document | None

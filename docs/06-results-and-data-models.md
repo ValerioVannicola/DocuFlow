@@ -260,7 +260,7 @@ Returned by `ExtractionResult.provenance()`.
 | `value` | `Any` | Current value. |
 | `original_value` | `Any` | Original value before correction. |
 | `corrected` | `bool` | Whether field was corrected. |
-| `confidence` | `float` | Field confidence. |
+| `trust_gate` | `bool` | Field trust gate. |
 | `source_text` | `str` | First evidence text. |
 | `page` | `int \| None` | First evidence page. |
 | `bbox` | `Any` | First evidence bbox. |

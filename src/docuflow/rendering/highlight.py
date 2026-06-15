@@ -97,10 +97,10 @@ def _annotate(img: object, boxes: list, dpi: int, show_labels: bool = True) -> o
             font = ImageFont.load_default()
 
     for field_name, bbox, color in boxes:
-        x0 = int(round(bbox.x0 * scale))
-        y0 = int(round(bbox.y0 * scale))
-        x1 = int(round(bbox.x1 * scale))
-        y1 = int(round(bbox.y1 * scale))
+        x0 = round(bbox.x0 * scale)
+        y0 = round(bbox.y0 * scale)
+        x1 = round(bbox.x1 * scale)
+        y1 = round(bbox.y1 * scale)
         w, h = img.size  # type: ignore[attr-defined]
         x0, y0 = max(0, x0), max(0, y0)
         x1, y1 = min(w, x1), min(h, y1)

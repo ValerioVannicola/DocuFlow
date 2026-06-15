@@ -549,6 +549,99 @@ class Validate:
         return state
 
 
+class FillForm:
+    """Fill a PDF form with trusted data from a Pydantic model instance or mapping."""
+
+    name = "fill_form"
+
+    def __init__(
+        self,
+        data: Any = None,
+        output_path: str | None = None,
+        strategy: str = "auto",
+        match_by: str = "auto",
+        field_map: dict[str, Any] | None = None,
+        formats: dict[str, Any] | None = None,
+        flatten: bool = False,
+        detect_blank_spaces: bool = False,
+        blank_detection_mode: str = "heuristic",
+        llm: Any = None,
+        model: str = "openai/gpt-4o",
+        llm_kwargs: dict[str, Any] | None = None,
+        vision_dpi: int = DEFAULT_DPI,
+        min_detection_confidence: float = 0.5,
+        skip_none: bool = True,
+        unmatched: str = "warn",
+        overflow: str = "shrink",
+    ):
+        self.data = data
+        self.output_path = output_path
+        self.strategy = strategy
+        self.match_by = match_by
+        self.field_map = field_map
+        self.formats = formats
+        self.flatten = flatten
+        self.detect_blank_spaces = detect_blank_spaces
+        self.blank_detection_mode = blank_detection_mode
+        self.llm = llm
+        self.model = model
+        self.llm_kwargs = llm_kwargs
+        self.vision_dpi = vision_dpi
+        self.min_detection_confidence = min_detection_confidence
+        self.skip_none = skip_none
+        self.unmatched = unmatched
+        self.overflow = overflow
+
+    async def execute(self, state: PipelineState) -> PipelineState:
+        if state.document is None:
+            state.errors.append("No document to fill")
+            state.status = "failed"
+            return state
+
+        data = self.data or state.metadata.get("fill_data") or state.metadata.get("data")
+        if data is None:
+            state.errors.append("No data provided for PDF form filling")
+            state.status = "failed"
+            return state
+
+        from docuflow.filling.api import fill_pdf_form_async
+
+        start = time.monotonic()
+        state.filling_result = await fill_pdf_form_async(
+            state.document.metadata.file_path,
+            data,
+            output_path=self.output_path or state.metadata.get("output_path"),
+            strategy=self.strategy,
+            match_by=self.match_by,
+            field_map=self.field_map,
+            formats=self.formats,
+            flatten=self.flatten,
+            detect_blank_spaces=self.detect_blank_spaces,
+            blank_detection_mode=self.blank_detection_mode,
+            llm=self.llm,
+            model=self.model,
+            llm_kwargs=self.llm_kwargs,
+            vision_dpi=self.vision_dpi,
+            min_detection_confidence=self.min_detection_confidence,
+            skip_none=self.skip_none,
+            unmatched=self.unmatched,
+            overflow=self.overflow,
+        )
+        state.filling_result.document_id = state.document.id
+        duration = (time.monotonic() - start) * 1000
+        state.trace.add_event(
+            "fill_form",
+            step_name=self.name,
+            duration_ms=duration,
+            success=state.filling_result.success,
+        )
+
+        if not state.filling_result.success:
+            state.errors.extend(state.filling_result.errors)
+            state.status = "failed"
+        return state
+
+
 class Store:
     name = "store"
 
@@ -564,6 +657,8 @@ class Store:
             await self.storage.save_document(state.document)
         if state.extraction_result:
             await self.storage.save_result(state.extraction_result)
+        if state.filling_result and hasattr(self.storage, "save_filling_result"):
+            await self.storage.save_filling_result(state.filling_result)
         await self.storage.save_trace(state.trace)
         duration = (time.monotonic() - start) * 1000
         state.trace.add_event("store", step_name=self.name, duration_ms=duration)

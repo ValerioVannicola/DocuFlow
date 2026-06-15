@@ -94,15 +94,30 @@ def __getattr__(name: str) -> object:
         from docuflow.rendering.highlight import highlight_fields_async
 
         return highlight_fields_async
+    if name == "fill_pdf_form":
+        from docuflow.filling.api import fill_pdf_form
+
+        return fill_pdf_form
+    if name == "fill_pdf_form_async":
+        from docuflow.filling.api import fill_pdf_form_async
+
+        return fill_pdf_form_async
+    if name == "FillingResult":
+        from docuflow.filling.models import FillingResult
+
+        return FillingResult
     raise AttributeError(f"module 'docuflow' has no attribute {name!r}")
 
 
 __all__ = [
     "DocumentPipeline",
+    "FillingResult",
     "Pipeline",
     "PrivacyPolicy",
     "WorkflowRouter",
     "__version__",
     "extract",
     "extract_async",
+    "fill_pdf_form",
+    "fill_pdf_form_async",
 ]
