@@ -146,6 +146,18 @@ def __getattr__(name: str) -> object:
         from docuflow.splitting.models import SplitResult
 
         return SplitResult
+    if name == "extract_metadata":
+        from docuflow.metadata.api import extract_metadata
+
+        return extract_metadata
+    if name == "extract_metadata_async":
+        from docuflow.metadata.api import extract_metadata_async
+
+        return extract_metadata_async
+    if name == "DocumentMetadataResult":
+        from docuflow.metadata.models import DocumentMetadataResult
+
+        return DocumentMetadataResult
     raise AttributeError(f"module 'docuflow' has no attribute {name!r}")
 
 
@@ -168,4 +180,7 @@ __all__ = [
     "preview_fill_async",
     "split_document",
     "split_document_async",
+    "extract_metadata",
+    "extract_metadata_async",
+    "DocumentMetadataResult",
 ]
