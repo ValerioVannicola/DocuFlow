@@ -349,18 +349,22 @@ def _generate_temperatures(n: int, mean: float = 0.3, spread: float = 0.15) -> l
 
 
 DECIDER_SYSTEM_PROMPT = """You are a data extraction judge. You will receive multiple candidate \
-extractions of the same document, each produced independently by a different LLM instance.
+extractions of the same document, each produced independently by a different LLM instance, \
+plus the original document text.
 
-Your job is to compare all candidates field by field and produce the single best extraction.
+Your job is to produce the single best extraction by verifying every field against the source.
 
 Rules:
-1. For each field, pick the value that appears most consistently across candidates.
-2. If candidates disagree, prefer the value that has stronger evidence (exact quote from source).
-3. If a field has the same value in all candidates, keep it — that is high confidence.
-4. For confidence, set it based on agreement: 1.0 if all agree, 0.7 if majority agrees, \
-0.4 if split.
-5. Return the same JSON format: {"data": {...}, "evidence": {...}}
-6. Evidence confidence should reflect the cross-candidate agreement, not just one instance."""
+1. For EVERY field — whether candidates agree or not — locate the value in the document text \
+and confirm it is actually present there.
+2. If candidates disagree, pick the value best supported by an exact or near-exact quote from \
+the source.
+3. If candidates agree but the value cannot be found in the source text, set confidence to 0.4 \
+and flag it in evidence — unanimous agreement does not override the source.
+4. If candidates agree and the value IS confirmed in the source, set confidence to 1.0.
+5. If a majority agrees and the value is in the source, set confidence to 0.7.
+6. Return the same JSON format: {"data": {...}, "evidence": {...}}
+7. Evidence text should be a direct quote from the source document, not a paraphrase."""
 
 
 def _build_decider_prompt(
@@ -374,14 +378,27 @@ def _build_decider_prompt(
         field_desc_lines.append(f"- {name}: {prop.get('type', 'string')}")
 
     parts = ["## Schema Fields\n" + "\n".join(field_desc_lines) + "\n"]
-    parts.append(f"## Document Text (for reference)\n{document_text[:3000]}\n")
+
+    # Use up to 8000 chars so the decider can actually locate values deep in the document.
+    # If the document is longer, include the tail as well — field values often appear at the end.
+    doc_limit = 8000
+    if len(document_text) <= doc_limit:
+        doc_excerpt = document_text
+    else:
+        half = doc_limit // 2
+        doc_excerpt = (
+            document_text[:half]
+            + "\n...[middle truncated]...\n"
+            + document_text[-half:]
+        )
+    parts.append(f"## Document Text (source of truth)\n{doc_excerpt}\n")
 
     for i, candidate in enumerate(candidates):
         parts.append(f"## Candidate {i + 1}\n```json\n{json.dumps(candidate, indent=2)}\n```\n")
 
     parts.append(
-        f"Compare all {len(candidates)} candidates. Produce the single best extraction. "
-        "Return JSON with 'data' and 'evidence' keys."
+        f"Verify each field against the document text above, then produce the single best "
+        "extraction. Return JSON with 'data' and 'evidence' keys."
     )
 
     return [
@@ -966,13 +983,14 @@ Your job is to look at the document images, compare all candidates field by fiel
 produce the single best extraction.
 
 Rules:
-1. USE THE IMAGES to verify candidate values — look at the actual document.
-2. For each field, check which candidate value matches what you see in the images.
-3. If candidates agree, keep the value — that is high confidence.
-4. If candidates disagree, trust what you see in the images over any single candidate.
-5. For confidence, set 1.0 if all agree and you confirm in the image, 0.7 if majority \
-agrees, 0.4 if you had to pick based on your own reading.
-6. Return the same JSON format: {"data": {...}, "evidence": {...}}"""
+1. For EVERY field — whether candidates agree or not — look at the document images and \
+confirm the value is actually visible there. The images are the ground truth.
+2. If candidates agree but you cannot locate the value in the images, set confidence to 0.4 \
+— unanimous agreement does not override what the document shows.
+3. If candidates agree and you confirm the value in the images, set confidence to 1.0.
+4. If candidates disagree, trust what you see in the images over any single candidate; \
+set confidence to 0.7 if a majority matches the image, 0.4 if you resolved it yourself.
+5. Return the same JSON format: {"data": {...}, "evidence": {...}}"""
 
 
 def _build_hybrid_decider_prompt(
