@@ -102,6 +102,14 @@ def __getattr__(name: str) -> object:
         from docuflow.filling.api import fill_pdf_form_async
 
         return fill_pdf_form_async
+    if name == "fill_docx_form":
+        from docuflow.filling.api import fill_docx_form
+
+        return fill_docx_form
+    if name == "fill_docx_form_async":
+        from docuflow.filling.api import fill_docx_form_async
+
+        return fill_docx_form_async
     if name == "commit_fill":
         from docuflow.filling.api import commit_fill
 
@@ -122,6 +130,22 @@ def __getattr__(name: str) -> object:
         from docuflow.filling.models import FillingResult
 
         return FillingResult
+    if name == "split_document":
+        from docuflow.splitting.api import split_document
+
+        return split_document
+    if name == "split_document_async":
+        from docuflow.splitting.api import split_document_async
+
+        return split_document_async
+    if name == "DocumentSection":
+        from docuflow.splitting.models import DocumentSection
+
+        return DocumentSection
+    if name == "SplitResult":
+        from docuflow.splitting.models import SplitResult
+
+        return SplitResult
     raise AttributeError(f"module 'docuflow' has no attribute {name!r}")
 
 
@@ -136,8 +160,12 @@ __all__ = [
     "commit_fill_async",
     "extract",
     "extract_async",
+    "fill_docx_form",
+    "fill_docx_form_async",
     "fill_pdf_form",
     "fill_pdf_form_async",
     "preview_fill",
     "preview_fill_async",
+    "split_document",
+    "split_document_async",
 ]

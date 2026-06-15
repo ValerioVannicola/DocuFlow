@@ -550,7 +550,11 @@ class Validate:
 
 
 class FillForm:
-    """Fill a PDF form with trusted data from a Pydantic model instance or mapping."""
+    """Fill a PDF or DOCX form with trusted data from a Pydantic model instance or mapping.
+
+    Dispatches automatically: ``.docx`` / ``.doc`` files use :func:`fill_docx_form_async`;
+    all other files use :func:`fill_pdf_form_async`.
+    """
 
     name = "fill_form"
 
@@ -606,31 +610,52 @@ class FillForm:
             state.status = "failed"
             return state
 
-        from docuflow.filling.api import fill_pdf_form_async
+        from pathlib import Path as _Path
+
+        _file_path = state.document.metadata.file_path
+        _is_docx = _Path(_file_path).suffix.lower() in (".docx", ".doc")
 
         start = time.monotonic()
-        state.filling_result = await fill_pdf_form_async(
-            state.document.metadata.file_path,
-            data,
-            output_path=self.output_path or state.metadata.get("output_path"),
-            document_id=state.document.id,
-            review=self.review,
-            strategy=self.strategy,
-            match_by=self.match_by,
-            field_map=self.field_map,
-            formats=self.formats,
-            flatten=self.flatten,
-            detect_blank_spaces=self.detect_blank_spaces,
-            blank_detection_mode=self.blank_detection_mode,
-            llm=self.llm,
-            model=self.model,
-            llm_kwargs=self.llm_kwargs,
-            vision_dpi=self.vision_dpi,
-            min_detection_confidence=self.min_detection_confidence,
-            skip_none=self.skip_none,
-            unmatched=self.unmatched,
-            overflow=self.overflow,
-        )
+        if _is_docx:
+            from docuflow.filling.api import fill_docx_form_async
+
+            state.filling_result = await fill_docx_form_async(
+                _file_path,
+                data,
+                output_path=self.output_path or state.metadata.get("output_path"),
+                document_id=state.document.id,
+                review=self.review,
+                strategy=self.strategy,  # type: ignore[arg-type]
+                formats=self.formats,
+                flatten=self.flatten,
+                skip_none=self.skip_none,
+                unmatched=self.unmatched,  # type: ignore[arg-type]
+            )
+        else:
+            from docuflow.filling.api import fill_pdf_form_async
+
+            state.filling_result = await fill_pdf_form_async(
+                _file_path,
+                data,
+                output_path=self.output_path or state.metadata.get("output_path"),
+                document_id=state.document.id,
+                review=self.review,
+                strategy=self.strategy,
+                match_by=self.match_by,
+                field_map=self.field_map,
+                formats=self.formats,
+                flatten=self.flatten,
+                detect_blank_spaces=self.detect_blank_spaces,
+                blank_detection_mode=self.blank_detection_mode,
+                llm=self.llm,
+                model=self.model,
+                llm_kwargs=self.llm_kwargs,
+                vision_dpi=self.vision_dpi,
+                min_detection_confidence=self.min_detection_confidence,
+                skip_none=self.skip_none,
+                unmatched=self.unmatched,
+                overflow=self.overflow,
+            )
         state.filling_result.document_id = state.document.id
         duration = (time.monotonic() - start) * 1000
         state.trace.add_event(

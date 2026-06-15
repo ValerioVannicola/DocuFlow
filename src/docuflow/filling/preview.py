@@ -81,6 +81,9 @@ async def preview_fill_async(
     clean placements are green. Fields without a known location (e.g. some
     AcroForm widgets) are skipped.
     """
+    if Path(result.input_path).suffix.lower() in (".docx", ".doc"):
+        return []  # DOCX preview not yet supported; commit to see the filled document
+
     from docuflow.rendering.renderer import render_page
 
     by_page = _collect(result)

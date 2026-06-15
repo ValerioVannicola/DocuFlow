@@ -567,6 +567,144 @@ async def reject_fill(
 
 
 @mcp.tool()
+async def split_document(
+    file_path: str,
+    sections: str,
+    model: str = "gemini/gemini-2.5-flash",
+    deep: bool = False,
+    allow_overlap: bool = True,
+    split_rules: str = "",
+    pages: str = "",
+) -> str:
+    """Split a PDF into named sections by assigning page numbers using an LLM.
+
+    Args:
+        file_path: Path to the PDF document
+        sections: JSON array of section objects, each with "name" and "description".
+            Example: [{"name": "body", "description": "Main contract terms"},
+                      {"name": "exhibits", "description": "Exhibit attachments"}]
+        model: LiteLLM model string
+        deep: When True, also return confidence and evidence per section
+        allow_overlap: When True, a page may appear in multiple sections
+        split_rules: Optional freeform instruction overriding the default splitting logic
+        pages: Comma-separated 0-based page indices to process; empty means all pages
+
+    Returns:
+        SplitResult JSON with page_map (section → pages), confidence, evidence, usage
+    """
+    from docuflow.splitting.api import split_document_async as _split
+    from docuflow.splitting.models import DocumentSection
+
+    try:
+        raw_sections = json.loads(sections)
+        doc_sections = [DocumentSection(**s) for s in raw_sections]
+    except Exception as exc:
+        return json.dumps({"error": f"Invalid sections JSON: {exc}"})
+
+    page_list: list[int] | None = None
+    if pages.strip():
+        try:
+            page_list = [int(p.strip()) for p in pages.split(",") if p.strip()]
+        except ValueError:
+            return json.dumps({"error": "pages must be comma-separated integers"})
+
+    result = await _split(
+        file_path,
+        doc_sections,
+        model=model,
+        deep=deep,
+        allow_overlap=allow_overlap,
+        split_rules=split_rules,
+        pages=page_list,
+    )
+
+    return json.dumps({
+        "success": result.success,
+        "total_pages": result.total_pages,
+        "page_map": result.page_map,
+        "sections": {
+            name: {
+                "pages": sr.pages,
+                "confidence": sr.confidence,
+                "evidence": sr.evidence,
+            }
+            for name, sr in result.sections.items()
+        },
+        "usage": result.usage,
+        "warnings": result.warnings,
+        "errors": result.errors,
+    }, indent=2)
+
+
+@mcp.tool()
+async def fill_docx_form(
+    file_path: str,
+    data: str,
+    output_path: str = "",
+    strategy: str = "auto",
+    flatten: bool = False,
+    review: bool = False,
+    document_id: str = "",
+    store_path: str = "./.docuflow_store",
+) -> str:
+    """Fill a DOCX form (content controls or Jinja2 template) with structured data.
+
+    Args:
+        file_path: Path to the input .docx file
+        data: JSON string of field values to fill (keys match content control tags or template vars)
+        output_path: Where to save the filled DOCX; defaults to <stem>-filled.docx
+        strategy: "auto" (detect), "content_controls" (Word SDT fields), or "template" (Jinja2 {{ }})
+        flatten: Remove SDT wrappers after filling (content_controls only)
+        review: When True, plan the fill but do not write the file yet
+        document_id: Optional document identifier for storage
+        store_path: Path to the local document store (used when review=True)
+
+    Returns:
+        FillingResult JSON (success, strategy, fields, warnings, errors, review_status)
+    """
+    import json as _json
+
+    from docuflow.filling.api import fill_docx_form_async as _fill_docx_form_async
+
+    try:
+        data_dict = _json.loads(data)
+    except Exception as exc:
+        return json.dumps({"error": f"Invalid JSON data: {exc}"})
+
+    result = await _fill_docx_form_async(
+        file_path,
+        data_dict,
+        output_path=output_path or None,
+        document_id=document_id,
+        review=review,
+        strategy=strategy,  # type: ignore[arg-type]
+        flatten=flatten,
+    )
+
+    if review and document_id:
+        from docuflow.storage.local import LocalDocumentStore
+
+        store = LocalDocumentStore(store_path)
+        await store.save_filling_result(result)
+
+    return json.dumps({
+        "success": result.success,
+        "strategy": result.strategy,
+        "output_path": result.output_path,
+        "committed": result.committed,
+        "review_status": result.review_status if review else None,
+        "fields": {
+            name: {"value": str(f.value), "target": f.target_name, "method": f.method}
+            for name, f in result.fields.items()
+        },
+        "unmapped_model_fields": result.unmapped_model_fields,
+        "unmapped_doc_fields": result.unmapped_pdf_fields,
+        "warnings": result.warnings,
+        "errors": result.errors,
+    }, indent=2)
+
+
+@mcp.tool()
 async def screenshot_document(
     file_path: str,
     output_dir: str,
