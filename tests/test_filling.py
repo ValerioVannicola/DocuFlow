@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import io
 from pathlib import Path
 from typing import Any
 
@@ -173,11 +175,17 @@ async def test_llm_blank_detector_converts_relative_bbox_to_page_points(monkeypa
         """
     )
 
-    async def fake_render_all_pages(path: str, dpi: int):
+    async def fake_render_pages_encoded(path: str, dpi: int):
         assert dpi == 100
-        return [fake_image]
+        buf = io.BytesIO()
+        fake_image.save(buf, format="PNG")
+        encoded = base64.b64encode(buf.getvalue()).decode("ascii")
+        # page dims in PDF points: 200px * 72/100 = 144pt wide, 400px * 72/100 = 288pt tall
+        return [encoded], [(144.0, 288.0)]
 
-    monkeypatch.setattr("docuflow.rendering.renderer.render_all_pages", fake_render_all_pages)
+    monkeypatch.setattr(
+        "docuflow.filling.llm_detector._render_pages_encoded", fake_render_pages_encoded
+    )
 
     field_map, warnings = await detect_blank_field_map_llm(
         input_path,
@@ -211,7 +219,7 @@ def test_overlay_can_use_llm_blank_detection(monkeypatch, tmp_path) -> None:
     )
 
     async def fake_detect(*args: Any, **kwargs: Any):
-        assert kwargs["model"] == "openai/gpt-4o"
+        assert kwargs["model"] == "gemini/gemini-2.5-flash"
         return {"name": placement}, ["LLM blank-space detection is opt-in."]
 
     def fake_write(input_pdf: Path, output_pdf: Path, plan: Any, *, overflow: str = "shrink") -> list[str]:
@@ -337,3 +345,220 @@ async def test_fill_form_workflow_step_stores_filling_result(monkeypatch, tmp_pa
 
     assert state.status == "pending"
     assert state.filling_result == expected
+
+
+# --- Review / approval workflow -------------------------------------------------
+
+_MANUAL_FIELD_MAP = {
+    "name": {"page_number": 0, "bbox": {"x0": 72, "y0": 120, "x1": 220, "y1": 138}}
+}
+
+
+def _prepare_overlay_for_review(monkeypatch, tmp_path):
+    from docuflow.filling.api import fill_pdf_form
+
+    input_path = tmp_path / "static.pdf"
+    output_path = tmp_path / "static-filled.pdf"
+    _touch_pdf(input_path)
+
+    calls: list[str] = []
+
+    def fake_write(input_pdf: Path, output_pdf: Path, plan: Any, *, overflow: str = "shrink") -> list[str]:
+        calls.append("write")
+        output_pdf.write_bytes(input_pdf.read_bytes())
+        return []
+
+    monkeypatch.setattr("docuflow.filling.api.write_overlay", fake_write)
+
+    result = fill_pdf_form(
+        str(input_path),
+        {"name": "Mario Rossi"},
+        output_path=str(output_path),
+        strategy="overlay",
+        review=True,
+        field_map=_MANUAL_FIELD_MAP,
+    )
+    return result, output_path, calls
+
+
+def test_review_defers_write(monkeypatch, tmp_path) -> None:
+    result, output_path, calls = _prepare_overlay_for_review(monkeypatch, tmp_path)
+
+    assert calls == []  # nothing written during prepare
+    assert output_path.exists() is False
+    assert result.committed is False
+    assert result.review_status == "pending"
+    assert result.fields["name"].formatted_value == "Mario Rossi"
+
+
+def test_edit_field_value_preserves_original_and_logs_correction(monkeypatch, tmp_path) -> None:
+    result, _, _ = _prepare_overlay_for_review(monkeypatch, tmp_path)
+
+    result.edit_field("name", value="Maria Bianchi", corrected_by="alice", reason="typo")
+
+    field = result.fields["name"]
+    assert field.value == "Maria Bianchi"
+    assert field.formatted_value == "Maria Bianchi"
+    assert field.original_value == "Mario Rossi"
+    assert field.corrected is True
+    assert result.data["name"] == "Maria Bianchi"
+    assert len(result.corrections) == 1
+    assert result.corrections[0].old_value == "Mario Rossi"
+    assert result.corrections[0].corrected_by == "alice"
+
+
+def test_edit_field_placement_moves_box(monkeypatch, tmp_path) -> None:
+    from docuflow.documents.models import BoundingBox
+
+    result, _, _ = _prepare_overlay_for_review(monkeypatch, tmp_path)
+
+    new_box = BoundingBox(x0=100, y0=200, x1=300, y1=220)
+    result.edit_field("name", bbox=new_box, page_number=1, corrected_by="alice")
+
+    field = result.fields["name"]
+    assert field.placement.bbox == new_box
+    assert field.placement.page_number == 1
+    assert field.bbox == new_box
+    assert result.corrections[0].new_placement is not None
+    assert result.corrections[0].new_placement.bbox == new_box
+
+
+def test_approve_then_commit_writes(monkeypatch, tmp_path) -> None:
+    from docuflow.filling.api import commit_fill
+
+    result, output_path, calls = _prepare_overlay_for_review(monkeypatch, tmp_path)
+
+    result.approve(approved_by="alice")
+    assert result.review_status == "approved"
+
+    committed = commit_fill(result)
+    assert calls == ["write"]
+    assert committed.committed is True
+    assert output_path.exists() is True
+
+
+def test_commit_without_approval_raises(monkeypatch, tmp_path) -> None:
+    from docuflow.filling.api import commit_fill
+
+    result, _, _ = _prepare_overlay_for_review(monkeypatch, tmp_path)
+
+    with pytest.raises(ValueError, match="requires an approved result"):
+        commit_fill(result)
+
+
+def test_commit_with_force_writes_pending(monkeypatch, tmp_path) -> None:
+    from docuflow.filling.api import commit_fill
+
+    result, output_path, calls = _prepare_overlay_for_review(monkeypatch, tmp_path)
+
+    commit_fill(result, force=True)
+    assert calls == ["write"]
+    assert output_path.exists() is True
+
+
+def test_reject_blocks_commit(monkeypatch, tmp_path) -> None:
+    from docuflow.filling.api import commit_fill
+
+    result, _, calls = _prepare_overlay_for_review(monkeypatch, tmp_path)
+
+    result.reject(rejected_by="alice", reason="wrong recipient")
+    assert result.review_status == "rejected"
+
+    with pytest.raises(ValueError, match="rejected"):
+        commit_fill(result)
+    assert calls == []
+
+
+def test_double_approve_raises(monkeypatch, tmp_path) -> None:
+    result, _, _ = _prepare_overlay_for_review(monkeypatch, tmp_path)
+    result.approve()
+    with pytest.raises(ValueError, match="already"):
+        result.approve()
+
+
+def test_edit_after_commit_raises(monkeypatch, tmp_path) -> None:
+    from docuflow.filling.api import commit_fill
+
+    result, _, _ = _prepare_overlay_for_review(monkeypatch, tmp_path)
+    result.approve()
+    commit_fill(result)
+    with pytest.raises(ValueError, match="committed"):
+        result.edit_field("name", value="X")
+
+
+def test_review_rules_flag_auto_detected_and_low_confidence() -> None:
+    from docuflow.documents.models import BoundingBox
+    from docuflow.filling.models import FieldPlacement, FilledField, FillingResult
+    from docuflow.filling.review import evaluate_fill_review
+
+    result = FillingResult(input_path="x.pdf", strategy="overlay")
+    result.fields = {
+        "name": FilledField(
+            field_name="name",
+            placement=FieldPlacement(
+                bbox=BoundingBox(x0=0, y0=0, x1=10, y1=10), source="llm", confidence=0.3
+            ),
+            method="llm_detected_blank",
+        )
+    }
+    result.unmapped_model_fields = ["policy_number"]
+
+    reasons = evaluate_fill_review(result)
+    assert any("confidence" in r for r in reasons)
+    assert any("automatic blank detection" in r for r in reasons)
+    assert any("policy_number" in r for r in reasons)
+
+
+def test_preview_fill_renders_one_image_per_page(monkeypatch, tmp_path) -> None:
+    image_mod = pytest.importorskip("PIL.Image")
+    from docuflow.documents.models import BoundingBox
+    from docuflow.filling.models import FieldPlacement, FilledField, FillingResult
+    from docuflow.filling.preview import preview_fill
+
+    input_path = tmp_path / "static.pdf"
+    _touch_pdf(input_path)
+    result = FillingResult(input_path=str(input_path), strategy="overlay")
+    result.fields = {
+        "name": FilledField(
+            field_name="name",
+            formatted_value="Mario Rossi",
+            placement=FieldPlacement(
+                page_number=0, bbox=BoundingBox(x0=72, y0=120, x1=220, y1=138)
+            ),
+            page_number=0,
+            bbox=BoundingBox(x0=72, y0=120, x1=220, y1=138),
+        )
+    }
+
+    async def fake_render_page(path: str, page_number: int = 0, dpi: int = 150):
+        return image_mod.new("RGB", (600, 800), "white")
+
+    monkeypatch.setattr("docuflow.rendering.renderer.render_page", fake_render_page)
+
+    saved = preview_fill(result, output_dir=str(tmp_path), dpi=100)
+    assert len(saved) == 1
+    assert Path(saved[0]).exists()
+
+
+async def test_store_round_trips_pending_fill(tmp_path) -> None:
+    from docuflow.filling.models import FilledField, FillingResult
+    from docuflow.storage.local import LocalDocumentStore
+
+    store = LocalDocumentStore(base_path=str(tmp_path / "store"))
+    result = FillingResult(
+        input_path="x.pdf",
+        document_id="doc-9",
+        strategy="overlay",
+        needs_review=True,
+        review_status="pending",
+        fields={"name": FilledField(field_name="name", formatted_value="Mario")},
+    )
+    await store.save_filling_result(result)
+
+    pending = await store.get_pending_fills()
+    assert "doc-9" in pending
+
+    loaded = await store.load_filling_result("doc-9")
+    assert loaded is not None
+    assert loaded.review_status == "pending"
+    assert loaded.fields["name"].formatted_value == "Mario"

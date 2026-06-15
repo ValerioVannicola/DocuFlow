@@ -102,6 +102,22 @@ def __getattr__(name: str) -> object:
         from docuflow.filling.api import fill_pdf_form_async
 
         return fill_pdf_form_async
+    if name == "commit_fill":
+        from docuflow.filling.api import commit_fill
+
+        return commit_fill
+    if name == "commit_fill_async":
+        from docuflow.filling.api import commit_fill_async
+
+        return commit_fill_async
+    if name == "preview_fill":
+        from docuflow.filling.preview import preview_fill
+
+        return preview_fill
+    if name == "preview_fill_async":
+        from docuflow.filling.preview import preview_fill_async
+
+        return preview_fill_async
     if name == "FillingResult":
         from docuflow.filling.models import FillingResult
 
@@ -116,8 +132,12 @@ __all__ = [
     "PrivacyPolicy",
     "WorkflowRouter",
     "__version__",
+    "commit_fill",
+    "commit_fill_async",
     "extract",
     "extract_async",
     "fill_pdf_form",
     "fill_pdf_form_async",
+    "preview_fill",
+    "preview_fill_async",
 ]

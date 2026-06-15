@@ -62,6 +62,14 @@ class LocalDocumentStore:
             content = await f.read()
         return ExtractionResult.model_validate_json(content)
 
+    async def load_filling_result(self, document_id: str) -> FillingResult | None:
+        result_path = self.base_path / document_id / "filling.json"
+        if not result_path.is_file():
+            return None
+        async with aiofiles.open(result_path) as f:
+            content = await f.read()
+        return FillingResult.model_validate_json(content)
+
     async def load_document(self, document_id: str) -> Document | None:
         doc_path = self.base_path / document_id / "document.json"
         if not doc_path.is_file():
@@ -77,6 +85,34 @@ class LocalDocumentStore:
         for entry in sorted(self.base_path.iterdir()):
             if entry.is_dir() and (entry / "extraction.json").is_file():
                 doc_ids.append(entry.name)
+        return doc_ids
+
+    async def list_fillings(self) -> list[str]:
+        doc_ids: list[str] = []
+        if not self.base_path.is_dir():
+            return doc_ids
+        for entry in sorted(self.base_path.iterdir()):
+            if entry.is_dir() and (entry / "filling.json").is_file():
+                doc_ids.append(entry.name)
+        return doc_ids
+
+    async def get_pending_fills(self) -> list[str]:
+        """Document IDs whose filling awaits human review (needs_review, still pending)."""
+        return await self.get_fills_by_status("pending_review")
+
+    async def get_fills_by_status(self, status: str) -> list[str]:
+        doc_ids: list[str] = []
+        for doc_id in await self.list_fillings():
+            result = await self.load_filling_result(doc_id)
+            if result is None:
+                continue
+            if (
+                (status == "pending_review" and result.needs_review and result.review_status == "pending")
+                or (status == "approved" and result.review_status == "approved")
+                or (status == "rejected" and result.review_status == "rejected")
+                or (status == "committed" and result.committed)
+            ):
+                doc_ids.append(doc_id)
         return doc_ids
 
     async def get_pending_reviews(self) -> list[str]:

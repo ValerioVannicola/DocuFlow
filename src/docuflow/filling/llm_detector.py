@@ -79,7 +79,7 @@ async def detect_blank_field_map_llm(
     data: BaseModel | Mapping[str, Any],
     *,
     llm: Any = None,
-    model: str = "openai/gpt-4o",
+    model: str = "gemini/gemini-2.5-flash",
     llm_kwargs: Mapping[str, Any] | None = None,
     dpi: int = DEFAULT_DPI,
     min_confidence: float = 0.5,
@@ -91,16 +91,18 @@ async def detect_blank_field_map_llm(
     The LLM returns page-relative boxes. This function converts them into
     DocuFlow's standard page coordinates: top-left origin in PDF points.
     """
-    from docuflow.rendering.renderer import render_all_pages
-
     data_fields = collect_data_fields(data, skip_none=skip_none)
     if not data_fields:
         return {}, ["No data fields were available for LLM blank detection."]
 
     llm = llm or _default_llm(model=model, llm_kwargs=llm_kwargs)
-    images = await render_all_pages(path, dpi=dpi)
+
+    # Render pages one at a time and encode to base64 immediately so we never
+    # hold all PIL Images in memory simultaneously.
+    images_base64, page_dims = await _render_pages_encoded(path, dpi=dpi)
+
     response = await llm.complete(
-        _build_messages(data_fields, _encode_images(images)),
+        _build_messages(data_fields, images_base64),
         temperature=0.0,
         response_format=JSON_MODE,
     )
@@ -124,15 +126,14 @@ async def detect_blank_field_map_llm(
                 f"({placement.confidence:.2f} < {min_confidence:.2f}), so it was ignored."
             )
             continue
-        if placement.page_number < 0 or placement.page_number >= len(images):
+        if placement.page_number < 0 or placement.page_number >= len(page_dims):
             warnings.append(
                 f"LLM placement for '{placement.field_name}' has out-of-range page "
                 f"{placement.page_number}, so it was ignored."
             )
             continue
 
-        page_width = float(images[placement.page_number].width) * 72.0 / dpi
-        page_height = float(images[placement.page_number].height) * 72.0 / dpi
+        page_width, page_height = page_dims[placement.page_number]
         bbox = _relative_to_page_bbox(placement.bbox, page_width, page_height)
         if bbox.width <= 1 or bbox.height <= 1:
             warnings.append(
@@ -160,11 +161,41 @@ async def detect_blank_field_map_llm(
             step_name="fill_form",
             model=getattr(llm, "model", ""),
             detected_fields=len(placements),
-            n_pages=len(images),
+            n_pages=len(page_dims),
             dpi=dpi,
             usage=getattr(response, "usage", {}),
         )
     return placements, warnings
+
+
+async def _render_pages_encoded(
+    path: str | Path,
+    dpi: int,
+) -> tuple[list[str], list[tuple[float, float]]]:
+    """Render each PDF page, encode to base64, and return (encoded_list, page_dims_in_pts).
+
+    Pages are encoded one at a time so we never hold all PIL Images simultaneously.
+    """
+    from docuflow.rendering.renderer import render_page
+
+    page_count = _count_pages(path)
+    images_base64: list[str] = []
+    page_dims: list[tuple[float, float]] = []
+    for page_num in range(page_count):
+        img = await render_page(str(path), page_num, dpi=dpi)
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        images_base64.append(base64.b64encode(buf.getvalue()).decode("ascii"))
+        page_dims.append((float(img.width) * 72.0 / dpi, float(img.height) * 72.0 / dpi))
+    return images_base64, page_dims
+
+
+def _count_pages(path: str | Path) -> int:
+    try:
+        from pypdf import PdfReader
+        return len(PdfReader(str(path)).pages)
+    except Exception:
+        return 1
 
 
 def _default_llm(model: str, llm_kwargs: Mapping[str, Any] | None) -> Any:
@@ -205,15 +236,6 @@ def _build_messages(data_fields: list[Any], images_base64: list[str]) -> list[di
         {"role": "system", "content": LLM_BLANK_DETECTION_SYSTEM_PROMPT},
         {"role": "user", "content": user_content},
     ]
-
-
-def _encode_images(images: list[Any]) -> list[str]:
-    encoded: list[str] = []
-    for image in images:
-        buffer = io.BytesIO()
-        image.save(buffer, format="PNG")
-        encoded.append(base64.b64encode(buffer.getvalue()).decode("ascii"))
-    return encoded
 
 
 def _parse_response(content: str) -> LLMPlacementResponse:

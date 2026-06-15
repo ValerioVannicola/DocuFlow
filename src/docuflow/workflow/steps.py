@@ -558,6 +558,7 @@ class FillForm:
         self,
         data: Any = None,
         output_path: str | None = None,
+        review: bool = False,
         strategy: str = "auto",
         match_by: str = "auto",
         field_map: dict[str, Any] | None = None,
@@ -566,7 +567,7 @@ class FillForm:
         detect_blank_spaces: bool = False,
         blank_detection_mode: str = "heuristic",
         llm: Any = None,
-        model: str = "openai/gpt-4o",
+        model: str = "gemini/gemini-2.5-flash",
         llm_kwargs: dict[str, Any] | None = None,
         vision_dpi: int = DEFAULT_DPI,
         min_detection_confidence: float = 0.5,
@@ -576,6 +577,7 @@ class FillForm:
     ):
         self.data = data
         self.output_path = output_path
+        self.review = review
         self.strategy = strategy
         self.match_by = match_by
         self.field_map = field_map
@@ -611,6 +613,8 @@ class FillForm:
             state.document.metadata.file_path,
             data,
             output_path=self.output_path or state.metadata.get("output_path"),
+            document_id=state.document.id,
+            review=self.review,
             strategy=self.strategy,
             match_by=self.match_by,
             field_map=self.field_map,

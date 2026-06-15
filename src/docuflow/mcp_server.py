@@ -430,6 +430,143 @@ async def reject_document(
 
 
 @mcp.tool()
+async def get_pending_fills(
+    store_path: str = "./.docuflow_store",
+) -> str:
+    """Get document IDs whose PDF form fill awaits human review before being written.
+
+    Args:
+        store_path: Path to the local document store
+
+    Returns:
+        JSON list of document IDs with a pending, review-flagged fill
+    """
+    from docuflow.storage.local import LocalDocumentStore
+
+    store = LocalDocumentStore(store_path)
+    ids = await store.get_pending_fills()
+    return json.dumps(ids, indent=2)
+
+
+@mcp.tool()
+async def edit_fill_field(
+    document_id: str,
+    field_name: str,
+    new_value: str,
+    corrected_by: str = "",
+    reason: str = "",
+    store_path: str = "./.docuflow_store",
+) -> str:
+    """Change a planned fill value before the PDF is committed, and save it.
+
+    Args:
+        document_id: The document UUID
+        field_name: Name of the field to edit
+        new_value: The corrected value to write
+        corrected_by: Who made the edit
+        reason: Why the edit was needed
+        store_path: Path to the local document store
+
+    Returns:
+        JSON with the field's old value, new value, and correction record
+    """
+    from docuflow.storage.local import LocalDocumentStore
+
+    store = LocalDocumentStore(store_path)
+    result = await store.load_filling_result(document_id)
+    if result is None:
+        return json.dumps({"error": f"No filling result found for document {document_id}"})
+
+    result.edit_field(field_name, value=new_value, corrected_by=corrected_by, reason=reason)
+    await store.save_filling_result(result)
+
+    field = result.fields[field_name]
+    return json.dumps({
+        "field_name": field_name,
+        "old_value": field.original_value,
+        "new_value": field.value,
+        "corrected": True,
+        "corrected_by": corrected_by,
+    }, indent=2, default=str)
+
+
+@mcp.tool()
+async def approve_fill(
+    document_id: str,
+    approved_by: str = "",
+    commit: bool = True,
+    store_path: str = "./.docuflow_store",
+) -> str:
+    """Approve a reviewed PDF fill and (by default) write the output PDF.
+
+    Args:
+        document_id: The document UUID
+        approved_by: Who approved it
+        commit: When True, write the output PDF immediately after approval
+        store_path: Path to the local document store
+
+    Returns:
+        JSON confirmation with review status, committed flag, and output path
+    """
+    from docuflow.filling.api import commit_fill_async
+    from docuflow.storage.local import LocalDocumentStore
+
+    store = LocalDocumentStore(store_path)
+    result = await store.load_filling_result(document_id)
+    if result is None:
+        return json.dumps({"error": f"No filling result found for document {document_id}"})
+
+    result.approve(approved_by=approved_by)
+    if commit:
+        await commit_fill_async(result)
+    await store.save_filling_result(result)
+
+    return json.dumps({
+        "document_id": document_id,
+        "review_status": result.review_status,
+        "approved_by": approved_by,
+        "committed": result.committed,
+        "output_path": result.output_path if result.committed else "",
+    }, indent=2)
+
+
+@mcp.tool()
+async def reject_fill(
+    document_id: str,
+    rejected_by: str = "",
+    reason: str = "",
+    store_path: str = "./.docuflow_store",
+) -> str:
+    """Reject a reviewed PDF fill; the output PDF is not written.
+
+    Args:
+        document_id: The document UUID
+        rejected_by: Who rejected it
+        reason: Why it was rejected
+        store_path: Path to the local document store
+
+    Returns:
+        JSON confirmation with review status and reason
+    """
+    from docuflow.storage.local import LocalDocumentStore
+
+    store = LocalDocumentStore(store_path)
+    result = await store.load_filling_result(document_id)
+    if result is None:
+        return json.dumps({"error": f"No filling result found for document {document_id}"})
+
+    result.reject(rejected_by=rejected_by, reason=reason)
+    await store.save_filling_result(result)
+
+    return json.dumps({
+        "document_id": document_id,
+        "review_status": result.review_status,
+        "rejected_by": rejected_by,
+        "reason": reason,
+    }, indent=2)
+
+
+@mcp.tool()
 async def screenshot_document(
     file_path: str,
     output_dir: str,

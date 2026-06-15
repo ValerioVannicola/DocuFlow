@@ -16,6 +16,7 @@ from docuflow.filling.llm_detector import detect_blank_field_map_llm
 from docuflow.filling.models import (
     BlankDetectionMode,
     FillingResult,
+    FillPlan,
     FillStrategy,
     MatchStrategy,
     OverflowPolicy,
@@ -28,6 +29,7 @@ from docuflow.filling.planner import (
     dump_data,
     schema_name_for,
 )
+from docuflow.filling.review import evaluate_fill_review
 from docuflow.filling.writer import write_acroform, write_overlay
 from docuflow.observability.traces import Trace
 
@@ -37,6 +39,8 @@ async def fill_pdf_form_async(
     data: BaseModel | Mapping[str, Any],
     output_path: str | None = None,
     *,
+    document_id: str = "",
+    review: bool = False,
     strategy: FillStrategy = "auto",
     match_by: MatchStrategy = "auto",
     field_map: Mapping[str, Any] | None = None,
@@ -45,7 +49,7 @@ async def fill_pdf_form_async(
     detect_blank_spaces: bool = False,
     blank_detection_mode: BlankDetectionMode = "heuristic",
     llm: Any = None,
-    model: str = "openai/gpt-4o",
+    model: str = "gemini/gemini-2.5-flash",
     llm_kwargs: Mapping[str, Any] | None = None,
     vision_dpi: int = DEFAULT_DPI,
     min_detection_confidence: float = 0.5,
@@ -58,6 +62,8 @@ async def fill_pdf_form_async(
         path,
         data,
         output_path=output_path,
+        document_id=document_id,
+        review=review,
         strategy=strategy,
         match_by=match_by,
         field_map=field_map,
@@ -81,6 +87,8 @@ def fill_pdf_form(
     data: BaseModel | Mapping[str, Any],
     output_path: str | None = None,
     *,
+    document_id: str = "",
+    review: bool = False,
     strategy: FillStrategy = "auto",
     match_by: MatchStrategy = "auto",
     field_map: Mapping[str, Any] | None = None,
@@ -89,7 +97,7 @@ def fill_pdf_form(
     detect_blank_spaces: bool = False,
     blank_detection_mode: BlankDetectionMode = "heuristic",
     llm: Any = None,
-    model: str = "openai/gpt-4o",
+    model: str = "gemini/gemini-2.5-flash",
     llm_kwargs: Mapping[str, Any] | None = None,
     vision_dpi: int = DEFAULT_DPI,
     min_detection_confidence: float = 0.5,
@@ -103,6 +111,8 @@ def fill_pdf_form(
             path,
             data,
             output_path=output_path,
+            document_id=document_id,
+            review=review,
             strategy=strategy,
             match_by=match_by,
             field_map=field_map,
@@ -127,6 +137,8 @@ async def _fill_pdf_form(
     data: BaseModel | Mapping[str, Any],
     output_path: str | None = None,
     *,
+    document_id: str = "",
+    review: bool = False,
     strategy: FillStrategy = "auto",
     match_by: MatchStrategy = "auto",
     field_map: Mapping[str, Any] | None = None,
@@ -135,7 +147,7 @@ async def _fill_pdf_form(
     detect_blank_spaces: bool = False,
     blank_detection_mode: BlankDetectionMode = "heuristic",
     llm: Any = None,
-    model: str = "openai/gpt-4o",
+    model: str = "gemini/gemini-2.5-flash",
     llm_kwargs: Mapping[str, Any] | None = None,
     vision_dpi: int = DEFAULT_DPI,
     min_detection_confidence: float = 0.5,
@@ -148,6 +160,7 @@ async def _fill_pdf_form(
     trace = Trace()
     result = FillingResult(
         input_path=str(input_path),
+        document_id=document_id,
         output_path=str(resolved_output),
         schema_name=schema_name_for(data),
         data=dump_data(data, skip_none=skip_none),
@@ -177,20 +190,6 @@ async def _fill_pdf_form(
                 skip_none=skip_none,
                 unmatched=unmatched,
             )
-            if plan.errors:
-                _copy_input_if_needed(input_path, resolved_output)
-            elif plan.assignments:
-                plan.warnings.extend(
-                    write_acroform(
-                        input_path,
-                        resolved_output,
-                        plan.assignments,
-                        flatten=flatten,
-                    )
-                )
-            else:
-                plan.errors.append("No PDF form fields were assigned values.")
-                _copy_input_if_needed(input_path, resolved_output)
         else:
             detected_field_names: set[str] = set()
             overlay_field_map = field_map
@@ -231,30 +230,41 @@ async def _fill_pdf_form(
                     plan.fields[field_name].method = (
                         "llm_detected_blank" if source == "llm" else "auto_detected_blank"
                     )
-            if plan.errors:
-                _copy_input_if_needed(input_path, resolved_output)
-            elif plan.placements:
-                plan.warnings.extend(
-                    write_overlay(
-                        input_path,
-                        resolved_output,
-                        plan,
-                        overflow=overflow,
-                    )
-                )
-            else:
-                plan.errors.append("No static PDF overlay placements were assigned values.")
-                _copy_input_if_needed(input_path, resolved_output)
 
+        # Populate the result from the plan before deciding whether to write.
         result.fields = plan.fields
         result.pdf_fields = plan.pdf_fields
         result.unmapped_model_fields = plan.unmapped_model_fields
         result.unmapped_pdf_fields = plan.unmapped_pdf_fields
         result.warnings = plan.warnings
         result.errors = plan.errors
-        result.success = not plan.errors and any(
-            field.status == "filled" for field in result.fields.values()
-        )
+        result.flatten = flatten
+        result.overflow = overflow
+
+        has_writable = any(f.status == "filled" for f in result.fields.values())
+        if not plan.errors and not has_writable:
+            kind = (
+                "PDF form field"
+                if selected_strategy == "acroform"
+                else "static PDF overlay placement"
+            )
+            plan.errors.append(f"No {kind}s were assigned values.")
+
+        if review:
+            # Defer the write: run review heuristics and leave the result pending.
+            result.review_reasons = evaluate_fill_review(result) if not plan.errors else []
+            result.needs_review = bool(result.review_reasons)
+        elif plan.errors:
+            _copy_input_if_needed(input_path, resolved_output)
+            result.warnings.append(
+                f"Output at '{resolved_output}' is an unmodified copy of the input "
+                "— no fields were written. Check result.errors for details."
+            )
+        else:
+            result.warnings.extend(_write_from_result(result))
+            result.committed = True
+
+        result.success = not result.errors and has_writable
     except Exception as exc:
         result.success = False
         result.errors.append(str(exc))
@@ -274,13 +284,67 @@ async def _fill_pdf_form(
     return result
 
 
+async def commit_fill_async(result: FillingResult, *, force: bool = False) -> FillingResult:
+    """Write an approved (reviewed) fill to its output PDF.
+
+    Use this after ``fill_pdf_form(..., review=True)`` and ``result.approve(...)``.
+    Pass ``force=True`` to write a still-pending result without approval.
+    """
+    if result.committed:
+        raise ValueError("This filling result has already been committed.")
+    if result.review_status == "rejected":
+        raise ValueError("Cannot commit a rejected filling result.")
+    if not force and result.review_status != "approved":
+        raise ValueError(
+            "commit_fill requires an approved result. Call result.approve(...) "
+            "first, or pass force=True."
+        )
+    if result.errors:
+        raise ValueError(f"Cannot commit a result with errors: {'; '.join(result.errors)}")
+
+    result.warnings.extend(_write_from_result(result))
+    result.committed = True
+    result.success = True
+    return result
+
+
+def commit_fill(result: FillingResult, *, force: bool = False) -> FillingResult:
+    """Synchronous version of :func:`commit_fill_async`."""
+    return run_sync(commit_fill_async(result, force=force))
+
+
+def _write_from_result(result: FillingResult) -> list[str]:
+    """Write the PDF from a result's planned fields (used for immediate and deferred writes)."""
+    input_path = Path(result.input_path)
+    output_path = Path(result.output_path)
+    filled = {name: f for name, f in result.fields.items() if f.status == "filled"}
+    if not filled:
+        _copy_input_if_needed(input_path, output_path)
+        return [
+            f"Output at '{output_path}' is an unmodified copy of the input "
+            "— no fields were written. Check result.errors for details."
+        ]
+
+    if result.strategy == "acroform":
+        assignments = {
+            f.target_name: f.formatted_value for f in filled.values() if f.target_name
+        }
+        return write_acroform(input_path, output_path, assignments, flatten=result.flatten)
+
+    placements = {
+        name: f.placement for name, f in filled.items() if f.placement is not None
+    }
+    plan = FillPlan(strategy="overlay", placements=placements, fields=result.fields)
+    return write_overlay(input_path, output_path, plan, overflow=result.overflow)
+
+
 async def _detect_overlay_field_map(
     *,
     input_path: Path,
     data: BaseModel | Mapping[str, Any],
     mode: BlankDetectionMode,
     llm: Any = None,
-    model: str = "openai/gpt-4o",
+    model: str = "gemini/gemini-2.5-flash",
     llm_kwargs: Mapping[str, Any] | None = None,
     vision_dpi: int = DEFAULT_DPI,
     min_detection_confidence: float = 0.5,

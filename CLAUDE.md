@@ -464,6 +464,48 @@ by default. Use `blank_detection_mode="llm"` for a vision LLM placement planner,
 relative 0-1 top-left boxes, which DocuFlow converts to standard `BoundingBox` page
 coordinates before writing. Manual pipelines can use `FillForm`.
 
+### Review & Approval (opt-in)
+
+Filling writes data *into* a file, so review must happen before the PDF is saved. Pass
+`review=True` to **prepare** a fill without writing it: the plan is built, review heuristics
+run, but `output_path` is not written until you approve and commit. Review is off by default
+(`review=False` writes immediately, as before).
+
+```python
+from docuflow import fill_pdf_form, preview_fill, commit_fill
+
+# 1. Prepare (nothing is written yet)
+result = fill_pdf_form("form.pdf", data, output_path="filled.pdf", review=True)
+result.review_status      # "pending"
+result.needs_review       # True if any review heuristic flagged the fill
+result.review_reasons     # ["Field 'name' was located by automatic blank detection", ...]
+result.committed          # False
+
+# 2. Show it (backend for a UI): renders each affected page with planned values overlaid
+images = preview_fill(result, output_dir="./preview")   # list of PNG paths
+
+# 3. Correct values and/or placements before saving
+result.edit_field("name", value="Maria Bianchi", corrected_by="alice", reason="typo")
+result.edit_field("name", bbox={"x0": 100, "y0": 200, "x1": 300, "y1": 220}, page_number=0)
+result.corrections        # [FillCorrection(...)] — full audit log, original values preserved
+
+# 4. Approve (or reject) and commit
+result.approve(approved_by="alice")          # or result.reject(rejected_by="alice", reason="...")
+commit_fill(result)                          # writes filled.pdf (requires approval, or force=True)
+result.committed          # True
+```
+
+`edit_field()` is unified: pass `value=` to change what is written, and/or `bbox` /
+`page_number` / `font_size` / `align` to change where/how (overlay). Each edit preserves the
+original and appends a `FillCorrection`. `commit_fill(result, force=True)` writes a still-pending
+result without approval. A rejected result cannot be committed. Async variants:
+`fill_pdf_form_async`, `preview_fill_async`, `commit_fill_async`.
+
+`LocalDocumentStore` persists fills to `filling.json`; query pending ones with
+`await store.get_pending_fills()` and reload with `await store.load_filling_result(doc_id)`.
+The `FillForm` pipeline step takes `review=True` too. MCP exposes `get_pending_fills`,
+`edit_fill_field`, `approve_fill`, and `reject_fill`.
+
 ## Quality Report
 
 ```python
@@ -650,7 +692,11 @@ from docuflow.workflow import (
 from docuflow.search import search_document
 from docuflow.screenshots import screenshot_pages_sync
 from docuflow.quality import quality_report, QualityReport, QualitySnapshot, QualityLog
-from docuflow.filling import FillingResult, FilledField, FieldPlacement, FormField
+from docuflow import fill_pdf_form, commit_fill, preview_fill
+from docuflow.filling import (
+    FillingResult, FilledField, FieldPlacement, FormField, FillCorrection,
+    commit_fill, commit_fill_async, preview_fill, preview_fill_async, evaluate_fill_review,
+)
 from docuflow.workflow_config import load_workflow_config, run_workflow, WorkflowConfig
 from docuflow.batch import process_batch, BatchReport
 from docuflow.comparison import compare_documents, ComparisonResult
@@ -806,14 +852,14 @@ await store.get_by_status("rejected") # reviewed and rejected
 
 ## MCP Server (AI Agent Integration)
 
-DocuFlow runs as an MCP server with 14 tools any AI agent can call:
+DocuFlow runs as an MCP server with 18 tools any AI agent can call:
 
 ```bash
 pip install docuflow[mcp]
 docuflow-mcp  # starts the server
 ```
 
-Tools: `extract_document`, `extract_with_vision`, `discover_schema`, `compare_documents`, `process_batch`, `list_templates`, `show_template`, `search_in_document`, `get_pending_reviews`, `get_extraction_result`, `correct_field`, `approve_document`, `reject_document`, `screenshot_document`.
+Tools: `extract_document`, `extract_with_vision`, `discover_schema`, `compare_documents`, `process_batch`, `list_templates`, `show_template`, `search_in_document`, `get_pending_reviews`, `get_extraction_result`, `correct_field`, `approve_document`, `reject_document`, `screenshot_document`, `get_pending_fills`, `edit_fill_field`, `approve_fill`, `reject_fill`.
 
 ## Project Structure
 

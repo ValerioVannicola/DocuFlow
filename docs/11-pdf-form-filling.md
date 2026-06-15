@@ -260,6 +260,16 @@ result.unmapped_pdf_fields
 result.warnings
 result.errors
 result.trace_id
+
+# Review state (see "Review & Approval" below)
+result.committed                # True once the PDF has actually been written
+result.needs_review             # set by review heuristics when review=True
+result.review_status            # "pending" | "approved" | "rejected"
+result.reviewed_by
+result.reviewed_at
+result.rejection_reason
+result.review_reasons           # human-readable reasons the fill was flagged
+result.corrections              # [FillCorrection(...)] audit log of reviewer edits
 ```
 
 `FillingResult.fields` contains `FilledField` objects:
@@ -276,6 +286,75 @@ result.trace_id
 | `method` | Mapping method such as `"exact_alias"`, `"exact_name"`, or `"manual_overlay"`. |
 | `status` | `"filled"`, `"skipped"`, or `"failed"`. |
 | `warnings` | Field-level warnings, such as font-size shrinkage. |
+
+## Review & Approval
+
+Because filling writes data *into* a file, any human review has to happen **before** the
+PDF is saved. This is opt-in: pass `review=True` to **prepare** a fill without writing it.
+The plan is built and review heuristics run, but `output_path` is not touched until you
+approve and commit. With the default `review=False`, the PDF is written immediately, exactly
+as before.
+
+```python
+from docuflow import fill_pdf_form, preview_fill, commit_fill
+
+# 1. Prepare — nothing is written to output_path yet
+result = fill_pdf_form("form.pdf", data, output_path="filled.pdf", review=True)
+result.review_status      # "pending"
+result.needs_review       # True when a heuristic flagged the fill
+result.review_reasons     # why it was flagged
+result.committed          # False
+
+# 2. Show it — render each affected page with planned values overlaid (UI backend)
+images = preview_fill(result, output_dir="./preview")   # -> list of PNG paths
+
+# 3. Edit values and/or placements; originals are preserved, edits are logged
+result.edit_field("recipient", value="Maria Bianchi", corrected_by="alice", reason="typo")
+result.edit_field("recipient", bbox={"x0": 100, "y0": 200, "x1": 300, "y1": 220})
+
+# 4. Decide, then commit
+result.approve(approved_by="alice")     # or result.reject(rejected_by="alice", reason="...")
+commit_fill(result)                     # writes filled.pdf; requires approval (or force=True)
+result.committed          # True
+```
+
+### `result.edit_field(field_name, *, value=..., bbox=..., page_number=..., font_size=..., align=..., corrected_by="", reason="")`
+
+Unified editor for a planned fill. Pass `value=` to change what is written; pass any of
+`bbox` / `page_number` / `font_size` / `align` to change where/how it lands (overlay
+strategy). The first edit to a field preserves its `original_value`/placement, and every
+edit appends a `FillCorrection` to `result.corrections`. Raises if the result is already
+committed or rejected.
+
+### `result.approve(approved_by="")` / `result.reject(rejected_by="", reason="")`
+
+Stamp the decision (`review_status`, `reviewed_by`, `reviewed_at`). Each guards against
+deciding twice.
+
+### `commit_fill(result, *, force=False)` / `commit_fill_async(...)`
+
+Write an approved result to its `output_path`. Refuses a rejected result, and refuses a
+pending one unless `force=True`. Idempotent guard: a result can only be committed once.
+
+### `preview_fill(result, output_dir=".", *, dpi=150, format="png")` / `preview_fill_async(...)`
+
+Render each affected page with the planned values drawn at their target boxes and save
+images. Reviewer-edited or warned fields are highlighted in amber, clean placements in
+green. This is the backend a review UI consumes — no PDF is written. Returns the saved
+image paths.
+
+### Persistence
+
+`LocalDocumentStore` saves fills to `filling.json`:
+
+```python
+await store.save_filling_result(result)
+ids = await store.get_pending_fills()              # review-flagged, still pending
+result = await store.load_filling_result(doc_id)
+```
+
+`FillCorrection` records one reviewer edit: `field_name`, `old_value`, `new_value`,
+`old_placement`, `new_placement`, `corrected_by`, `reason`, `timestamp`.
 
 ## Workflow Step
 
@@ -299,6 +378,7 @@ filling_result = pipeline_result.state.filling_result
 | --- | --- |
 | `data` | `None` |
 | `output_path` | `None` |
+| `review` | `False` |
 | `strategy` | `"auto"` |
 | `match_by` | `"auto"` |
 | `field_map` | `None` |
@@ -307,7 +387,7 @@ filling_result = pipeline_result.state.filling_result
 | `detect_blank_spaces` | `False` |
 | `blank_detection_mode` | `"heuristic"` |
 | `llm` | `None` |
-| `model` | `"openai/gpt-4o"` |
+| `model` | `"gemini/gemini-2.5-flash"` |
 | `llm_kwargs` | `None` |
 | `vision_dpi` | `DEFAULT_DPI` |
 | `min_detection_confidence` | `0.5` |

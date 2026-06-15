@@ -5,7 +5,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
-from docuflow.filling.models import FieldPlacement, FillPlan, OverflowPolicy
+from docuflow.filling.models import FieldPlacement, FilledField, FillPlan, OverflowPolicy
 
 
 def write_acroform(
@@ -28,18 +28,14 @@ def write_acroform(
     for page in writer.pages:
         try:
             writer.update_page_form_field_values(
-                page,
-                assignments,
-                auto_regenerate=True,
-                flatten=flatten,
+                page, assignments, auto_regenerate=True, flatten=flatten,
             )
             unsupported_flatten = False
         except TypeError:
-            writer.update_page_form_field_values(
-                page,
-                assignments,
-                auto_regenerate=True,
-            )
+            try:
+                writer.update_page_form_field_values(page, assignments, auto_regenerate=True)
+            except TypeError:
+                writer.update_page_form_field_values(page, assignments)
 
     if unsupported_flatten:
         warnings.append(
@@ -80,14 +76,20 @@ def write_overlay(
             canvas = canvas_cls(packet, pagesize=(page_width, page_height))
             for field_name, placement in overlay_fields:
                 value = str(plan.fields[field_name].formatted_value)
-                font_size = _fit_font_size(value, placement, overflow=overflow)
-                if font_size != placement.font_size:
-                    plan.fields[field_name].warnings.append(
-                        f"Font size shrunk from {placement.font_size} to {font_size}."
+                if placement.multiline or overflow == "wrap":
+                    _draw_wrapped(
+                        canvas, value, placement, page_height,
+                        plan.fields[field_name], field_name=field_name, overflow=overflow,
                     )
-                canvas.setFont(placement.font_name, font_size)
-                x, y = _text_origin(placement, page_height, value, font_size)
-                canvas.drawString(x, y, value)
+                else:
+                    font_size = _fit_font_size(value, placement, overflow=overflow)
+                    if font_size != placement.font_size:
+                        plan.fields[field_name].warnings.append(
+                            f"Font size shrunk from {placement.font_size} to {font_size}."
+                        )
+                    canvas.setFont(placement.font_name, font_size)
+                    x, y = _text_origin(placement, page_height, value, font_size)
+                    canvas.drawString(x, y, value)
             canvas.save()
             packet.seek(0)
             overlay_pdf = pdf_reader_cls(packet)
@@ -128,7 +130,14 @@ def _set_need_appearances(writer: Any) -> None:
     try:
         writer.set_need_appearances_writer(True)
     except AttributeError:
-        return
+        # pypdf 5+: the method was removed; write directly into the AcroForm dict
+        try:
+            from pypdf.generic import BooleanObject, NameObject
+            acroform = writer._root_object.get("/AcroForm")
+            if acroform is not None:
+                acroform.update({NameObject("/NeedAppearances"): BooleanObject(True)})
+        except Exception:
+            return
 
 
 def _fit_font_size(
@@ -144,6 +153,67 @@ def _fit_font_size(
     if estimated_width <= placement.bbox.width:
         return placement.font_size
     return max(6.0, placement.font_size * placement.bbox.width / estimated_width)
+
+
+def _draw_wrapped(
+    canvas: Any,
+    value: str,
+    placement: FieldPlacement,
+    page_height: float,
+    filled_field: FilledField,
+    *,
+    field_name: str,
+    overflow: OverflowPolicy,
+) -> None:
+    """Draw word-wrapped text for multiline placements or overflow='wrap'."""
+    try:
+        from reportlab.pdfbase.pdfmetrics import stringWidth
+    except ImportError:
+        canvas.drawString(placement.bbox.x0, page_height - placement.bbox.y1, value)
+        return
+
+    font_name = placement.font_name
+    font_size = placement.font_size
+    line_height = font_size * 1.2
+    max_width = placement.bbox.width
+
+    # Honour explicit newlines, then word-wrap each paragraph to max_width.
+    lines: list[str] = []
+    for para in (value.splitlines() or [""]):
+        words = para.split()
+        if not words:
+            lines.append("")
+            continue
+        current = ""
+        for word in words:
+            test = (current + " " + word).strip()
+            if stringWidth(test, font_name, font_size) <= max_width:
+                current = test
+            else:
+                if current:
+                    lines.append(current)
+                current = word
+        lines.append(current)
+
+    # ReportLab origin is bottom-left; y decreases as we move down.
+    # bbox.y0 = top edge (top-left origin), bbox.y1 = bottom edge.
+    y_top = page_height - placement.bbox.y0 - font_size
+    y_min = page_height - placement.bbox.y1
+
+    canvas.setFont(font_name, font_size)
+    clipped = 0
+    for i, line in enumerate(lines):
+        y = y_top - i * line_height
+        if y < y_min:
+            clipped = len(lines) - i
+            break
+        canvas.drawString(placement.bbox.x0, y, line)
+
+    if clipped:
+        msg = f"{clipped} wrapped line(s) did not fit in the bounding box and were clipped."
+        if overflow == "error":
+            raise ValueError(f"Field '{field_name}': {msg}")
+        filled_field.warnings.append(msg)
 
 
 def _text_origin(
