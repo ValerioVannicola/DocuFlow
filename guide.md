@@ -2702,6 +2702,143 @@ For the full parameter reference, see [`docs/11-pdf-form-filling.md`](docs/11-pd
 
 ---
 
+## 18e. DOCX Form Filling
+
+`fill_docx_form` fills Word documents using either content controls (Word SDT form fields)
+or Jinja2 template variables (`{{ }}`). The same `FillingResult`, review/approval workflow,
+`edit_field`, and `commit_fill` apply.
+
+```python
+from docuflow import fill_docx_form, commit_fill
+```
+
+### Auto strategy
+
+`"auto"` inspects the file: if SDT content controls are found it uses
+`"content_controls"`; otherwise it falls back to `"template"`.
+
+```python
+result = fill_docx_form(
+    "claim-form.docx",
+    data={"claimant_name": "Mario Rossi", "policy_number": "POL-42"},
+    output_path="claim-form-filled.docx",
+)
+# result.strategy == "content_controls"  (if the docx has SDT fields)
+```
+
+### Template strategy
+
+Assumes the document contains `{{ field_name }}` placeholders. Rendered via
+[docxtpl](https://docxtpl.readthedocs.io), which handles Word's run-splitting transparently:
+
+```python
+result = fill_docx_form(
+    "claim-template.docx",
+    data={"claimant_name": "Mario Rossi", "policy_number": "POL-42"},
+    output_path="claim-template-filled.docx",
+    strategy="template",
+)
+```
+
+### Discover what fields are available
+
+```python
+from docuflow.filling import inspect_content_controls, inspect_template_vars
+
+controls = inspect_content_controls("form.docx")     # list[FormField]
+vars_    = inspect_template_vars("template.docx")    # list[str]
+```
+
+### Review and approval
+
+Identical to the PDF path — `review=True` defers the write:
+
+```python
+result = fill_docx_form("form.docx", data, output_path="out.docx", review=True)
+result.edit_field("policy_number", value="POL-CORRECTED", corrected_by="reviewer")
+result.approve(approved_by="reviewer")
+commit_fill(result)   # writes the DOCX now
+```
+
+### FillForm workflow step
+
+`FillForm` dispatches automatically: `.docx` / `.doc` files → `fill_docx_form_async`;
+all other files → `fill_pdf_form_async`. No change to the step API.
+
+For the full reference, see [`docs/11-pdf-form-filling.md`](docs/11-pdf-form-filling.md).
+
+---
+
+## 18f. Document Splitting
+
+`split_document` assigns each page of a PDF to one or more named sections using an LLM.
+Sections are defined via a Pydantic model — field names become section identifiers and
+`Field(description=...)` tells the LLM what belongs there.
+
+```python
+from pydantic import BaseModel, Field
+from docuflow import split_document
+
+class ContractSections(BaseModel):
+    contract_body:  str = Field(description="Main contract terms and conditions")
+    exhibits:       str = Field(description="Attached exhibits and appendices")
+    signature_page: str = Field(description="Pages containing signature blocks")
+
+result = split_document("contract.pdf", ContractSections)
+
+print(result.page_map)
+# {"contract_body": [0, 1, 2], "exhibits": [3, 4], "signature_page": [5]}
+```
+
+Alternatively, pass a list of `DocumentSection` objects:
+
+```python
+from docuflow.splitting import DocumentSection
+
+result = split_document("contract.pdf", [
+    DocumentSection(name="contract_body", description="Main contract terms"),
+    DocumentSection(name="exhibits",      description="Attached exhibits"),
+])
+```
+
+### Deep mode
+
+`deep=True` adds per-section confidence (`"high"` / `"medium"` / `"low"`) and an evidence
+statement:
+
+```python
+result = split_document("contract.pdf", ContractSections, deep=True)
+
+for name, section in result.sections.items():
+    print(f"{name}: pages {section.pages} ({section.confidence})")
+    print(f"  {section.evidence}")
+```
+
+### Options
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `model` | `"gemini/gemini-2.5-flash"` | Any LiteLLM model string. |
+| `deep` | `False` | Also return confidence + evidence per section. |
+| `allow_overlap` | `True` | A page may appear in multiple sections. |
+| `split_rules` | `""` | Custom instruction overriding the default prompt logic. |
+| `pages` | `None` | `list[int]` of 0-based page indices to process. `None` = all pages. |
+
+### SplitResult
+
+```python
+result.success              # bool
+result.page_map             # dict[str, list[int]] — sorted page indices
+result.sections["body"].confidence   # "high" | "medium" | "low"
+result.sections["body"].evidence     # str
+result.usage                # token counts and cost
+result.warnings             # out-of-range pages, etc.
+```
+
+For the full reference, see [`docs/12-document-splitting.md`](docs/12-document-splitting.md).
+
+---
+
 ## 19. Storage
 
 Storage persists documents, extraction results, and traces to disk.
@@ -2905,7 +3042,8 @@ docuflow templates init invoice --dir ./my_templates
 ```python
 # Core
 from docuflow import extract, DocumentPipeline, Pipeline, PrivacyPolicy
-from docuflow import process_batch, compare_documents, fill_pdf_form
+from docuflow import process_batch, compare_documents, fill_pdf_form, fill_docx_form
+from docuflow import split_document, split_document_async
 
 # Parsers
 from docuflow.parsing.pdfplumber_parser import PdfplumberParser
@@ -2957,5 +3095,10 @@ from docuflow.extraction.models import (
     ExtractionResult, ExtractedField, FieldCorrection,
     ReviewVerdict, FieldProvenance,
 )
-from docuflow.filling import FillingResult, FilledField, FieldPlacement, FormField
+from docuflow.filling import (
+    FillingResult, FilledField, FieldPlacement, FormField,
+    fill_docx_form, fill_docx_form_async,
+    inspect_content_controls, inspect_template_vars,
+)
+from docuflow.splitting import split_document, split_document_async, DocumentSection, SplitResult
 ```

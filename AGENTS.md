@@ -424,9 +424,9 @@ from docuflow.screenshots import screenshot_pages_sync
 shots = screenshot_pages_sync("doc.pdf", output_dir="./pages", dpi=200)
 ```
 
-## PDF Form Filling
+## PDF and DOCX Form Filling
 
-PDF write-back is separate from extraction and returns `FillingResult`, not `ExtractionResult`.
+PDF and DOCX write-back is separate from extraction and returns `FillingResult`, not `ExtractionResult`.
 
 ```bash
 pip install docuflow[forms]
@@ -505,6 +505,50 @@ result without approval. A rejected result cannot be committed. Async variants:
 `await store.get_pending_fills()` and reload with `await store.load_filling_result(doc_id)`.
 The `FillForm` pipeline step takes `review=True` too. MCP exposes `get_pending_fills`,
 `edit_fill_field`, `approve_fill`, and `reject_fill`.
+
+### DOCX Form Filling (opt-in)
+
+`fill_docx_form` fills Word documents. Two strategies: `"content_controls"` (Word SDT
+fields) and `"template"` (Jinja2 `{{ }}` via docxtpl). `"auto"` picks the right one.
+
+```python
+from docuflow import fill_docx_form, commit_fill
+from docuflow.filling import inspect_content_controls, inspect_template_vars
+
+# content_controls strategy
+result = fill_docx_form("form.docx", data, output_path="filled.docx")
+
+# template strategy
+result = fill_docx_form("template.docx", data, strategy="template")
+
+# discover what fields exist
+controls = inspect_content_controls("form.docx")   # list[FormField]
+vars_    = inspect_template_vars("template.docx")  # list[str]
+```
+
+The same `review=True` / `edit_field` / `approve` / `commit_fill` workflow applies.
+`FillForm` dispatches automatically on `.docx` extension. MCP: `fill_docx_form`.
+
+## Document Splitting
+
+`split_document` assigns each page to named sections defined via a Pydantic model:
+
+```python
+from pydantic import BaseModel, Field
+from docuflow import split_document
+
+class ContractSections(BaseModel):
+    contract_body:  str = Field(description="Main contract terms")
+    exhibits:       str = Field(description="Attached exhibits")
+    signature_page: str = Field(description="Signature blocks")
+
+result = split_document("contract.pdf", ContractSections)
+result.page_map     # {"contract_body": [0,1,2], "exhibits": [3,4], "signature_page": [5]}
+```
+
+Or pass a list of `DocumentSection` objects. `deep=True` adds confidence + evidence.
+`allow_overlap=False` enforces one section per page. `split_rules` overrides the prompt.
+MCP: `split_document`.
 
 ## Quality Report
 
@@ -652,8 +696,8 @@ docuflow templates init invoice
 
 ```python
 # Top-level
-from docuflow import extract, fill_pdf_form, DocumentPipeline, Pipeline, PrivacyPolicy
-from docuflow import process_batch, compare_documents
+from docuflow import extract, fill_pdf_form, fill_docx_form, DocumentPipeline, Pipeline, PrivacyPolicy
+from docuflow import process_batch, compare_documents, split_document
 
 # Parsing
 from docuflow.parsing.pdfplumber_parser import PdfplumberParser
@@ -692,11 +736,13 @@ from docuflow.workflow import (
 from docuflow.search import search_document
 from docuflow.screenshots import screenshot_pages_sync
 from docuflow.quality import quality_report, QualityReport, QualitySnapshot, QualityLog
-from docuflow import fill_pdf_form, commit_fill, preview_fill
+from docuflow import fill_pdf_form, fill_docx_form, commit_fill, preview_fill
 from docuflow.filling import (
     FillingResult, FilledField, FieldPlacement, FormField, FillCorrection,
     commit_fill, commit_fill_async, preview_fill, preview_fill_async, evaluate_fill_review,
+    fill_docx_form, fill_docx_form_async, inspect_content_controls, inspect_template_vars,
 )
+from docuflow.splitting import split_document, split_document_async, DocumentSection, SplitResult
 from docuflow.workflow_config import load_workflow_config, run_workflow, WorkflowConfig
 from docuflow.batch import process_batch, BatchReport
 from docuflow.comparison import compare_documents, ComparisonResult
@@ -852,14 +898,14 @@ await store.get_by_status("rejected") # reviewed and rejected
 
 ## MCP Server (AI Agent Integration)
 
-DocuFlow runs as an MCP server with 18 tools any AI agent can call:
+DocuFlow runs as an MCP server with 20 tools any AI agent can call:
 
 ```bash
 pip install docuflow[mcp]
 docuflow-mcp  # starts the server
 ```
 
-Tools: `extract_document`, `extract_with_vision`, `discover_schema`, `compare_documents`, `process_batch`, `list_templates`, `show_template`, `search_in_document`, `get_pending_reviews`, `get_extraction_result`, `correct_field`, `approve_document`, `reject_document`, `screenshot_document`, `get_pending_fills`, `edit_fill_field`, `approve_fill`, `reject_fill`.
+Tools: `extract_document`, `extract_with_vision`, `discover_schema`, `compare_documents`, `process_batch`, `list_templates`, `show_template`, `search_in_document`, `get_pending_reviews`, `get_extraction_result`, `correct_field`, `approve_document`, `reject_document`, `screenshot_document`, `get_pending_fills`, `edit_fill_field`, `approve_fill`, `reject_fill`, `split_document`, `fill_docx_form`.
 
 ## Project Structure
 
@@ -878,13 +924,14 @@ src/docuflow/
   serve.py             # FastAPI server (create_app, run_server)
   dockerize.py         # Docker deployment generator
   eval.py              # EvalHarness (accuracy measurement)
-  mcp_server.py        # MCP server (14 tools for AI agents)
+  mcp_server.py        # MCP server (20 tools for AI agents)
   constants.py         # DEFAULT_DPI
   errors.py            # All exception classes
   documents/           # Document, Page, Block, Evidence, Table, Cell
   extraction/          # ExtractionEngine, VisionExtractionEngine, HybridExtractionEngine
     llm/               # LLMAdapter protocol, LiteLLMAdapter
-  filling/             # fill_pdf_form, FillingResult, AcroForm and overlay writers
+  filling/             # fill_pdf_form, fill_docx_form, FillingResult, AcroForm/overlay/DOCX writers
+  splitting/           # split_document, SplitResult, DocumentSection
   parsing/             # Parser protocol, pdfplumber, Tesseract, Docling, Smart
   ocr/                 # OCREngine protocol, TesseractOCR, preprocessing
   rendering/           # PDF page to image rendering

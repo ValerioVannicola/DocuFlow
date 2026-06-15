@@ -629,6 +629,66 @@ reject_fill(
 Loads a stored result, rejects it, saves it, and returns review status JSON. The output PDF
 is not written.
 
+### `split_document`
+
+```python
+split_document(
+    file_path: str,
+    sections: str,
+    model: str = "gemini/gemini-2.5-flash",
+    deep: bool = False,
+    allow_overlap: bool = True,
+    split_rules: str = "",
+    pages: str = "",
+) -> str
+```
+
+Parameters:
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `file_path` | Required | Path to the PDF document. |
+| `sections` | Required | JSON array of section objects, each with `"name"` and `"description"`. Example: `[{"name": "body", "description": "Main terms"}, {"name": "exhibits", "description": "Attached exhibits"}]`. |
+| `model` | `"gemini/gemini-2.5-flash"` | LiteLLM model string. |
+| `deep` | `false` | When `true`, each section also includes `confidence` and `evidence`. |
+| `allow_overlap` | `true` | When `true`, a page may appear in multiple sections. |
+| `split_rules` | `""` | Optional prompt overriding default splitting logic. |
+| `pages` | `""` | Comma-separated 0-based page indices to process. Empty means all pages. |
+
+Returns `SplitResult` JSON with `page_map` (section → pages), per-section confidence and
+evidence (deep mode), usage, warnings, and errors. See `12-document-splitting.md`.
+
+### `fill_docx_form`
+
+```python
+fill_docx_form(
+    file_path: str,
+    data: str,
+    output_path: str = "",
+    strategy: str = "auto",
+    flatten: bool = False,
+    review: bool = False,
+    document_id: str = "",
+    store_path: str = "./.docuflow_store",
+) -> str
+```
+
+Parameters:
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `file_path` | Required | Path to the input `.docx` file. |
+| `data` | Required | JSON string of field values to fill (keys match content control tags or template variable names). |
+| `output_path` | `""` | Where to save the filled DOCX. Defaults to `<stem>-filled.docx`. |
+| `strategy` | `"auto"` | `"auto"` (detect), `"content_controls"` (Word SDT), or `"template"` (Jinja2 `{{ }}`). |
+| `flatten` | `false` | Remove SDT wrappers after filling (content_controls only). |
+| `review` | `false` | When `true`, plan the fill but do not write the file. |
+| `document_id` | `""` | Optional document identifier. Used for storage when `review=true`. |
+| `store_path` | `"./.docuflow_store"` | Store path when `review=true`. |
+
+Returns `FillingResult` JSON (success, strategy, fields, warnings, errors, review_status).
+See `11-pdf-form-filling.md` for the full review/approval workflow.
+
 ### `screenshot_document`
 
 ```python

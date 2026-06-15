@@ -1,7 +1,7 @@
-# PDF Form Filling
+# PDF and DOCX Form Filling
 
-DocuFlow can write trusted structured data into PDF forms. This is a write-back feature,
-not extraction, so it returns a dedicated `FillingResult` instead of `ExtractionResult`.
+DocuFlow can write trusted structured data into PDF and DOCX forms. This is a write-back
+feature, not extraction, so it returns a dedicated `FillingResult` instead of `ExtractionResult`.
 
 Install the optional writer dependencies:
 
@@ -10,7 +10,8 @@ pip install docuflow[forms]
 ```
 
 The `forms` extra installs `pypdf` for PDF writing, `reportlab` for static overlay
-placements, and `pdfplumber` for opt-in blank-space detection.
+placements, `pdfplumber` for opt-in blank-space detection, `python-docx` for DOCX
+content controls, and `docxtpl` for Jinja2 DOCX templates.
 
 ## Public API
 
@@ -394,6 +395,156 @@ filling_result = pipeline_result.state.filling_result
 | `skip_none` | `True` |
 | `unmatched` | `"warn"` |
 | `overflow` | `"shrink"` |
+
+## DOCX Form Filling
+
+Word documents are filled through `fill_docx_form` / `fill_docx_form_async`. The same
+`FillingResult`, review/approval workflow, `edit_field`, `approve`, `reject`, and
+`commit_fill` functions apply — only the writer and strategy selection differ.
+
+```python
+from docuflow import fill_docx_form, commit_fill
+from docuflow.filling import inspect_content_controls, inspect_template_vars
+```
+
+### Strategies
+
+| Strategy | What it targets | Library |
+| --- | --- | --- |
+| `"content_controls"` | Word SDT form fields (text, checkbox, dropdown, date) | `python-docx` (XML) |
+| `"template"` | Jinja2 `{{ field }}` placeholders anywhere in the document | `docxtpl` |
+| `"auto"` | Inspect the file: content controls first, then template variables | both |
+
+### `fill_docx_form()`
+
+```python
+fill_docx_form(
+    path: str,
+    data: BaseModel | Mapping[str, Any],
+    output_path: str | None = None,
+    *,
+    document_id: str = "",
+    review: bool = False,
+    strategy: Literal["auto", "content_controls", "template"] = "auto",
+    formats: Mapping[str, str | Callable] | None = None,
+    flatten: bool = False,
+    skip_none: bool = True,
+    unmatched: Literal["error", "warn", "ignore"] = "warn",
+) -> FillingResult
+```
+
+`fill_docx_form_async` is the async version; `fill_docx_form` is the sync wrapper.
+
+**Parameters specific to DOCX:**
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `strategy` | `"auto"` | `"content_controls"` for Word SDT fields, `"template"` for `{{ }}` placeholders. |
+| `flatten` | `False` | Content controls only: remove SDT wrappers after filling, converting to plain text. |
+
+### Inspection helpers
+
+Discover what fields are available in a DOCX before filling:
+
+```python
+from docuflow.filling import inspect_content_controls, inspect_template_vars
+
+controls = inspect_content_controls("form.docx")
+# → [FormField(name="claimant_name", field_type="plainText"), ...]
+
+vars_ = inspect_template_vars("template.docx")
+# → ["claimant_name", "policy_number", ...]
+```
+
+`inspect_content_controls` returns a `list[FormField]` (same type as `inspect_pdf_form`).
+Field types are `"plainText"`, `"richText"`, `"checkbox"`, `"dropdown"`, `"comboBox"`,
+or `"date"`. `inspect_template_vars` returns sorted variable names found in `{{ }}` markers.
+
+### Content controls example
+
+Assumes a `.docx` with Word SDT text fields tagged `claimant_name` and `policy_number`:
+
+```python
+from docuflow import fill_docx_form
+
+result = fill_docx_form(
+    "claim-form.docx",
+    data={"claimant_name": "Mario Rossi", "policy_number": "POL-42"},
+    output_path="claim-form-filled.docx",
+)
+# result.strategy == "content_controls"
+```
+
+Pass `flatten=True` to remove the SDT wrappers after filling (the document becomes plain
+text; the form fields can no longer be re-edited in Word):
+
+```python
+result = fill_docx_form("form.docx", data, flatten=True)
+```
+
+### Template example
+
+Assumes a `.docx` whose paragraphs contain `{{ claimant_name }}` and `{{ policy_number }}`:
+
+```python
+from docuflow import fill_docx_form
+
+result = fill_docx_form(
+    "claim-template.docx",
+    data={"claimant_name": "Mario Rossi", "policy_number": "POL-42"},
+    output_path="claim-template-filled.docx",
+    strategy="template",
+)
+```
+
+docxtpl resolves Jinja2 variable names against the data keys. It handles Word's
+run-splitting transparently (Word sometimes splits `{{ name }}` across multiple XML runs
+for spell-check reasons).
+
+### Field matching
+
+Field matching reuses the same logic as AcroForm filling: exact name → normalized
+(stripped punctuation, lowercased) → Pydantic aliases. Pass `formats={"field": fmt}` to
+apply format strings or callables, and `unmatched="error"` to raise on unmapped fields.
+
+### Review, approval, and commit
+
+`review=True`, `edit_field`, `approve`, `reject`, and `commit_fill` work identically to
+the PDF path:
+
+```python
+result = fill_docx_form("form.docx", data, output_path="out.docx", review=True)
+result.edit_field("policy_number", value="POL-CORRECTED", corrected_by="reviewer")
+result.approve(approved_by="reviewer")
+commit_fill(result)
+```
+
+The `FillForm` workflow step dispatches automatically based on the file extension:
+`.docx` / `.doc` → `fill_docx_form_async`; all other extensions → `fill_pdf_form_async`.
+
+### MCP tool
+
+```python
+fill_docx_form(
+    file_path: str,
+    data: str,          # JSON string → parsed to dict
+    output_path: str = "",
+    strategy: str = "auto",
+    flatten: bool = False,
+    review: bool = False,
+    document_id: str = "",
+    store_path: str = "./.docuflow_store",
+) -> str               # FillingResult JSON
+```
+
+### DOCX limits
+
+- Content control preview (`preview_fill`) is not yet supported for DOCX.
+- Legacy `.doc` binary format is not supported.
+- Placement edits (`bbox`, `page_number`, `font_size`) via `edit_field` are ignored for
+  DOCX strategies (those parameters are overlay-only).
+
+---
 
 ## Current Limits
 
