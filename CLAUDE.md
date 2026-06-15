@@ -444,6 +444,7 @@ result = fill_pdf_form(
     field_map=None,              # PDF field map or overlay placements
     detect_blank_spaces=False,   # opt-in static blank detection; off by default
     blank_detection_mode="heuristic",  # "heuristic" | "llm" | "hybrid"
+    overflow="shrink",           # "shrink" | "wrap" | "error" | "page"
 )
 
 result.success
@@ -592,6 +593,25 @@ for name, section in result.sections.items():
 
 MCP exposes `split_document` (sections as JSON string). Full reference: `docs/12-document-splitting.md`.
 
+## Document Metadata Extraction
+
+Extract PDF annotations and DOCX structural elements:
+
+```python
+from docuflow import extract_metadata
+from docuflow.metadata import DocumentMetadataResult
+
+result = extract_metadata("contract.pdf")   # or .docx
+result.comments     # list[Comment]   — reviewer notes (author, date, text, bbox)
+result.highlights   # list[Highlight] — subtype, color (hex), bbox
+result.hyperlinks   # list[Hyperlink] — url, text, bbox
+result.signatures   # list[Signature] — field_name, signed, signer (PDF only)
+result.revisions    # list[Revision]  — insertion/deletion, author, date (DOCX only)
+result.has_metadata
+```
+
+No extra install — uses pypdf (`[forms]`) for PDF, stdlib for DOCX. Full reference: `docs/13-document-metadata.md`.
+
 ## Quality Report
 
 ```python
@@ -739,7 +759,7 @@ docuflow templates init invoice
 ```python
 # Top-level
 from docuflow import extract, fill_pdf_form, fill_docx_form, DocumentPipeline, Pipeline, PrivacyPolicy
-from docuflow import process_batch, compare_documents, split_document
+from docuflow import process_batch, compare_documents, split_document, extract_metadata
 
 # Parsing
 from docuflow.parsing.pdfplumber_parser import PdfplumberParser

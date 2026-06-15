@@ -69,7 +69,7 @@ Parameters:
 | `min_detection_confidence` | `0.5` | Ignore LLM placements below this confidence. |
 | `skip_none` | `True` | Skip fields whose value is `None`. |
 | `unmatched` | `"warn"` | What to do when a model field cannot be mapped: add warning, error, or ignore. |
-| `overflow` | `"shrink"` | Static overlay behavior when text is wider than the target box. |
+| `overflow` | `"shrink"` | Static overlay behavior when text is wider than the target box: `"shrink"` reduces font size to fit; `"wrap"` word-wraps within the box and clips; `"error"` raises; `"page"` appends continuation pages. |
 
 ### `fill_pdf_form_async()`
 
@@ -164,6 +164,30 @@ result = fill_pdf_form(
         }
     },
 )
+```
+
+### Overflow Handling
+
+The `overflow` parameter controls what happens when filled text does not fit in the target
+bounding box. It applies to multiline placements and when `overflow="wrap"` is set.
+
+| Value | Behaviour |
+| --- | --- |
+| `"shrink"` *(default)* | Single-line fields: shrink the font until the text fits. Multiline: clip and warn. |
+| `"wrap"` | Word-wrap within the bounding box. Lines that still don't fit are clipped and a warning is added. |
+| `"error"` | Raise `ValueError` if any content is clipped. |
+| `"page"` | Append blank continuation page(s) to the output PDF. Text resumes from the top margin of each new page, using the same `x0` / `font_size` / `font_name` as the original placement. The field's `warnings` list records which appended page number(s) received the overflow. |
+
+```python
+result = fill_pdf_form(
+    "static-form.pdf",
+    data={"notes": very_long_text},
+    output_path="filled.pdf",
+    strategy="overlay",
+    field_map={"notes": {"page_number": 0, "bbox": {...}, "multiline": True}},
+    overflow="page",   # appends continuation pages as needed
+)
+# result.fields["notes"].warnings → ["Content overflowed; continued on appended page 2."]
 ```
 
 ### Opt-In Blank Detection
@@ -394,7 +418,7 @@ filling_result = pipeline_result.state.filling_result
 | `min_detection_confidence` | `0.5` |
 | `skip_none` | `True` |
 | `unmatched` | `"warn"` |
-| `overflow` | `"shrink"` |
+| `overflow` | `"shrink"` | `"shrink"` \| `"wrap"` \| `"error"` \| `"page"` |
 
 ## DOCX Form Filling
 

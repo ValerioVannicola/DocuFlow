@@ -444,6 +444,7 @@ result = fill_pdf_form(
     field_map=None,              # PDF field map or overlay placements
     detect_blank_spaces=False,   # opt-in static blank detection; off by default
     blank_detection_mode="heuristic",  # "heuristic" | "llm" | "hybrid"
+    overflow="shrink",           # "shrink" | "wrap" | "error" | "page"
 )
 
 result.success
@@ -549,6 +550,26 @@ result.page_map     # {"contract_body": [0,1,2], "exhibits": [3,4], "signature_p
 Or pass a list of `DocumentSection` objects. `deep=True` adds confidence + evidence.
 `allow_overlap=False` enforces one section per page. `split_rules` overrides the prompt.
 MCP: `split_document`.
+
+## Document Metadata Extraction
+
+`extract_metadata` extracts PDF annotations and DOCX structural elements without touching
+the text content:
+
+```python
+from docuflow import extract_metadata
+from docuflow.metadata import DocumentMetadataResult, Comment, Highlight, Hyperlink, Signature, Revision
+
+result = extract_metadata("contract.pdf")   # or .docx
+result.comments     # list[Comment]   — reviewer notes
+result.highlights   # list[Highlight] — color, subtype, bbox
+result.hyperlinks   # list[Hyperlink] — url, text, bbox
+result.signatures   # list[Signature] — field_name, signed, signer (PDF only)
+result.revisions    # list[Revision]  — insertion/deletion + author, date (DOCX only)
+result.has_metadata # True when at least one item was found
+```
+
+No extra install needed — uses pypdf (already in `[forms]`) for PDF, stdlib for DOCX.
 
 ## Quality Report
 
@@ -697,7 +718,7 @@ docuflow templates init invoice
 ```python
 # Top-level
 from docuflow import extract, fill_pdf_form, fill_docx_form, DocumentPipeline, Pipeline, PrivacyPolicy
-from docuflow import process_batch, compare_documents, split_document
+from docuflow import process_batch, compare_documents, split_document, extract_metadata
 
 # Parsing
 from docuflow.parsing.pdfplumber_parser import PdfplumberParser
@@ -743,6 +764,7 @@ from docuflow.filling import (
     fill_docx_form, fill_docx_form_async, inspect_content_controls, inspect_template_vars,
 )
 from docuflow.splitting import split_document, split_document_async, DocumentSection, SplitResult
+from docuflow.metadata import extract_metadata, extract_metadata_async, DocumentMetadataResult, Comment, Highlight, Hyperlink, Signature, Revision
 from docuflow.workflow_config import load_workflow_config, run_workflow, WorkflowConfig
 from docuflow.batch import process_batch, BatchReport
 from docuflow.comparison import compare_documents, ComparisonResult
@@ -932,6 +954,7 @@ src/docuflow/
     llm/               # LLMAdapter protocol, LiteLLMAdapter
   filling/             # fill_pdf_form, fill_docx_form, FillingResult, AcroForm/overlay/DOCX writers
   splitting/           # split_document, SplitResult, DocumentSection
+  metadata/            # extract_metadata, DocumentMetadataResult, PDF annotations + DOCX metadata
   parsing/             # Parser protocol, pdfplumber, Tesseract, Docling, Smart
   ocr/                 # OCREngine protocol, TesseractOCR, preprocessing
   rendering/           # PDF page to image rendering

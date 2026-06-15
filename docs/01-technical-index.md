@@ -34,6 +34,9 @@ public API, supported options, and examples.
 - `12-document-splitting.md` — `split_document()`, `SplitResult`, section definitions via
   Pydantic models or `DocumentSection` lists, deep mode (confidence + evidence), overlap
   control, and the `split_document` MCP tool.
+- `13-document-metadata.md` — `extract_metadata()`, `DocumentMetadataResult`, PDF annotation
+  extraction (comments, highlights, hyperlinks, signatures) and DOCX metadata (comments,
+  tracked changes, hyperlinks, highlighted runs).
 
 ## Installation Extras
 
@@ -84,6 +87,7 @@ Most high-level APIs have async and sync entry points:
 | `docuflow.commit_fill()` | `docuflow.commit_fill_async()` |
 | `docuflow.preview_fill()` | `docuflow.preview_fill_async()` |
 | `docuflow.split_document()` | `docuflow.split_document_async()` |
+| `docuflow.extract_metadata()` | `docuflow.extract_metadata_async()` |
 | `DocumentPipeline.run_sync()` | `DocumentPipeline.run()` |
 | `run_workflow()` | `run_workflow_async()` |
 | `process_batch()` | `process_batch_async()` |
@@ -111,6 +115,7 @@ from docuflow import (
     preview_fill,
     process_batch,
     split_document,
+    extract_metadata,
     quality_report,
     run_workflow,
 )
@@ -154,6 +159,8 @@ These are the most common selectable values across the high-level APIs.
 | PDF form unmatched policy | `unmatched` | `"error"`, `"warn"`, `"ignore"`. |
 | PDF blank detection | `detect_blank_spaces` | `False` by default; set `True` to opt into heuristic static blank detection. |
 | PDF blank detection mode | `blank_detection_mode` | `"heuristic"`, `"llm"`, `"hybrid"`. |
+| PDF/DOCX overlay overflow | `overflow` | `"shrink"` (default), `"wrap"`, `"error"`, `"page"` (appends continuation pages). |
+| Document metadata type | `DocumentMetadataResult` | `.comments`, `.highlights`, `.hyperlinks`, `.signatures`, `.revisions`. |
 
 ## Coordinate And Evidence Contract
 
