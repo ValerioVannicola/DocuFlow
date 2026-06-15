@@ -960,14 +960,14 @@ await store.get_by_status("rejected") # reviewed and rejected
 
 ## MCP Server (AI Agent Integration)
 
-DocuFlow runs as an MCP server with 20 tools any AI agent can call:
+DocuFlow runs as an MCP server with 21 tools any AI agent can call:
 
 ```bash
 pip install docuflow[mcp]
 docuflow-mcp  # starts the server
 ```
 
-Tools: `extract_document`, `extract_with_vision`, `discover_schema`, `compare_documents`, `process_batch`, `list_templates`, `show_template`, `search_in_document`, `get_pending_reviews`, `get_extraction_result`, `correct_field`, `approve_document`, `reject_document`, `screenshot_document`, `get_pending_fills`, `edit_fill_field`, `approve_fill`, `reject_fill`, `split_document`, `fill_docx_form`.
+Tools: `extract_document`, `extract_with_vision`, `discover_schema`, `compare_documents`, `process_batch`, `list_templates`, `show_template`, `search_in_document`, `get_pending_reviews`, `get_extraction_result`, `correct_field`, `approve_document`, `reject_document`, `screenshot_document`, `get_pending_fills`, `edit_fill_field`, `approve_fill`, `reject_fill`, `split_document`, `fill_docx_form`, `extract_document_metadata`.
 
 ## Project Structure
 
@@ -986,7 +986,7 @@ src/docuflow/
   serve.py             # FastAPI server (create_app, run_server)
   dockerize.py         # Docker deployment generator
   eval.py              # EvalHarness (accuracy measurement)
-  mcp_server.py        # MCP server (20 tools for AI agents)
+  mcp_server.py        # MCP server (21 tools for AI agents)
   constants.py         # DEFAULT_DPI
   errors.py            # All exception classes
   documents/           # Document, Page, Block, Evidence, Table, Cell

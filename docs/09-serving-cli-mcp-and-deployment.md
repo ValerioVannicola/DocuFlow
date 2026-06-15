@@ -689,6 +689,21 @@ Parameters:
 Returns `FillingResult` JSON (success, strategy, fields, warnings, errors, review_status).
 See `11-pdf-form-filling.md` for the full review/approval workflow.
 
+### `extract_document_metadata`
+
+```python
+extract_document_metadata(
+    file_path: str,
+) -> str
+```
+
+Extracts document-level metadata from a PDF or DOCX file: annotation comments, highlights,
+hyperlinks, signature fields, and tracked-change revisions. Dispatches on file extension.
+
+Returns `DocumentMetadataResult` JSON with `comments`, `highlights`, `hyperlinks`,
+`signatures`, `revisions`, `warnings`, and `errors`.
+See `13-document-metadata.md` for the full model reference.
+
 ### `screenshot_document`
 
 ```python

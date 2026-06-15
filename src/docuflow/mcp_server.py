@@ -705,6 +705,89 @@ async def fill_docx_form(
 
 
 @mcp.tool()
+async def extract_document_metadata(
+    file_path: str,
+) -> str:
+    """Extract document-level metadata: comments, highlights, hyperlinks, signatures, and tracked changes.
+
+    Works on PDF and DOCX files. PDF extracts annotation-layer objects (comments, highlights,
+    hyperlinks, signature fields). DOCX extracts comments, tracked insertions/deletions,
+    hyperlinks, and highlighted runs.
+
+    Args:
+        file_path: Path to the PDF or DOCX file
+
+    Returns:
+        DocumentMetadataResult JSON with comments, highlights, hyperlinks, signatures,
+        revisions, warnings, and errors
+    """
+    from docuflow.metadata.api import extract_metadata_async
+
+    result = await extract_metadata_async(file_path)
+
+    def _bbox(b) -> dict | None:
+        if b is None:
+            return None
+        return {"x0": b.x0, "y0": b.y0, "x1": b.x1, "y1": b.y1}
+
+    return json.dumps({
+        "success": result.success,
+        "has_metadata": result.has_metadata,
+        "comments": [
+            {
+                "page_number": c.page_number,
+                "author": c.author,
+                "date": c.date,
+                "text": c.text,
+                "bbox": _bbox(c.bbox),
+            }
+            for c in result.comments
+        ],
+        "highlights": [
+            {
+                "page_number": h.page_number,
+                "subtype": h.subtype,
+                "color": h.color,
+                "text": h.text,
+                "bbox": _bbox(h.bbox),
+            }
+            for h in result.highlights
+        ],
+        "hyperlinks": [
+            {
+                "page_number": lnk.page_number,
+                "url": lnk.url,
+                "text": lnk.text,
+                "bbox": _bbox(lnk.bbox),
+            }
+            for lnk in result.hyperlinks
+        ],
+        "signatures": [
+            {
+                "page_number": s.page_number,
+                "field_name": s.field_name,
+                "signer": s.signer,
+                "date": s.date,
+                "signed": s.signed,
+                "bbox": _bbox(s.bbox),
+            }
+            for s in result.signatures
+        ],
+        "revisions": [
+            {
+                "revision_type": r.revision_type,
+                "author": r.author,
+                "date": r.date,
+                "text": r.text,
+            }
+            for r in result.revisions
+        ],
+        "warnings": result.warnings,
+        "errors": result.errors,
+    }, indent=2)
+
+
+@mcp.tool()
 async def screenshot_document(
     file_path: str,
     output_dir: str,
