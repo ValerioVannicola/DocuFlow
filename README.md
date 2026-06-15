@@ -5,6 +5,13 @@
 
 #### DocuFlow turns unstructured documents into production-ready data. Unlike typical extraction tools that stop at raw JSON, DocuFlow adds evidence, consensus, verification, validation, and auditability so you can trust, review, and ship the result.
 
+
+## Why DocuFlow?
+
+Most document extraction tools focus on one part of the problem: parsing a PDF, running OCR, or calling an LLM. In real workflows, that is rarely enough. Teams also need schemas, evidence, trust signals, validation, privacy controls, review steps, corrections, storage, and an audit trail they can rely on.
+
+DocuFlow is a workflow runtime for document extraction and PDF write-back. It combines parsers, OCR, LLMs, validation rules, review logic, consensus, verification, form filling, and deployment options into one reproducible pipeline, so document data can move from messy PDFs into production systems, and trusted data can be written back into forms, with traceability and control.
+
 ## What It Can Process
 
 DocuFlow accepts these source types today:
@@ -18,12 +25,6 @@ DocuFlow accepts these source types today:
 
 With `parser="auto"`, DocuFlow routes each source to the right path and still normalizes
 everything to the same internal `Document` model.
-
-## Why DocuFlow?
-
-Most document extraction tools focus on one part of the problem: parsing a PDF, running OCR, or calling an LLM. In real workflows, that is rarely enough. Teams also need schemas, evidence, trust signals, validation, privacy controls, review steps, corrections, storage, and an audit trail they can rely on.
-
-DocuFlow is a workflow runtime for document extraction and PDF write-back. It combines parsers, OCR, LLMs, validation rules, review logic, consensus, verification, form filling, and deployment options into one reproducible pipeline, so document data can move from messy PDFs into production systems, and trusted data can be written back into forms, with traceability and control.
 
 ## Installation
 
