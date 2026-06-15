@@ -67,20 +67,36 @@ def write_overlay(
     for field_name, placement in plan.placements.items():
         by_page[placement.page_number].append((field_name, placement))
 
+    # page_sizes[i] is (width, height) of page i — needed when appending overflow pages.
+    page_sizes: list[tuple[float, float]] = []
+
+    # Pending overflow: list of (page_size, placement, remaining_lines, filled_field, field_name)
+    _OverflowPending = tuple[tuple[float, float], FieldPlacement, list[str], FilledField, str]
+    pending_overflow: list[_OverflowPending] = []
+
     for page_number, page in enumerate(reader.pages):
         page_width = float(page.mediabox.right) - float(page.mediabox.left)
         page_height = float(page.mediabox.top) - float(page.mediabox.bottom)
+        page_sizes.append((page_width, page_height))
         overlay_fields = by_page.get(page_number, [])
         if overlay_fields:
             packet = io.BytesIO()
             canvas = canvas_cls(packet, pagesize=(page_width, page_height))
             for field_name, placement in overlay_fields:
                 value = str(plan.fields[field_name].formatted_value)
-                if placement.multiline or overflow == "wrap":
-                    _draw_wrapped(
+                if placement.multiline or overflow in ("wrap", "page"):
+                    remaining = _draw_wrapped(
                         canvas, value, placement, page_height,
                         plan.fields[field_name], field_name=field_name, overflow=overflow,
                     )
+                    if remaining and overflow == "page":
+                        pending_overflow.append((
+                            (page_width, page_height),
+                            placement,
+                            remaining,
+                            plan.fields[field_name],
+                            field_name,
+                        ))
                 else:
                     font_size = _fit_font_size(value, placement, overflow=overflow)
                     if font_size != placement.font_size:
@@ -98,6 +114,33 @@ def write_overlay(
 
     if not by_page:
         warnings.append("No overlay placements were available; output PDF was not modified.")
+
+    # Append continuation pages for fields whose content overflowed.
+    for page_size, placement, remaining_lines, filled_field, field_name in pending_overflow:
+        page_num_start = writer.get_num_pages() + 1
+        continuation = 0
+        while remaining_lines:
+            pw, ph = page_size
+            packet = io.BytesIO()
+            canvas = canvas_cls(packet, pagesize=(pw, ph))
+            remaining_lines = _draw_continuation_page(
+                canvas, remaining_lines, placement, ph,
+                filled_field, field_name=field_name,
+            )
+            canvas.save()
+            packet.seek(0)
+            cont_pdf = pdf_reader_cls(packet)
+            writer.add_page(cont_pdf.pages[0])
+            continuation += 1
+        page_num_end = page_num_start + continuation - 1
+        page_range = (
+            f"page {page_num_start}"
+            if page_num_start == page_num_end
+            else f"pages {page_num_start}–{page_num_end}"
+        )
+        filled_field.warnings.append(
+            f"Content overflowed; continued on appended {page_range}."
+        )
 
     with Path(output_path).open("wb") as file:
         writer.write(file)
@@ -155,29 +198,13 @@ def _fit_font_size(
     return max(6.0, placement.font_size * placement.bbox.width / estimated_width)
 
 
-def _draw_wrapped(
-    canvas: Any,
-    value: str,
-    placement: FieldPlacement,
-    page_height: float,
-    filled_field: FilledField,
-    *,
-    field_name: str,
-    overflow: OverflowPolicy,
-) -> None:
-    """Draw word-wrapped text for multiline placements or overflow='wrap'."""
+def _wrap_text(value: str, font_name: str, font_size: float, max_width: float) -> list[str]:
+    """Word-wrap value into lines no wider than max_width. Respects explicit newlines."""
     try:
-        from reportlab.pdfbase.pdfmetrics import stringWidth
+        from reportlab.pdfbase.pdfmetrics import stringWidth as _sw
     except ImportError:
-        canvas.drawString(placement.bbox.x0, page_height - placement.bbox.y1, value)
-        return
+        return [value]
 
-    font_name = placement.font_name
-    font_size = placement.font_size
-    line_height = font_size * 1.2
-    max_width = placement.bbox.width
-
-    # Honour explicit newlines, then word-wrap each paragraph to max_width.
     lines: list[str] = []
     for para in (value.splitlines() or [""]):
         words = para.split()
@@ -187,33 +214,95 @@ def _draw_wrapped(
         current = ""
         for word in words:
             test = (current + " " + word).strip()
-            if stringWidth(test, font_name, font_size) <= max_width:
+            if _sw(test, font_name, font_size) <= max_width:
                 current = test
             else:
                 if current:
                     lines.append(current)
                 current = word
         lines.append(current)
+    return lines
 
-    # ReportLab origin is bottom-left; y decreases as we move down.
-    # bbox.y0 = top edge (top-left origin), bbox.y1 = bottom edge.
+
+def _draw_wrapped(
+    canvas: Any,
+    value: str,
+    placement: FieldPlacement,
+    page_height: float,
+    filled_field: FilledField,
+    *,
+    field_name: str,
+    overflow: OverflowPolicy,
+) -> list[str]:
+    """Draw word-wrapped text inside placement bbox. Returns lines that did not fit."""
+    try:
+        from reportlab.pdfbase.pdfmetrics import stringWidth as _sw  # noqa: F401
+    except ImportError:
+        canvas.drawString(placement.bbox.x0, page_height - placement.bbox.y1, value)
+        return []
+
+    font_name = placement.font_name
+    font_size = placement.font_size
+    line_height = font_size * 1.2
+
+    lines = _wrap_text(value, font_name, font_size, placement.bbox.width)
+
+    # ReportLab origin is bottom-left; bbox.y0 = top edge, bbox.y1 = bottom edge.
     y_top = page_height - placement.bbox.y0 - font_size
     y_min = page_height - placement.bbox.y1
 
     canvas.setFont(font_name, font_size)
-    clipped = 0
+    overflow_lines: list[str] = []
     for i, line in enumerate(lines):
         y = y_top - i * line_height
         if y < y_min:
-            clipped = len(lines) - i
+            overflow_lines = lines[i:]
             break
         canvas.drawString(placement.bbox.x0, y, line)
 
-    if clipped:
-        msg = f"{clipped} wrapped line(s) did not fit in the bounding box and were clipped."
+    if overflow_lines:
         if overflow == "error":
-            raise ValueError(f"Field '{field_name}': {msg}")
-        filled_field.warnings.append(msg)
+            raise ValueError(
+                f"Field '{field_name}': {len(overflow_lines)} wrapped line(s) did not fit."
+            )
+        if overflow != "page":
+            filled_field.warnings.append(
+                f"{len(overflow_lines)} wrapped line(s) did not fit in the bounding box "
+                "and were clipped."
+            )
+
+    return overflow_lines
+
+
+def _draw_continuation_page(
+    canvas: Any,
+    lines: list[str],
+    placement: FieldPlacement,
+    page_height: float,
+    filled_field: FilledField,
+    *,
+    field_name: str,
+) -> list[str]:
+    """Draw as many lines as fit starting at the top margin of a continuation page.
+
+    Returns any lines that still didn't fit (caller appends another page).
+    """
+    font_name = placement.font_name
+    font_size = placement.font_size
+    line_height = font_size * 1.2
+    top_margin = font_size * 2  # small top margin on continuation pages
+    y_top = page_height - top_margin - font_size
+    y_min = font_size  # bottom margin
+
+    canvas.setFont(font_name, font_size)
+    remaining: list[str] = []
+    for i, line in enumerate(lines):
+        y = y_top - i * line_height
+        if y < y_min:
+            remaining = lines[i:]
+            break
+        canvas.drawString(placement.bbox.x0, y, line)
+    return remaining
 
 
 def _text_origin(

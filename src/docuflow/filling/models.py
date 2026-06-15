@@ -16,7 +16,7 @@ DocxFillStrategy = Literal["auto", "content_controls", "template"]
 MatchStrategy = Literal["auto", "name", "alias", "manual", "label", "llm"]
 BlankDetectionMode = Literal["heuristic", "llm", "hybrid"]
 UnmatchedPolicy = Literal["error", "warn", "ignore"]
-OverflowPolicy = Literal["error", "shrink", "wrap"]
+OverflowPolicy = Literal["error", "shrink", "wrap", "page"]
 
 
 class FieldPlacement(BaseModel):
