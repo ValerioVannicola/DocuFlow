@@ -104,6 +104,18 @@ async def discover_schema(
     model: str = "openai/gpt-4o",
     parser: str | dict[str, Any] | None = "auto",
 ) -> DiscoveryResult:
+    """Infer a likely schema from a sample document.
+
+    Args:
+        path: Path to the sample document to inspect.
+        llm: Optional LLM adapter. If omitted, DocuFlow creates one from ``model``.
+        model: Model name used when ``llm`` is not supplied.
+        parser: Parser selector or config. ``auto`` uses source-aware defaults.
+
+    Returns:
+        DiscoveryResult: Suggested fields, generated Pydantic model, and YAML template.
+    """
+
     from docuflow.ingestion.local import ingest_file
     from docuflow.ingestion.mime import detect_source_kind
     from docuflow.processor import DocumentPipeline
@@ -166,4 +178,16 @@ def discover_schema_sync(
     model: str = "openai/gpt-4o",
     parser: str | dict[str, Any] | None = "auto",
 ) -> DiscoveryResult:
+    """Synchronous wrapper for :func:`discover_schema`.
+
+    Args:
+        path: Path to the sample document to inspect.
+        llm: Optional LLM adapter. If omitted, DocuFlow creates one from ``model``.
+        model: Model name used when ``llm`` is not supplied.
+        parser: Parser selector or config. ``auto`` uses source-aware defaults.
+
+    Returns:
+        DiscoveryResult: Suggested fields, generated Pydantic model, and YAML template.
+    """
+
     return run_sync(discover_schema(path, llm, model, parser))

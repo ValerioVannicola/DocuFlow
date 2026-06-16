@@ -111,6 +111,12 @@ class WorkflowRouter:
     registered workflow. Documents that match nothing land in
     `report.unclassified` with the classifier's reason — they are never
     force-extracted with the wrong schema.
+
+    Args:
+        model: LLM model name used by the classifier.
+        llm: Optional pre-configured LLM adapter.
+        confidence_threshold: Minimum classification confidence for auto-routing.
+        peek_chars: Number of leading characters read from text-only inputs.
     """
 
     def __init__(

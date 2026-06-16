@@ -21,6 +21,33 @@ if TYPE_CHECKING:
 
 
 class WorkflowConfig(BaseModel):
+    """Portable YAML workflow configuration.
+
+    Args:
+        name: Workflow name.
+        version: Workflow version string.
+        description: Human-readable workflow description.
+        schema: Field definitions used to build the Pydantic schema.
+        parser: Parser selector or parser config dict.
+        model: LLM model name.
+        extraction_type: ``"text"``, ``"vision"``, ``"hybrid"``, or ``"auto"``.
+        extraction_mode: ``"single"`` or ``"multi"``.
+        escalation: Auto-escalation thresholds for ``extraction_type="auto"``.
+        verification: Zoom-and-verify thresholds.
+        schema_shards: Number of schema shards for wide schemas.
+        n_instances: Number of parallel LLM candidates in multi mode.
+        temperatures: Candidate temperatures for multi mode.
+        vision_dpi: Render DPI used for vision-based steps.
+        context: Optional domain instructions injected into prompts.
+        normalize_output: Preserve source text by default or normalize values.
+        validation: Validation rules.
+        review: Review rules.
+        privacy: Optional privacy configuration.
+        storage: Optional storage backend.
+        llm: Optional LiteLLM keyword arguments.
+        quality_threshold: Default threshold used by quality reports.
+    """
+
     name: str = "workflow"
     version: str = "1.0"
     description: str = ""
@@ -201,6 +228,15 @@ class WorkflowConfig(BaseModel):
 
 
 def load_workflow_config(source: str | Path | dict) -> WorkflowConfig:
+    """Load and validate a workflow config.
+
+    Args:
+        source: YAML path or already-parsed mapping.
+
+    Returns:
+        WorkflowConfig: Validated workflow configuration.
+    """
+
     if isinstance(source, dict):
         return WorkflowConfig.model_validate(source)
     path = Path(source)
@@ -218,6 +254,16 @@ async def run_workflow(
     config: str | Path | dict | WorkflowConfig,
     path: str,
 ) -> ExtractionResult:
+    """Run a configured workflow on one document.
+
+    Args:
+        config: Workflow config path, mapping, or validated model.
+        path: Input document path.
+
+    Returns:
+        ExtractionResult: Final workflow result.
+    """
+
     if not isinstance(config, WorkflowConfig):
         config = load_workflow_config(config)
     pipeline = config.build_pipeline()
@@ -229,6 +275,16 @@ def run_workflow_sync(
     config: str | Path | dict | WorkflowConfig,
     path: str,
 ) -> ExtractionResult:
+    """Synchronous wrapper for :func:`run_workflow`.
+
+    Args:
+        config: Workflow config path, mapping, or validated model.
+        path: Input document path.
+
+    Returns:
+        ExtractionResult: Final workflow result.
+    """
+
     if not isinstance(config, WorkflowConfig):
         config = load_workflow_config(config)
     pipeline = config.build_pipeline()

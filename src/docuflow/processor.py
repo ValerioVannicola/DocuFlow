@@ -12,6 +12,32 @@ from docuflow.ingestion.mime import SourceKind, detect_source_kind
 
 
 class DocumentPipeline:
+    """Configure and run DocuFlow extraction pipelines.
+
+    This is the main reusable user-facing pipeline object. It selects a parser,
+    applies optional privacy, validation, review, and verification steps, and
+    returns an :class:`~docuflow.extraction.models.ExtractionResult`.
+
+    Args:
+        parser: Parser selector, parser config dict, parser object, or ``"auto"``.
+        model: LLM model name passed to LiteLLM.
+        storage: Optional storage backend name, config, or instance.
+        validators: Optional validation rules.
+        review_rules: Optional review rules.
+        privacy: Optional privacy policy.
+        extraction_mode: ``"single"`` or ``"multi"``.
+        extraction_type: ``"text"``, ``"vision"``, ``"hybrid"``, or ``"auto"``.
+        n_instances: Number of parallel LLM candidates in multi mode.
+        temperatures: Optional candidate temperatures for multi mode.
+        vision_dpi: Render DPI used for vision-based steps.
+        context: Optional domain instructions injected into prompts.
+        escalation: Auto-escalation thresholds for ``extraction_type="auto"``.
+        verification: Zoom-and-verify thresholds.
+        schema_shards: Optional number of schema shards for wide schemas.
+        llm_kwargs: Extra LiteLLM keyword arguments.
+        normalize_output: Preserve source text by default or normalize values.
+    """
+
     def __init__(
         self,
         parser: Any | str | dict | None = "auto",
@@ -274,6 +300,17 @@ class DocumentPipeline:
         schema: type[BaseModel],
         **kwargs: Any,
     ) -> ExtractionResult:
+        """Run the configured pipeline on one document.
+
+        Args:
+            path: Input document path.
+            schema: Pydantic schema used to validate the extraction.
+            **kwargs: Extra metadata forwarded into the pipeline state.
+
+        Returns:
+            ExtractionResult: Final extraction result for the document.
+        """
+
         from docuflow.workflow.pipeline import Pipeline
         from docuflow.workflow.steps import (
             Extract,
@@ -441,6 +478,8 @@ class DocumentPipeline:
         schema: type[BaseModel],
         **kwargs: Any,
     ) -> ExtractionResult:
+        """Synchronous wrapper for :meth:`run`."""
+
         return run_sync(self.run(path, schema, **kwargs))
 
     def export(

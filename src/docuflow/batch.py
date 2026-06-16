@@ -25,6 +25,8 @@ class DocumentSummary(BaseModel):
 
 
 class BatchReport(BaseModel):
+    """Aggregated summary returned by batch processing."""
+
     total: int = 0
     succeeded: int = 0
     failed: int = 0
@@ -92,6 +94,18 @@ async def process_batch(
     pipeline: Any,
     concurrency: int = 5,
 ) -> BatchReport:
+    """Run one pipeline across many files and collect a batch report.
+
+    Args:
+        files: Document paths to process.
+        schema: Pydantic schema to extract from every file.
+        pipeline: Object exposing ``run(path, schema)``.
+        concurrency: Maximum number of concurrent extractions.
+
+    Returns:
+        BatchReport: Per-file summaries plus aggregate counts and usage.
+    """
+
     semaphore = asyncio.Semaphore(concurrency)
     summaries: list[DocumentSummary] = []
     results: list[ExtractionResult] = []
@@ -171,4 +185,16 @@ def process_batch_sync(
     pipeline: Any,
     concurrency: int = 5,
 ) -> BatchReport:
+    """Synchronous wrapper for :func:`process_batch`.
+
+    Args:
+        files: Document paths to process.
+        schema: Pydantic schema to extract from every file.
+        pipeline: Object exposing ``run(path, schema)``.
+        concurrency: Maximum number of concurrent extractions.
+
+    Returns:
+        BatchReport: Per-file summaries plus aggregate counts and usage.
+    """
+
     return run_sync(process_batch(files, schema, pipeline, concurrency))

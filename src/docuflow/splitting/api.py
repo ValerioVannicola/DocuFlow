@@ -96,7 +96,22 @@ def split_document(
     llm: Any = None,
     llm_kwargs: Mapping[str, Any] | None = None,
 ) -> SplitResult:
-    """Synchronous version of :func:`split_document_async`."""
+    """Synchronous version of :func:`split_document_async`.
+
+    Args:
+        path: Path to the PDF document.
+        schema: Section definitions — Pydantic model class or list of DocumentSection.
+        model: LiteLLM model string.
+        deep: When True, also return confidence and evidence per section.
+        allow_overlap: When True, a page may appear in multiple sections.
+        split_rules: Optional freeform instruction that overrides default splitting.
+        pages: Subset of 0-based page indices to consider.
+        llm: Optional pre-configured LLM adapter instance.
+        llm_kwargs: Extra keyword arguments forwarded to litellm.
+
+    Returns:
+        SplitResult: Section assignments for the document.
+    """
     return run_sync(
         _split_document(
             path,
