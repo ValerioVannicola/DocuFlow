@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
@@ -17,6 +18,35 @@ if TYPE_CHECKING:
 _EXECUTOR = ThreadPoolExecutor(max_workers=4)
 _LOW_CONFIDENCE_THRESHOLD = 60.0
 
+#: Environment variable that overrides the path to the native ``tesseract``
+#: executable, for installs where the binary is not on ``PATH`` (common on
+#: Windows). Equivalent to setting ``pytesseract.pytesseract.tesseract_cmd``.
+_TESSERACT_CMD_ENV = "DOCUFLOW_TESSERACT_CMD"
+
+
+def _configure_tesseract(pytesseract: object) -> None:
+    """Point pytesseract at an explicit binary path when configured."""
+    cmd = os.environ.get(_TESSERACT_CMD_ENV)
+    if cmd:
+        pytesseract.pytesseract.tesseract_cmd = cmd  # type: ignore[attr-defined]
+
+
+def _binary_not_found_message(exc: Exception) -> str:
+    return (
+        "The Tesseract OCR engine binary was not found. The pytesseract Python "
+        "package is installed, but it shells out to the native 'tesseract' "
+        "program, which is a separate install.\n"
+        "Fix one of:\n"
+        "  - Install Tesseract and make sure it is on your PATH "
+        "(macOS: 'brew install tesseract'; Debian/Ubuntu: "
+        "'apt-get install tesseract-ocr'; Windows: install from "
+        "https://github.com/UB-Mannheim/tesseract/wiki).\n"
+        f"  - Or set the {_TESSERACT_CMD_ENV} environment variable to the full "
+        "path of the tesseract executable "
+        r"(e.g. C:\Users\you\AppData\Local\Programs\Tesseract-OCR\tesseract.exe)."
+        f"\nUnderlying error: {exc}"
+    )
+
 
 def _run_tesseract_sync(
     image: Image,
@@ -32,6 +62,8 @@ def _run_tesseract_sync(
             "pytesseract is required for OCR. Install with: pip install docuflow[ocr]"
         ) from e
 
+    _configure_tesseract(pytesseract)
+
     if preprocess_steps is not None:
         image = preprocess(image, preprocess_steps)
 
@@ -41,6 +73,8 @@ def _run_tesseract_sync(
         data = pytesseract.image_to_data(
             image, lang=language, config=config, output_type=pytesseract.Output.DICT
         )
+    except pytesseract.TesseractNotFoundError as exc:
+        raise OCRError(_binary_not_found_message(exc)) from exc
     except Exception as exc:
         raise OCRError(f"Tesseract OCR failed: {exc}") from exc
 

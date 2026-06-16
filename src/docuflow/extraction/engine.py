@@ -6,6 +6,7 @@ import io
 import json
 import re
 import uuid
+import warnings
 from types import UnionType
 from typing import Any, Union, get_args, get_origin
 
@@ -857,15 +858,40 @@ class VisionExtractionEngine:
     @staticmethod
     async def _enrich_document_with_ocr(
         document: Document, images: list, dpi: int = DEFAULT_DPI,
+        trace: Trace | None = None,
     ) -> None:
+        """Populate the document with OCR blocks/confidence for evidence grounding.
+
+        OCR enrichment is optional in vision mode: the vision LLM reads the page
+        images directly, so a missing or failing OCR engine must not abort the
+        extraction. On failure this warns and returns, leaving the document
+        without OCR — no bounding boxes and no OCR confidence score — while the
+        run still completes.
+        """
         from docuflow.documents.models import Page
         from docuflow.ocr.base import blocks_to_points
         from docuflow.ocr.tesseract import TesseractOCR
 
         ocr = TesseractOCR(preprocess_steps=[])
         scale = 72.0 / dpi
-        # Pages OCR concurrently — the Tesseract executor runs 4 workers
-        ocr_results = await asyncio.gather(*(ocr.ocr(image) for image in images))
+        try:
+            # Pages OCR concurrently — the Tesseract executor runs 4 workers
+            ocr_results = await asyncio.gather(*(ocr.ocr(image) for image in images))
+        except Exception as exc:
+            warnings.warn(
+                "Vision extraction proceeded without OCR enrichment: "
+                f"{exc} "
+                "No bounding boxes or OCR confidence score will be available. "
+                "Install an OCR engine to compute these values — the native "
+                "'tesseract' binary must be on PATH, or set the "
+                "DOCUFLOW_TESSERACT_CMD environment variable to its path.",
+                stacklevel=2,
+            )
+            if trace:
+                trace.add_event(
+                    "vision_ocr_unavailable", step_name="extraction", error=str(exc),
+                )
+            return
         pages: list[Page] = [
             Page(
                 page_number=i,
@@ -911,7 +937,7 @@ class VisionExtractionEngine:
         # with the LLM call(s) instead of preceding them.
         ocr_start = time.monotonic()
         enrich_task = asyncio.ensure_future(
-            self._enrich_document_with_ocr(document, images, dpi=self.dpi)
+            self._enrich_document_with_ocr(document, images, dpi=self.dpi, trace=trace)
         )
 
         def _trace_enrichment() -> None:
@@ -1101,7 +1127,7 @@ class HybridExtractionEngine:
         ocr_start = time.monotonic()
         enrich_task = asyncio.ensure_future(
             VisionExtractionEngine._enrich_document_with_ocr(
-                document, images, dpi=self.dpi,
+                document, images, dpi=self.dpi, trace=trace,
             )
         )
         vision_tasks = [
@@ -1109,12 +1135,9 @@ class HybridExtractionEngine:
             for t in temps
         ]
 
-        try:
-            await enrich_task
-        except Exception:
-            for t in vision_tasks:
-                t.cancel()
-            raise
+        # OCR enrichment is non-fatal: it warns and returns on failure, so a
+        # missing OCR engine never cancels the vision/text candidate calls.
+        await enrich_task
         ocr_ms = (time.monotonic() - ocr_start) * 1000
         if trace:
             trace.add_event(

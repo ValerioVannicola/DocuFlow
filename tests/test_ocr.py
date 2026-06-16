@@ -132,6 +132,54 @@ class TestTesseractOCR:
         assert result.low_confidence_word_ratio == pytest.approx(0.5)
 
 
+class TestTesseractBinaryConfig:
+    async def test_binary_not_found_raises_actionable_error(self):
+        from docuflow.errors import OCRError
+
+        class FakeNotFoundError(Exception):
+            pass
+
+        mock_pyt = _make_mock_pytesseract({}, "")
+        mock_pyt.TesseractNotFoundError = FakeNotFoundError
+        mock_pyt.image_to_data.side_effect = FakeNotFoundError("tesseract is not installed")
+        mock_image = MagicMock()
+
+        with patch.dict(sys.modules, {"pytesseract": mock_pyt}):
+            if "docuflow.ocr.tesseract" in sys.modules:
+                del sys.modules["docuflow.ocr.tesseract"]
+            from docuflow.ocr.tesseract import TesseractOCR
+
+            ocr = TesseractOCR(preprocess_steps=[])
+            with pytest.raises(OCRError) as exc_info:
+                await ocr.ocr(mock_image)
+
+        msg = str(exc_info.value)
+        # The error must tell the user how to fix it, not just echo the failure.
+        assert "DOCUFLOW_TESSERACT_CMD" in msg
+        assert "PATH" in msg
+
+    async def test_env_var_sets_tesseract_cmd(self, monkeypatch):
+        mock_data = {
+            "text": ["Hi"], "conf": [95.0],
+            "left": [1], "top": [1], "width": [5], "height": [5],
+        }
+        mock_pyt = _make_mock_pytesseract(mock_data, "Hi")
+        mock_image = MagicMock()
+
+        custom = r"C:\custom\Tesseract-OCR\tesseract.exe"
+        monkeypatch.setenv("DOCUFLOW_TESSERACT_CMD", custom)
+
+        with patch.dict(sys.modules, {"pytesseract": mock_pyt}):
+            if "docuflow.ocr.tesseract" in sys.modules:
+                del sys.modules["docuflow.ocr.tesseract"]
+            from docuflow.ocr.tesseract import TesseractOCR
+
+            ocr = TesseractOCR(preprocess_steps=[])
+            await ocr.ocr(mock_image)
+
+        assert mock_pyt.pytesseract.tesseract_cmd == custom
+
+
 class TestPreprocessing:
     def test_to_grayscale(self):
         from PIL import Image

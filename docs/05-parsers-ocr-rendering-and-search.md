@@ -153,6 +153,26 @@ Behavior:
 
 Requires the `pytesseract` Python package and the system `tesseract` executable.
 
+#### Locating the `tesseract` binary
+
+`pytesseract` is only a wrapper — it shells out to the native `tesseract`
+program, which is a separate install:
+
+- macOS: `brew install tesseract`
+- Debian/Ubuntu: `apt-get install tesseract-ocr`
+- Windows: install from https://github.com/UB-Mannheim/tesseract/wiki
+
+If the binary is not on your `PATH` (common on Windows, where the installer
+does not add it), set the `DOCUFLOW_TESSERACT_CMD` environment variable to its
+full path instead of editing code:
+
+```bash
+export DOCUFLOW_TESSERACT_CMD="C:\Users\you\AppData\Local\Programs\Tesseract-OCR\tesseract.exe"
+```
+
+When the binary cannot be found, DocuFlow raises an `OCRError` that explains
+both of these fixes.
+
 ### `SmartParser`
 
 Import:
@@ -342,6 +362,17 @@ field.ocr
 
 Native parsers may leave OCR confidence as `None`; downstream code treats that as "no OCR ran"
 rather than failure.
+
+### OCR in vision and hybrid modes
+
+`extraction_type="vision"` and `"hybrid"` do not use a parser, but they still
+produce `result.ocr` and bounding boxes: the engine OCRs the rendered page
+images in the background (`VisionExtractionEngine._enrich_document_with_ocr`) to
+ground evidence. This needs an OCR engine (the native `tesseract` binary, or
+`DOCUFLOW_TESSERACT_CMD`). When none is available the enrichment is skipped —
+the run still completes, a warning is emitted, and `result.ocr` is `None` with
+no bounding boxes. So OCR confidence is a function of *whether OCR ran*, not of
+*which parser was selected*.
 
 ## Rendering And Screenshots
 

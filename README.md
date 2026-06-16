@@ -80,9 +80,9 @@ print(result.fields["total"].evidence[0])   # page 0, bbox, source text
 ### Evidence & Confidence
 - Every field links to source text, page number, and word-precise bounding boxes (multi-line and cross-page highlights supported)
 - **Two independent confidence scores** — never the LLM's self-reported confidence:
-  - **OCR confidence** (from the parser): did we *read* the characters on the page correctly? Document-level and per-field, matched back from the extracted value to the OCR words
-  - **LLM consensus** (from multi-instance extraction): did independent LLM runs *interpret* the document the same way? The signal that matters when no parser is used (vision/hybrid)
-- Both are optional and never break the pipeline: no OCR → no OCR score; single instance → no consensus
+  - **OCR confidence** (from OCR): did we *read* the characters on the page correctly? Document-level and per-field, matched back from the extracted value to the OCR words. Produced whenever OCR runs — via an OCR parser (`tesseract`/`smart`/`docling`/cloud) in text mode, **and automatically in vision/hybrid mode**, where DocuFlow OCRs the rendered page images in the background to add bounding boxes and confidence (no parser selection required)
+  - **LLM consensus** (from multi-instance extraction): did independent LLM runs *interpret* the document the same way? Especially useful in vision/hybrid mode
+- Both are optional and never break the pipeline: with no OCR engine available there is simply no OCR score and no bounding boxes (a warning is emitted) and the run still completes; single instance → no consensus
 - **Token usage & cost**: every result reports prompt/completion tokens, call count, and litellm-priced cost
 - Full provenance chain: parser → model → evidence → validation → review → correction
 

@@ -275,6 +275,44 @@ class TestVisionExtractionEngine:
         assert doc.pages[0].blocks[0].bbox is not None
         assert doc.raw_text != ""
 
+    async def test_missing_ocr_engine_is_non_fatal(self):
+        """No OCR engine: vision extraction still completes, warns, no score."""
+        from unittest.mock import MagicMock
+
+        from docuflow.errors import OCRError
+
+        mock_llm = AsyncMock()
+        mock_llm.complete = AsyncMock(return_value=_make_llm_response())
+
+        mock_img = MagicMock()
+        mock_img.width = 600
+        mock_img.height = 800
+        mock_img.save = MagicMock()
+
+        engine = VisionExtractionEngine(llm=mock_llm, dpi=100)
+        engine._render_pages = AsyncMock(return_value=[mock_img])
+        engine._encode_images = MagicMock(return_value=["base64data"])
+
+        with patch("docuflow.ocr.tesseract.TesseractOCR") as mock_ocr_cls:
+            mock_ocr_instance = AsyncMock()
+            mock_ocr_instance.ocr = AsyncMock(
+                side_effect=OCRError("tesseract binary not found")
+            )
+            mock_ocr_cls.return_value = mock_ocr_instance
+
+            doc = _make_doc()
+            with pytest.warns(UserWarning, match="without OCR enrichment"):
+                result = await engine.extract(doc, schema=Invoice, mode="single")
+
+        # Extraction proceeded from the vision LLM despite OCR being unavailable.
+        assert result.data["supplier_name"] == "Acme Corp"
+        # No OCR ran → no document-level score and no per-field boxes.
+        assert result.ocr is None
+        assert result.confidence_score is None
+        assert doc.pages == []
+        assert all(not f.evidence or all(e.bbox is None for e in f.evidence)
+                   for f in result.fields.values())
+
 
 class TestVisionPrompt:
     def test_build_vision_prompt(self):

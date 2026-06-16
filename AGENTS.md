@@ -836,7 +836,7 @@ Multi agent: consensus percentage + source verification.
 Confidence is split into two independent, optional axes. Neither ever breaks
 the pipeline — when a score is not applicable it is `None`.
 
-### OCR confidence (only when an OCR-based parser ran)
+### OCR confidence (whenever OCR ran — including vision/hybrid)
 
 ```python
 result.ocr                       # OCRDocumentConfidence | None
@@ -854,9 +854,17 @@ field.ocr.matched_text           # the OCR text the value was matched to
 
 Field-level scores are computed by matching the extracted value **back** to the
 OCR words (evidence-hint text first, then the value itself; exact, then fuzzy
-via SequenceMatcher). `None` document-level = no OCR in the pipeline.
+via SequenceMatcher). `None` document-level = no OCR ran in the pipeline.
 `"unmatched"` field-level = OCR ran but the value couldn't be located (e.g.
 reformatted dates, anonymized values).
+
+OCR runs (and so these scores exist) in two ways: an OCR-based parser
+(`tesseract`/`smart`/`docling`/cloud) in text mode, **or** the automatic OCR
+enrichment that `vision`/`hybrid` run on the rendered page images for evidence
+grounding — no parser selection required. That enrichment is best-effort: if no
+OCR engine is available (`tesseract` binary missing / `DOCUFLOW_TESSERACT_CMD`
+unset), `VisionExtractionEngine._enrich_document_with_ocr` warns and returns, so
+the vision run still completes but with no bounding boxes and `result.ocr is None`.
 
 ### LLM consensus (only in multi-instance mode)
 
