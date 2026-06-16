@@ -10,7 +10,7 @@
 
 > DocuFlow turns unstructured documents into production-ready data. Unlike typical extraction tools that stop at raw JSON, DocuFlow adds evidence, consensus, verification, validation, and auditability so you can trust, review, and ship the result.
 
-> Licensing note: DocuFlow's core dependencies are permissive and commercially usable. The only weak-copyleft optional package in the tree is `docxtpl` (LGPL-2.1-only), used only for DOCX Jinja2 template filling.
+> Licensing note: DocuFlow's dependencies are permissive and commercially usable.
 
 ---
 
@@ -2732,9 +2732,8 @@ For the full parameter reference, see [`docs/11-pdf-form-filling.md`](docs/11-pd
 
 ## 18e. DOCX Form Filling
 
-`fill_docx_form` fills Word documents using either content controls (Word SDT form fields)
-or Jinja2 template variables (`{{ }}`). The same `FillingResult`, review/approval workflow,
-`edit_field`, and `commit_fill` apply.
+`fill_docx_form` fills Word documents using content controls (Word SDT form fields).
+The same `FillingResult`, review/approval workflow, `edit_field`, and `commit_fill` apply.
 
 ```python
 from docuflow import fill_docx_form, commit_fill
@@ -2742,8 +2741,7 @@ from docuflow import fill_docx_form, commit_fill
 
 ### Auto strategy
 
-`"auto"` inspects the file: if SDT content controls are found it uses
-`"content_controls"`; otherwise it falls back to `"template"`.
+`"auto"` inspects the file and uses `"content_controls"` when SDT content controls are found.
 
 ```python
 result = fill_docx_form(
@@ -2754,27 +2752,12 @@ result = fill_docx_form(
 # result.strategy == "content_controls"  (if the docx has SDT fields)
 ```
 
-### Template strategy
-
-Assumes the document contains `{{ field_name }}` placeholders. Rendered via
-[docxtpl](https://docxtpl.readthedocs.io), which handles Word's run-splitting transparently:
-
-```python
-result = fill_docx_form(
-    "claim-template.docx",
-    data={"claimant_name": "Mario Rossi", "policy_number": "POL-42"},
-    output_path="claim-template-filled.docx",
-    strategy="template",
-)
-```
-
 ### Discover what fields are available
 
 ```python
-from docuflow.filling import inspect_content_controls, inspect_template_vars
+from docuflow.filling import inspect_content_controls
 
 controls = inspect_content_controls("form.docx")     # list[FormField]
-vars_    = inspect_template_vars("template.docx")    # list[str]
 ```
 
 ### Review and approval
@@ -3126,7 +3109,7 @@ from docuflow.extraction.models import (
 from docuflow.filling import (
     FillingResult, FilledField, FieldPlacement, FormField,
     fill_docx_form, fill_docx_form_async,
-    inspect_content_controls, inspect_template_vars,
+    inspect_content_controls,
 )
 from docuflow.splitting import split_document, split_document_async, DocumentSection, SplitResult
 ```

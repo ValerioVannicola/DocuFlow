@@ -66,25 +66,6 @@ def write_content_controls(
     return warnings
 
 
-def write_template(
-    input_path: str | Path,
-    output_path: str | Path,
-    result: FillingResult,
-) -> list[str]:
-    """Render a docxtpl Jinja2 DOCX template with planned values."""
-    from docxtpl import DocxTemplate  # type: ignore[import-untyped]
-
-    tpl = DocxTemplate(str(input_path))
-    context = {
-        f.target_name: f.formatted_value
-        for f in result.fields.values()
-        if f.status == "filled"
-    }
-    tpl.render(context)
-    tpl.save(str(output_path))
-    return []
-
-
 def _fill_text(content_el, text: str) -> None:  # type: ignore[type-arg]
     """Replace all w:t content in an sdtContent element with a single text value."""
     from docx.oxml import OxmlElement  # type: ignore[import-untyped]

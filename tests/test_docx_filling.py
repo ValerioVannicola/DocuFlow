@@ -1,4 +1,4 @@
-"""Tests for DOCX form filling (content_controls and template strategies)."""
+"""Tests for DOCX form filling (content_controls strategy)."""
 from __future__ import annotations
 
 import io
@@ -89,17 +89,6 @@ def _make_checkbox_docx(name: str, checked: bool = False) -> bytes:
     return buf.getvalue()
 
 
-def _make_template_docx(text: str) -> bytes:
-    """Build a DOCX whose first paragraph contains raw Jinja2 template text."""
-    from docx import Document
-
-    doc = Document()
-    doc.add_paragraph(text)
-    buf = io.BytesIO()
-    doc.save(buf)
-    return buf.getvalue()
-
-
 def _write_tmp(tmp_path: Path, name: str, data: bytes) -> Path:
     p = tmp_path / name
     p.write_bytes(data)
@@ -147,21 +136,6 @@ def test_inspect_content_controls_checkbox(tmp_path):
     assert fields[0].name == "accepted"
 
 
-def test_inspect_template_vars(tmp_path):
-    p = _write_tmp(tmp_path, "tpl.docx", _make_template_docx("Hello {{ first_name }}, your ref is {{ policy_number }}."))
-    from docuflow.filling.docx_inspector import inspect_template_vars
-
-    vars_ = inspect_template_vars(p)
-    assert set(vars_) == {"first_name", "policy_number"}
-
-
-def test_inspect_template_vars_empty_doc(tmp_path):
-    p = _write_tmp(tmp_path, "empty.docx", _make_template_docx("No variables here."))
-    from docuflow.filling.docx_inspector import inspect_template_vars
-
-    assert inspect_template_vars(p) == []
-
-
 # ---------------------------------------------------------------------------
 # Strategy auto-detection
 # ---------------------------------------------------------------------------
@@ -171,13 +145,6 @@ def test_auto_strategy_picks_content_controls(tmp_path):
     from docuflow.filling.docx_planner import _select_docx_strategy
 
     assert _select_docx_strategy(p, "auto") == "content_controls"
-
-
-def test_auto_strategy_picks_template(tmp_path):
-    p = _write_tmp(tmp_path, "tpl.docx", _make_template_docx("{{ policy_number }}"))
-    from docuflow.filling.docx_planner import _select_docx_strategy
-
-    assert _select_docx_strategy(p, "auto") == "template"
 
 
 # ---------------------------------------------------------------------------
@@ -255,49 +222,6 @@ def test_write_content_controls_checkbox_true(tmp_path):
             assert checked_el.get(f"{{{w14}}}val") == "1"
 
 
-def test_write_template(tmp_path):
-    src = _write_tmp(
-        tmp_path, "tpl.docx",
-        _make_template_docx("Name: {{ claimant_name }}. Policy: {{ policy_number }}.")
-    )
-    out = tmp_path / "out.docx"
-
-    from docuflow.filling.models import FilledField, FillingResult
-
-    result = FillingResult(
-        input_path=str(src),
-        output_path=str(out),
-        strategy="template",
-        fields={
-            "claimant_name": FilledField(
-                field_name="claimant_name",
-                value="Mario Rossi",
-                formatted_value="Mario Rossi",
-                target_name="claimant_name",
-                status="filled",
-            ),
-            "policy_number": FilledField(
-                field_name="policy_number",
-                value="POL-42",
-                formatted_value="POL-42",
-                target_name="policy_number",
-                status="filled",
-            ),
-        },
-    )
-    from docuflow.filling.docx_writer import write_template
-
-    write_template(src, out, result)
-    assert out.exists()
-
-    from docx import Document
-
-    doc = Document(str(out))
-    text = " ".join(p.text for p in doc.paragraphs)
-    assert "Mario Rossi" in text
-    assert "POL-42" in text
-
-
 # ---------------------------------------------------------------------------
 # Full fill_docx_form end-to-end
 # ---------------------------------------------------------------------------
@@ -330,34 +254,6 @@ async def test_fill_docx_form_content_controls_e2e(tmp_path, contract):
     vals = {f.name: f.current_value for f in fields}
     assert vals["claimant_name"] == "Mario Rossi"
     assert vals["policy_number"] == "POL-42"
-
-
-@pytest.mark.asyncio
-async def test_fill_docx_form_template_e2e(tmp_path):
-    src = _write_tmp(
-        tmp_path, "tpl.docx",
-        _make_template_docx("Dear {{ claimant_name }}, ref {{ policy_number }}."),
-    )
-    out = tmp_path / "filled.docx"
-
-    from docuflow.filling.api import fill_docx_form_async
-
-    result = await fill_docx_form_async(
-        str(src),
-        {"claimant_name": "Mario Rossi", "policy_number": "POL-42"},
-        output_path=str(out),
-        strategy="template",
-    )
-    assert result.success
-    assert result.strategy == "template"
-    assert result.committed
-    assert out.exists()
-
-    from docx import Document
-
-    doc = Document(str(out))
-    text = " ".join(p.text for p in doc.paragraphs)
-    assert "Mario Rossi" in text
 
 
 @pytest.mark.asyncio

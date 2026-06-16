@@ -1026,7 +1026,6 @@ all = [
     { name = "azure-ai-documentintelligence" },
     { name = "boto3" },
     { name = "docling" },
-    { name = "docxtpl" },
     { name = "fastapi" },
     { name = "google-cloud-documentai" },
     { name = "httpx" },
@@ -1062,7 +1061,6 @@ docling = [
     { name = "docling" },
 ]
 forms = [
-    { name = "docxtpl" },
     { name = "pdfplumber" },
     { name = "pypdf" },
     { name = "python-docx" },
@@ -1107,7 +1105,6 @@ requires-dist = [
     { name = "click", specifier = ">=8.0" },
     { name = "docling", marker = "extra == 'docling'", specifier = ">=2.90" },
     { name = "docuflow", extras = ["pdf", "forms", "ocr", "llm", "privacy", "docling", "azure", "aws", "gcp", "mcp", "serve", "jupyter"], marker = "extra == 'all'" },
-    { name = "docxtpl", marker = "extra == 'forms'", specifier = ">=0.17" },
     { name = "fastapi", marker = "extra == 'serve'", specifier = ">=0.115" },
     { name = "google-cloud-documentai", marker = "extra == 'gcp'", specifier = ">=2.30" },
     { name = "httpx", marker = "extra == 'serve'", specifier = ">=0.28" },
@@ -1136,20 +1133,6 @@ requires-dist = [
     { name = "uvicorn", extras = ["standard"], marker = "extra == 'serve'", specifier = ">=0.30" },
 ]
 provides-extras = ["pdf", "forms", "ocr", "llm", "privacy", "docling", "azure", "aws", "gcp", "mcp", "serve", "jupyter", "all", "dev"]
-
-[[package]]
-name = "docxtpl"
-version = "0.20.2"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "jinja2" },
-    { name = "lxml" },
-    { name = "python-docx" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/b2/b4/4435f3fcb1357ec441079c4af1dda3ea926fad6dcead4aed2d93b369944e/docxtpl-0.20.2.tar.gz", hash = "sha256:eddf3350d70b4d123208e801d585bcb313d21044a377a14f75a66d0965841de1", size = 17890, upload-time = "2025-11-13T12:47:15.943Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/a4/ad/e07939d8e020e513d3860400413ba1e0e06102c469639b440d921337efef/docxtpl-0.20.2-py3-none-any.whl", hash = "sha256:626d5c570a46a62b2ca73b4d08f1c240fa031a5bc45371e1466a4fe184923d10", size = 17881, upload-time = "2025-11-13T12:47:13.704Z" },
-]
 
 [[package]]
 name = "et-xmlfile"

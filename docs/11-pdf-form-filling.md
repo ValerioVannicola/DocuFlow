@@ -10,8 +10,8 @@ pip install docuflow[forms]
 ```
 
 The `forms` extra installs `pypdf` for PDF writing, `reportlab` for static overlay
-placements, `pdfplumber` for opt-in blank-space detection, `python-docx` for DOCX
-content controls, and `docxtpl` for Jinja2 DOCX templates.
+placements, `pdfplumber` for opt-in blank-space detection, and `python-docx` for DOCX
+content controls.
 
 ## Public API
 
@@ -428,7 +428,7 @@ Word documents are filled through `fill_docx_form` / `fill_docx_form_async`. The
 
 ```python
 from docuflow import fill_docx_form, commit_fill
-from docuflow.filling import inspect_content_controls, inspect_template_vars
+from docuflow.filling import inspect_content_controls
 ```
 
 ### Strategies
@@ -436,8 +436,7 @@ from docuflow.filling import inspect_content_controls, inspect_template_vars
 | Strategy | What it targets | Library |
 | --- | --- | --- |
 | `"content_controls"` | Word SDT form fields (text, checkbox, dropdown, date) | `python-docx` (XML) |
-| `"template"` | Jinja2 `{{ field }}` placeholders anywhere in the document | `docxtpl` |
-| `"auto"` | Inspect the file: content controls first, then template variables | both |
+| `"auto"` | Inspect the file: content controls first | `python-docx` (XML) |
 
 ### `fill_docx_form()`
 
@@ -449,7 +448,7 @@ fill_docx_form(
     *,
     document_id: str = "",
     review: bool = False,
-    strategy: Literal["auto", "content_controls", "template"] = "auto",
+    strategy: Literal["auto", "content_controls"] = "auto",
     formats: Mapping[str, str | Callable] | None = None,
     flatten: bool = False,
     skip_none: bool = True,
@@ -463,7 +462,7 @@ fill_docx_form(
 
 | Parameter | Default | Description |
 | --- | --- | --- |
-| `strategy` | `"auto"` | `"content_controls"` for Word SDT fields, `"template"` for `{{ }}` placeholders. |
+| `strategy` | `"auto"` | `"content_controls"` for Word SDT fields. |
 | `flatten` | `False` | Content controls only: remove SDT wrappers after filling, converting to plain text. |
 
 ### Inspection helpers
@@ -471,18 +470,15 @@ fill_docx_form(
 Discover what fields are available in a DOCX before filling:
 
 ```python
-from docuflow.filling import inspect_content_controls, inspect_template_vars
+from docuflow.filling import inspect_content_controls
 
 controls = inspect_content_controls("form.docx")
 # → [FormField(name="claimant_name", field_type="plainText"), ...]
-
-vars_ = inspect_template_vars("template.docx")
-# → ["claimant_name", "policy_number", ...]
 ```
 
 `inspect_content_controls` returns a `list[FormField]` (same type as `inspect_pdf_form`).
 Field types are `"plainText"`, `"richText"`, `"checkbox"`, `"dropdown"`, `"comboBox"`,
-or `"date"`. `inspect_template_vars` returns sorted variable names found in `{{ }}` markers.
+or `"date"`.
 
 ### Content controls example
 
@@ -505,26 +501,6 @@ text; the form fields can no longer be re-edited in Word):
 ```python
 result = fill_docx_form("form.docx", data, flatten=True)
 ```
-
-### Template example
-
-Assumes a `.docx` whose paragraphs contain `{{ claimant_name }}` and `{{ policy_number }}`:
-
-```python
-from docuflow import fill_docx_form
-
-result = fill_docx_form(
-    "claim-template.docx",
-    data={"claimant_name": "Mario Rossi", "policy_number": "POL-42"},
-    output_path="claim-template-filled.docx",
-    strategy="template",
-)
-```
-
-`docxtpl` resolves Jinja2 variable names against the data keys. It handles Word's
-run-splitting transparently (Word sometimes splits `{{ name }}` across multiple XML runs
-for spell-check reasons). It is the only weak-copyleft optional dependency in the forms
-stack (`LGPL-2.1-only`) and is used only for DOCX Jinja2 template rendering.
 
 ### Field matching
 

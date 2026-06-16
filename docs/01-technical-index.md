@@ -151,7 +151,7 @@ These are the most common selectable values across the high-level APIs.
 | Highlight color | `highlight_fields(color=...)` | `None`, `"auto"`, CSS color string, RGB tuple, RGBA tuple. |
 | Screenshot/highlight format | `format` | Usually `"png"` or `"jpeg"`, depending on Pillow support. |
 | PDF form filling strategy | `strategy` | `"auto"`, `"acroform"`, `"overlay"`. |
-| DOCX form filling strategy | `strategy` | `"auto"`, `"content_controls"`, `"template"`. |
+| DOCX form filling strategy | `strategy` | `"auto"`, `"content_controls"`. |
 | Fill review status | `FillingResult.review_status` | `"pending"`, `"approved"`, `"rejected"` (only when `review=True`). |
 | Local store fill query status | `LocalDocumentStore.get_fills_by_status()` | `"pending_review"`, `"approved"`, `"rejected"`, `"committed"`. |
 | Split confidence | `SectionResult.confidence` | `"high"`, `"medium"`, `"low"` (deep mode only). |

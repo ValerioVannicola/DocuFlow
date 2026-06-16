@@ -6,7 +6,7 @@ from docuflow.filling.api import (
     fill_pdf_form,
     fill_pdf_form_async,
 )
-from docuflow.filling.docx_inspector import inspect_content_controls, inspect_template_vars
+from docuflow.filling.docx_inspector import inspect_content_controls
 from docuflow.filling.inspector import inspect_pdf_form
 from docuflow.filling.models import (
     DocxFillStrategy,
@@ -37,7 +37,6 @@ __all__ = [
     "fill_pdf_form_async",
     "inspect_content_controls",
     "inspect_pdf_form",
-    "inspect_template_vars",
     "preview_fill",
     "preview_fill_async",
 ]

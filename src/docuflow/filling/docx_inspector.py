@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 from docuflow.filling.models import FormField
@@ -43,33 +42,6 @@ def inspect_content_controls(path: str | Path) -> list[FormField]:
         )
 
     return fields
-
-
-def inspect_template_vars(path: str | Path) -> list[str]:
-    """Return Jinja2 variable names found in a DOCX template (handles run-splitting)."""
-    from docx import Document  # type: ignore[import-untyped]
-
-    doc = Document(str(path))
-    pattern = re.compile(r"\{\{[\s]*(\w+)[\s]*\}\}")
-    found: set[str] = set()
-
-    def _scan(paragraphs: list) -> None:  # type: ignore[type-arg]
-        for para in paragraphs:
-            text = "".join(r.text for r in para.runs)
-            for m in pattern.finditer(text):
-                found.add(m.group(1))
-
-    _scan(doc.paragraphs)
-    for table in doc.tables:
-        for row in table.rows:
-            for cell in row.cells:
-                _scan(cell.paragraphs)
-    for section in doc.sections:
-        for hdr_ftr in (section.header, section.footer):
-            if hdr_ftr:
-                _scan(hdr_ftr.paragraphs)
-
-    return sorted(found)
 
 
 def _parse_sdt(

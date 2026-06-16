@@ -11,8 +11,8 @@ from docuflow.observability.traces import Trace
 # Sentinel for "argument not provided" so callers can edit a value to None/False.
 _UNSET: Any = object()
 
-FillStrategy = Literal["auto", "acroform", "overlay", "content_controls", "template"]
-DocxFillStrategy = Literal["auto", "content_controls", "template"]
+FillStrategy = Literal["auto", "acroform", "overlay", "content_controls"]
+DocxFillStrategy = Literal["auto", "content_controls"]
 MatchStrategy = Literal["auto", "name", "alias", "manual", "label", "llm"]
 BlankDetectionMode = Literal["heuristic", "llm", "hybrid"]
 UnmatchedPolicy = Literal["error", "warn", "ignore"]
@@ -85,7 +85,7 @@ class FillCorrection(BaseModel):
 class FillPlan(BaseModel):
     """Internal write plan produced before modifying the PDF."""
 
-    strategy: Literal["acroform", "overlay", "content_controls", "template"]
+    strategy: Literal["acroform", "overlay", "content_controls"]
     assignments: dict[str, Any] = Field(default_factory=dict)
     placements: dict[str, FieldPlacement] = Field(default_factory=dict)
     fields: dict[str, FilledField] = Field(default_factory=dict)
@@ -110,7 +110,7 @@ class FillingResult(BaseModel):
     document_id: str = ""
     output_path: str = ""
     schema_name: str = ""
-    strategy: Literal["acroform", "overlay", "content_controls", "template", ""] = ""
+    strategy: Literal["acroform", "overlay", "content_controls", ""] = ""
     success: bool = False
     committed: bool = False
     data: dict[str, Any] = Field(default_factory=dict)

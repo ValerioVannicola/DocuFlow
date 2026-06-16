@@ -33,7 +33,7 @@ dependencies = [
 
 [project.optional-dependencies]
 pdf = ["pdfplumber>=0.11", "pypdfium2>=4.30"]
-forms = ["pypdf>=5.0", "reportlab>=4.0", "pdfplumber>=0.11", "python-docx>=1.1", "docxtpl>=0.17"]
+forms = ["pypdf>=5.0", "reportlab>=4.0", "pdfplumber>=0.11", "python-docx>=1.1"]
 ocr = ["pytesseract>=0.3.10", "Pillow>=10.0"]
 llm = ["litellm>=1.40"]
 privacy = ["presidio-analyzer>=2.2", "presidio-anonymizer>=2.2"]

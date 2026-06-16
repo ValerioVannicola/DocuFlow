@@ -63,7 +63,7 @@ print(result.fields["total"].evidence[0])   # page 0, bbox, source text
 ### Parsing
 - **7 parsers**: pdfplumber (native PDFs), Tesseract OCR (scanned docs), Docling (tables/layout), Smart (auto per-page), Azure Document Intelligence, AWS Textract, Google Document AI
 - **Source-aware ingestion**: the default `parser="auto"` accepts PDFs, images, text/Markdown/HTML/CSV/JSON/XML/email files, and Docling-backed Office/spreadsheet documents while still normalizing everything to DocuFlow's `Document` model
-- **Commercial-use friendly licensing**: the core dependency set is MIT/BSD/Apache-2.0, and the only weak-copyleft optional package is `docxtpl` (LGPL-2.1-only) for DOCX Jinja2 template filling
+- **Permissive licensing throughout**: the dependency set is MIT/BSD/Apache-2.0, with no copyleft packages in the tree
 - Every parser produces blocks with bounding boxes for evidence grounding
 
 ### Extraction

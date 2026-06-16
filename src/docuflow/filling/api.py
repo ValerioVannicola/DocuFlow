@@ -400,10 +400,6 @@ def _write_from_result(result: FillingResult) -> list[str]:
         from docuflow.filling.docx_writer import write_content_controls
         return write_content_controls(input_path, output_path, result)
 
-    if result.strategy == "template":
-        from docuflow.filling.docx_writer import write_template
-        return write_template(input_path, output_path, result)
-
     placements = {
         name: f.placement for name, f in filled.items() if f.placement is not None
     }
@@ -500,7 +496,7 @@ async def fill_docx_form_async(
     skip_none: bool = True,
     unmatched: UnmatchedPolicy = "warn",
 ) -> FillingResult:
-    """Fill a DOCX form (content controls or Jinja2 template) and return a FillingResult.
+    """Fill a DOCX form with content controls and return a FillingResult.
 
     Args:
         path: Input DOCX path.
@@ -508,7 +504,7 @@ async def fill_docx_form_async(
         output_path: Optional output DOCX path.
         document_id: Optional document identifier.
         review: If ``True``, prepare a fill without writing it yet.
-        strategy: DOCX fill strategy (``auto``, ``content_controls``, ``template``).
+        strategy: DOCX fill strategy (``auto``, ``content_controls``).
         formats: Optional field-format overrides.
         flatten: Flatten content controls after fill.
         skip_none: Skip ``None`` values from ``data``.
@@ -552,7 +548,7 @@ def fill_docx_form(
         output_path: Optional output DOCX path.
         document_id: Optional document identifier.
         review: If ``True``, prepare a fill without writing it yet.
-        strategy: DOCX fill strategy (``auto``, ``content_controls``, ``template``).
+        strategy: DOCX fill strategy (``auto``, ``content_controls``).
         formats: Optional field-format overrides.
         flatten: Flatten content controls after fill.
         skip_none: Skip ``None`` values from ``data``.

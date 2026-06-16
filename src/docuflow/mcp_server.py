@@ -643,13 +643,13 @@ async def fill_docx_form(
     document_id: str = "",
     store_path: str = "./.docuflow_store",
 ) -> str:
-    """Fill a DOCX form (content controls or Jinja2 template) with structured data.
+    """Fill a DOCX form (content controls) with structured data.
 
     Args:
         file_path: Path to the input .docx file
-        data: JSON string of field values to fill (keys match content control tags or template vars)
+        data: JSON string of field values to fill (keys match content control tags or aliases)
         output_path: Where to save the filled DOCX; defaults to <stem>-filled.docx
-        strategy: "auto" (detect), "content_controls" (Word SDT fields), or "template" (Jinja2 {{ }})
+        strategy: "auto" (detect) or "content_controls" (Word SDT fields)
         flatten: Remove SDT wrappers after filling (content_controls only)
         review: When True, plan the fill but do not write the file yet
         document_id: Optional document identifier for storage

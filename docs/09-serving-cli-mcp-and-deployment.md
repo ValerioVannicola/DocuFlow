@@ -679,9 +679,9 @@ Parameters:
 | Parameter | Default | Description |
 | --- | --- | --- |
 | `file_path` | Required | Path to the input `.docx` file. |
-| `data` | Required | JSON string of field values to fill (keys match content control tags or template variable names). |
+| `data` | Required | JSON string of field values to fill (keys match content control tags or aliases). |
 | `output_path` | `""` | Where to save the filled DOCX. Defaults to `<stem>-filled.docx`. |
-| `strategy` | `"auto"` | `"auto"` (detect), `"content_controls"` (Word SDT), or `"template"` (Jinja2 `{{ }}`). |
+| `strategy` | `"auto"` | `"auto"` (detect) or `"content_controls"` (Word SDT). |
 | `flatten` | `false` | Remove SDT wrappers after filling (content_controls only). |
 | `review` | `false` | When `true`, plan the fill but do not write the file. |
 | `document_id` | `""` | Optional document identifier. Used for storage when `review=true`. |
