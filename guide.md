@@ -10,6 +10,8 @@
 
 > DocuFlow turns unstructured documents into production-ready data. Unlike typical extraction tools that stop at raw JSON, DocuFlow adds evidence, consensus, verification, validation, and auditability so you can trust, review, and ship the result.
 
+> Licensing note: DocuFlow's core dependencies are permissive and commercially usable. The only weak-copyleft optional package in the tree is `docxtpl` (LGPL-2.1-only), used only for DOCX Jinja2 template filling.
+
 ---
 
 ## Table of Contents

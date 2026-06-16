@@ -521,9 +521,10 @@ result = fill_docx_form(
 )
 ```
 
-docxtpl resolves Jinja2 variable names against the data keys. It handles Word's
+`docxtpl` resolves Jinja2 variable names against the data keys. It handles Word's
 run-splitting transparently (Word sometimes splits `{{ name }}` across multiple XML runs
-for spell-check reasons).
+for spell-check reasons). It is the only weak-copyleft optional dependency in the forms
+stack (`LGPL-2.1-only`) and is used only for DOCX Jinja2 template rendering.
 
 ### Field matching
 
