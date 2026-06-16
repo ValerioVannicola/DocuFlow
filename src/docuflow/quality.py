@@ -12,6 +12,8 @@ from docuflow.extraction.models import ExtractionResult
 
 
 class FieldQuality(BaseModel):
+    """Per-field quality flags used by :func:`quality_report`."""
+
     found_in_source: bool = False
     has_evidence: bool = False
     trust_gate: bool = False
@@ -21,6 +23,8 @@ class FieldQuality(BaseModel):
 
 
 class QualityReport(BaseModel):
+    """Quality summary for one extraction result or a batch of results."""
+
     score: float = 0.0
     completeness_rate: float = 0.0
     grounding_rate: float = 0.0
@@ -151,6 +155,16 @@ def quality_report(
     results: ExtractionResult | list[ExtractionResult],
     threshold: float = 0.7,
 ) -> QualityReport:
+    """Score one result or a batch of results.
+
+    Args:
+        results: A single extraction result or a list of results.
+        threshold: Minimum score required for ``ok=True``.
+
+    Returns:
+        QualityReport: Aggregated quality metrics and warnings.
+    """
+
     if isinstance(results, ExtractionResult):
         return _single_report(results, threshold)
 
@@ -221,6 +235,8 @@ def quality_report(
 
 
 class QualitySnapshot(BaseModel):
+    """Timestamped quality record suitable for logging."""
+
     snapshot_id: str = Field(default_factory=lambda: str(uuid4()))
     timestamp: datetime = Field(default_factory=datetime.now)
     tags: dict[str, str] = Field(default_factory=dict)
@@ -270,6 +286,12 @@ _METRIC_FIELDS = (
 
 
 class QualityLog:
+    """Append-only JSONL log for recording quality snapshots over time.
+
+    Args:
+        path: JSONL file used to persist quality snapshots.
+    """
+
     def __init__(self, path: str | Path) -> None:
         self._path = Path(path)
 
@@ -278,6 +300,16 @@ class QualityLog:
         report: QualityReport,
         tags: dict[str, str] | None = None,
     ) -> QualitySnapshot:
+        """Append a quality snapshot to the log file.
+
+        Args:
+            report: Quality report to record.
+            tags: Optional string tags used for filtering history later.
+
+        Returns:
+            QualitySnapshot: The written snapshot.
+        """
+
         snapshot = QualitySnapshot.from_report(report, tags=tags)
         self._path.parent.mkdir(parents=True, exist_ok=True)
         async with aiofiles.open(self._path, "a", encoding="utf-8") as f:
@@ -289,6 +321,8 @@ class QualityLog:
         report: QualityReport,
         tags: dict[str, str] | None = None,
     ) -> QualitySnapshot:
+        """Synchronous version of :meth:`record`."""
+
         snapshot = QualitySnapshot.from_report(report, tags=tags)
         self._path.parent.mkdir(parents=True, exist_ok=True)
         with open(self._path, "a", encoding="utf-8") as f:
@@ -300,6 +334,16 @@ class QualityLog:
         last_n: int | None = None,
         tags: dict[str, str] | None = None,
     ) -> list[QualitySnapshot]:
+        """Read snapshots from the log file.
+
+        Args:
+            last_n: Optional maximum number of recent snapshots to return.
+            tags: Optional tag filter applied before truncation.
+
+        Returns:
+            list[QualitySnapshot]: Matching snapshots in chronological order.
+        """
+
         if not self._path.exists():
             return []
         async with aiofiles.open(self._path, "r", encoding="utf-8") as f:
@@ -311,6 +355,8 @@ class QualityLog:
         last_n: int | None = None,
         tags: dict[str, str] | None = None,
     ) -> list[QualitySnapshot]:
+        """Synchronous version of :meth:`history`."""
+
         if not self._path.exists():
             return []
         content = self._path.read_text(encoding="utf-8")

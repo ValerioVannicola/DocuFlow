@@ -8,6 +8,20 @@ from docuflow.privacy.models import AnonymizationMode
 
 
 class PrivacyPolicy(BaseModel):
+    """Configure anonymization before LLM calls.
+
+    Args:
+        anonymize_before_llm: Whether to run anonymization before extraction.
+        mode: Anonymization mode.
+        reversible: Whether pseudonymization mappings can be restored.
+        provider: Optional anonymization provider implementation.
+        entities: Entity labels to detect.
+        fail_closed: Stop the pipeline if anonymization fails.
+        score_threshold: Minimum detection score to keep a finding.
+        log_scrubbing: Whether to scrub traces/logs.
+        mapping_store: Optional mapping store used for reversible modes.
+    """
+
     anonymize_before_llm: bool = True
     mode: AnonymizationMode = AnonymizationMode.PSEUDONYMIZE
     reversible: bool = True

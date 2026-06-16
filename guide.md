@@ -10,6 +10,8 @@
 
 > DocuFlow turns unstructured documents into production-ready data. Unlike typical extraction tools that stop at raw JSON, DocuFlow adds evidence, consensus, verification, validation, and auditability so you can trust, review, and ship the result.
 
+> Licensing note: DocuFlow's core dependencies are permissive and commercially usable. The only weak-copyleft optional package in the tree is `docxtpl` (LGPL-2.1-only), used only for DOCX Jinja2 template filling.
+
 ---
 
 ## Table of Contents
@@ -68,6 +70,20 @@ Most extraction tools stop at "here's your JSON." DocuFlow covers what happens a
 - **Privacy-first**: anonymize PII before it reaches the LLM
 - **Production tooling**: batch processing, document comparison, CSV export, token/cost accounting
 - **Self-containerizing**: any workflow exports to YAML and deploys itself as a Docker microservice
+
+### What It Can Process
+
+DocuFlow accepts these source types today:
+
+- PDF: `.pdf`
+- Images: `.png`, `.jpg`, `.jpeg`, `.tiff`, `.tif`, `.bmp`, `.gif`, `.webp`
+- Text-like files: `.txt`, `.md`, `.html`, `.htm`, `.csv`, `.json`, `.xml`
+- Office documents: `.docx`
+- Spreadsheets: `.xlsx`
+- Email: `.eml`
+
+With `parser="auto"`, DocuFlow routes each source to the right path and still normalizes
+everything to the same internal `Document` model.
 
 ### Three Ways to Use DocuFlow
 
@@ -706,7 +722,7 @@ for f in discovery.fields:
 Parameters:
 - `path` — path to the document
 - `model` — LLM model (default: `"openai/gpt-4o"`)
-- `parser` — which parser to use for reading the document (default: `"pdfplumber"`)
+- `parser` — which parser to use for reading the document (default: `"auto"`, source-aware)
 
 This is useful when you have a new document type and want a quick starting point. Discover the schema from one example, review/edit the YAML, then use it for batch processing.
 
@@ -714,7 +730,14 @@ This is useful when you have a new document type and want a quick starting point
 
 ## 6. Parsers
 
-Parsers convert raw PDF files into structured `Document` objects with pages, blocks, bounding boxes, and text. DocuFlow includes 4 local parsers and 3 cloud OCR parsers — all producing the same standardized output, so everything downstream (evidence, confidence, search) works identically regardless of which one you pick.
+Parsers convert raw documents into structured `Document` objects with pages, blocks, bounding boxes, and text. DocuFlow includes 4 local parsers and 3 cloud OCR parsers — all producing the same standardized output, so everything downstream (evidence, confidence, search) works identically regardless of which one you pick.
+
+The default `parser="auto"` is source-aware:
+
+- PDF inputs use native PDF parsing for text extraction, or Smart parsing in auto-escalation workflows.
+- Image inputs use Tesseract OCR for text extraction, or are rendered directly for vision/hybrid extraction.
+- Text-like inputs (`txt`, `md`, `html`, `csv`, `json`, `xml`, `eml`) are normalized by ingestion into a one-page parsed `Document`, so no parser is needed.
+- Office and spreadsheet inputs route to Docling when that extra is installed.
 
 ### PdfplumberParser (`"pdfplumber"`)
 
@@ -984,7 +1007,10 @@ Pick the simplest strategy that matches the document quality, then add more mach
 - **Mixed document streams**: use `parser="smart"`. It reads native text where possible and falls back to OCR only on pages that need it.
 - **Visually complex documents**: use `parser=None` with `extraction_type="vision"`. The model reads page images directly and can interpret layout, stamps, tables, and visual context.
 - **Very ambiguous or high-value documents**: use `extraction_type="hybrid"` to combine text and vision candidates, then let a decider choose the strongest field values.
-- **Variable-quality batches**: use `extraction_type="auto"` with `parser="smart"`. Start cheap and escalate to vision only when OCR quality is poor.
+- **Variable-quality batches**: use `extraction_type="auto"` with the default `parser="auto"`. Start cheap and escalate PDF/image inputs to vision only when OCR quality is poor.
+- **Text, email, CSV, JSON, XML, or Markdown files**: use the default `parser="auto"` with `extraction_type="text"`. Ingestion converts them into a one-page parsed `Document`, so no OCR or PDF parser is required.
+- **Images**: use the default `parser="auto"` for OCR-backed text extraction, or use `extraction_type="vision"`/`"hybrid"` when the visual layout matters.
+- **Office/spreadsheet files**: use the default `parser="auto"` with `docuflow[docling]` installed, or explicitly choose `parser="docling"`.
 - **Important documents**: add `extraction_mode="multi"` so independent candidates can agree or disagree before a final answer is accepted.
 - **Weak fields**: enable `verification` so low-confidence values get a zoomed re-read instead of relying on the original extraction alone.
 
@@ -994,6 +1020,8 @@ Rule of thumb:
 - scanned PDF -> `tesseract` or cloud OCR
 - mixed batch -> `smart`
 - complex layout -> `vision` or `hybrid`
+- text-like file -> parserless ingestion via `auto`
+- Office/spreadsheet -> `docling`
 - highest accuracy -> `multi` + `verification`
 
 #### Text Extraction (`extraction_type="text"`)
@@ -1002,12 +1030,12 @@ The parser produces text → the LLM reads that text. This is the default.
 
 ```python
 pipeline = DocumentPipeline(
-    parser="pdfplumber",           # or "tesseract", "docling", "smart"
+    parser="auto",              # or "pdfplumber", "tesseract", "docling", "smart"
     extraction_type="text",     # default
 )
 ```
 
-Pipeline: `Ingest → Parse → Extract`
+Pipeline: `Ingest → Parse? → Extract`
 
 The LLM receives the document text organized by page, plus the schema definition and an example of the expected output format.
 
@@ -1419,7 +1447,7 @@ Set your API key via environment variable (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`
 ```python
 from docuflow.extraction.llm.litellm_adapter import LiteLLMAdapter
 llm = LiteLLMAdapter(model="openai/gpt-4o", api_key="sk-...")
-pipeline = DocumentPipeline(parser="pdfplumber")
+pipeline = DocumentPipeline(parser="auto")
 # Use manual Pipeline with Extract(llm=llm) for custom LLM instances
 ```
 
@@ -1438,7 +1466,7 @@ result = extract(
     "invoice.pdf",
     schema=Invoice,
     model="openai/gpt-4o",
-    parser="pdfplumber",
+    parser="auto",
     storage="local",
     privacy=PrivacyPolicy(...),
 )
@@ -1473,7 +1501,7 @@ All parameters:
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `parser` | str or Parser | `"pdfplumber"` | `"pdfplumber"`, `"tesseract"`, `"docling"`, `"smart"`, `"azure-di"`, `"textract"`, `"google-docai"`, `None` |
+| `parser` | str or Parser | `"auto"` | `"auto"`, `"pdfplumber"`, `"tesseract"`, `"docling"`, `"smart"`, `"azure-di"`, `"textract"`, `"google-docai"`, `None` |
 | `model` | str | `"openai/gpt-4o"` | LLM model (litellm format) |
 | `storage` | str or Storage | `None` | `None`, `"local"`, or Storage instance |
 | `validators` | list | `None` | List of Validator instances |
@@ -2351,7 +2379,7 @@ docuflow run invoice.yaml invoice.pdf --output result.json
 | `name` | str | `"workflow"` | Workflow name |
 | `version` | str | `"1.0"` | Version string |
 | `schema` | dict | required | Field definitions (same format as YAML templates) |
-| `parser` | str | `"pdfplumber"` | `"pdfplumber"` \| `"tesseract"` \| `"docling"` \| `"smart"` \| `"azure-di"` \| `"textract"` \| `"google-docai"` |
+| `parser` | str | `"auto"` | `"auto"` \| `"pdfplumber"` \| `"tesseract"` \| `"docling"` \| `"smart"` \| `"azure-di"` \| `"textract"` \| `"google-docai"` |
 | `model` | str | `"openai/gpt-4o"` | Any litellm model string |
 | `extraction_type` | str | `"text"` | `"text"` \| `"vision"` \| `"hybrid"` \| `"auto"` |
 | `extraction_mode` | str | `"single"` | `"single"` \| `"multi"` |
@@ -3008,7 +3036,7 @@ docuflow extract-folder ./invoices --schema invoice --output results.csv --parse
 Options:
 - `--schema, -s` (required) — schema name or Python dotted path
 - `--model, -m` — LLM model (default: `openai/gpt-4o`)
-- `--parser, -p` — parser (default: `pdfplumber`). Options: `pdfplumber`, `tesseract`, `docling`, `smart`, `azure-di`, `textract`, `google-docai`
+- `--parser, -p` — parser (default: `auto`). Options: `auto`, `pdfplumber`, `tesseract`, `docling`, `smart`, `azure-di`, `textract`, `google-docai`
 - `--output, -o` — output CSV file
 - `--pattern` — file glob pattern (default: `**/*.pdf`)
 - `--concurrency, -c` — max parallel extractions (default: 5)

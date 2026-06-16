@@ -14,6 +14,8 @@ from docuflow.workflow.steps import PipelineStep
 
 @dataclass
 class PipelineResult:
+    """Result returned by the low-level manual pipeline runner."""
+
     state: PipelineState
     trace: Trace
     duration_ms: float = 0.0
@@ -22,6 +24,16 @@ class PipelineResult:
 
 
 class Pipeline:
+    """Run an explicit sequence of pipeline steps.
+
+    Users reach for this when they want to compose ingestion, parsing,
+    extraction, review, storage, or custom steps manually instead of using
+    :class:`docuflow.processor.DocumentPipeline`.
+
+    Args:
+        steps: Ordered list of pipeline steps to execute.
+    """
+
     def __init__(self, steps: list[PipelineStep]):
         self.steps = steps
 
@@ -52,6 +64,17 @@ class Pipeline:
         schema: type[BaseModel] | None = None,
         **kwargs: Any,
     ) -> PipelineResult:
+        """Run all configured steps.
+
+        Args:
+            input_path: Optional document path stored in pipeline state.
+            schema: Optional Pydantic schema stored in pipeline state.
+            **kwargs: Extra state metadata forwarded to steps.
+
+        Returns:
+            PipelineResult: Final pipeline state, trace, and timing.
+        """
+
         state = PipelineState()
         if input_path:
             state.metadata["input_path"] = input_path
@@ -100,4 +123,6 @@ class Pipeline:
         schema: type[BaseModel] | None = None,
         **kwargs: Any,
     ) -> PipelineResult:
+        """Synchronous wrapper for :meth:`run`."""
+
         return run_sync(self.run(input_path, schema, **kwargs))

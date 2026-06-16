@@ -75,11 +75,16 @@ async def preview_fill_async(
     dpi: int = 150,
     format: str = "png",
 ) -> list[str]:
-    """Render each page with planned values overlaid; save images. Returns saved paths.
+    """Render each page with planned values overlaid; save images.
 
-    Fields edited by a reviewer or carrying warnings are highlighted in amber;
-    clean placements are green. Fields without a known location (e.g. some
-    AcroForm widgets) are skipped.
+    Args:
+        result: Filling result with planned placements and values.
+        output_dir: Directory to write preview images to.
+        dpi: Render resolution used for page images.
+        format: Output image format, usually ``png`` or ``jpeg``.
+
+    Returns:
+        list[str]: Saved preview image paths.
     """
     if Path(result.input_path).suffix.lower() in (".docx", ".doc"):
         return []  # DOCX preview not yet supported; commit to see the filled document
@@ -110,7 +115,17 @@ def preview_fill(
     dpi: int = 150,
     format: str = "png",
 ) -> list[str]:
-    """Sync version of :func:`preview_fill_async`. Returns saved image paths."""
+    """Sync version of :func:`preview_fill_async`.
+
+    Args:
+        result: Filling result with planned placements and values.
+        output_dir: Directory to write preview images to.
+        dpi: Render resolution used for page images.
+        format: Output image format, usually ``png`` or ``jpeg``.
+
+    Returns:
+        list[str]: Saved preview image paths.
+    """
     return run_sync(
         preview_fill_async(result, output_dir, dpi=dpi, format=format)
     )

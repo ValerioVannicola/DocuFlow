@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, Field, create_model
@@ -101,28 +102,30 @@ async def discover_schema(
     path: str,
     llm: LLMAdapter | None = None,
     model: str = "openai/gpt-4o",
-    parser: str = "pdfplumber",
+    parser: str | dict[str, Any] | None = "auto",
 ) -> DiscoveryResult:
+    """Infer a likely schema from a sample document.
+
+    Args:
+        path: Path to the sample document to inspect.
+        llm: Optional LLM adapter. If omitted, DocuFlow creates one from ``model``.
+        model: Model name used when ``llm`` is not supplied.
+        parser: Parser selector or config. ``auto`` uses source-aware defaults.
+
+    Returns:
+        DiscoveryResult: Suggested fields, generated Pydantic model, and YAML template.
+    """
+
     from docuflow.ingestion.local import ingest_file
+    from docuflow.ingestion.mime import detect_source_kind
+    from docuflow.processor import DocumentPipeline
 
     document = await ingest_file(path)
 
-    if parser == "pdfplumber":
-        from docuflow.parsing.pdfplumber_parser import PdfplumberParser
-
-        document = await PdfplumberParser().parse(document)
-    elif parser == "tesseract":
-        from docuflow.parsing.tesseract_parser import TesseractParser
-
-        document = await TesseractParser().parse(document)
-    elif parser == "docling":
-        from docuflow.parsing.docling_parser import DoclingParser
-
-        document = await DoclingParser().parse(document)
-    elif parser == "smart":
-        from docuflow.parsing.smart_parser import SmartParser
-
-        document = await SmartParser().parse(document)
+    source_kind = detect_source_kind(Path(path))
+    parser_obj = DocumentPipeline(parser=parser)._resolve_parser_for_source(source_kind)
+    if parser_obj is not None:
+        document = await parser_obj.parse(document)
 
     if llm is None:
         from docuflow.extraction.llm.litellm_adapter import LiteLLMAdapter
@@ -173,6 +176,18 @@ def discover_schema_sync(
     path: str,
     llm: LLMAdapter | None = None,
     model: str = "openai/gpt-4o",
-    parser: str = "pdfplumber",
+    parser: str | dict[str, Any] | None = "auto",
 ) -> DiscoveryResult:
+    """Synchronous wrapper for :func:`discover_schema`.
+
+    Args:
+        path: Path to the sample document to inspect.
+        llm: Optional LLM adapter. If omitted, DocuFlow creates one from ``model``.
+        model: Model name used when ``llm`` is not supplied.
+        parser: Parser selector or config. ``auto`` uses source-aware defaults.
+
+    Returns:
+        DiscoveryResult: Suggested fields, generated Pydantic model, and YAML template.
+    """
+
     return run_sync(discover_schema(path, llm, model, parser))

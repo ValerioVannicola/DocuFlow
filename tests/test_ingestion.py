@@ -7,7 +7,9 @@ import pytest
 from docuflow.documents.models import Document
 from docuflow.errors import UnsupportedFileTypeError
 from docuflow.ingestion.local import ingest_file, ingest_file_sync, ingest_folder
-from docuflow.ingestion.mime import MIME_TYPES, detect_mime_type
+from docuflow.ingestion.mime import MIME_TYPES, detect_mime_type, detect_source_kind
+from docuflow.workflow.state import PipelineState
+from docuflow.workflow.steps import Parse
 
 
 class TestMimeDetection:
@@ -23,6 +25,18 @@ class TestMimeDetection:
 
     def test_case_insensitive(self):
         assert detect_mime_type(Path("test.PDF")) == "application/pdf"
+
+    def test_text_like_extensions(self):
+        assert detect_mime_type(Path("notes.md")) == "text/markdown"
+        assert detect_mime_type(Path("payload.json")) == "application/json"
+        assert detect_mime_type(Path("payload.xml")) == "application/xml"
+
+    def test_source_kind_detection(self):
+        assert detect_source_kind(Path("test.pdf")) == "pdf"
+        assert detect_source_kind(Path("test.png")) == "image"
+        assert detect_source_kind(Path("test.txt")) == "text"
+        assert detect_source_kind(Path("test.docx")) == "office"
+        assert detect_source_kind(Path("test.xlsx")) == "spreadsheet"
 
     def test_unsupported_raises(self):
         with pytest.raises(UnsupportedFileTypeError):
@@ -70,6 +84,49 @@ class TestIngestFile:
         pdf_path.write_bytes(b"%PDF-1.4 sync test")
         doc = ingest_file_sync(pdf_path)
         assert doc.metadata.file_name == "test.pdf"
+
+    async def test_ingest_text_file_builds_canonical_document(self, tmp_path):
+        text_path = tmp_path / "note.md"
+        text_path.write_text("# Claim\nName: Mario Rossi", encoding="utf-8")
+
+        doc = await ingest_file(text_path)
+
+        assert doc.metadata.mime_type == "text/markdown"
+        assert doc.metadata.extra["source_kind"] == "text"
+        assert doc.status == "parsed"
+        assert doc.raw_text == "# Claim\nName: Mario Rossi"
+        assert doc.metadata.page_count == 1
+        assert len(doc.pages) == 1
+        assert doc.pages[0].text == doc.raw_text
+        assert doc.pages[0].blocks[0].text == doc.raw_text
+
+    async def test_manual_parse_auto_skips_text_document(self, tmp_path):
+        text_path = tmp_path / "note.md"
+        text_path.write_text("# Claim\nName: Mario Rossi", encoding="utf-8")
+        doc = await ingest_file(text_path)
+
+        state = await Parse(parser="auto").execute(PipelineState(document=doc))
+
+        assert state.status == "pending"
+        assert state.errors == []
+        assert state.document is doc
+        assert state.document.status == "parsed"
+
+    async def test_ingest_image_file_builds_single_page_document(self, tmp_path):
+        image_mod = pytest.importorskip("PIL.Image")
+        image_path = tmp_path / "scan.png"
+        image_mod.new("RGB", (20, 10), "white").save(image_path)
+
+        doc = await ingest_file(image_path)
+
+        assert doc.metadata.mime_type == "image/png"
+        assert doc.metadata.extra["source_kind"] == "image"
+        assert doc.metadata.page_count == 1
+        assert len(doc.pages) == 1
+        assert doc.pages[0].width == 20
+        assert doc.pages[0].height == 10
+        assert doc.pages[0].unit == "px"
+        assert doc.pages[0].image_path == str(image_path.resolve())
 
 
 class TestIngestFolder:

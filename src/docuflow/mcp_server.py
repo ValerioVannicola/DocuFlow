@@ -21,7 +21,7 @@ mcp = FastMCP(
 async def extract_document(
     file_path: str,
     schema_name: str = "invoice",
-    parser: str = "pdfplumber",
+    parser: str = "auto",
     model: str = "openai/gpt-4o",
     extraction_mode: str = "single",
     n_instances: int = 5,
@@ -30,9 +30,9 @@ async def extract_document(
     """Extract structured data from a document using a schema.
 
     Args:
-        file_path: Path to the PDF file
+        file_path: Path to the document file
         schema_name: Template name (invoice, contract, receipt) or Python dotted path
-        parser: Parser to use (pdfplumber, tesseract, docling, smart, azure-di, textract, google-docai)
+        parser: Parser to use (auto, pdfplumber, tesseract, docling, smart, azure-di, textract, google-docai)
         model: LLM model (openai/gpt-4o, anthropic/claude-sonnet-4-20250514, etc)
         extraction_mode: single (1 call) or multi (N calls + decider)
         n_instances: Number of parallel agents for multi mode
@@ -96,7 +96,7 @@ async def extract_with_vision(
 @mcp.tool()
 async def discover_schema(
     file_path: str,
-    parser: str = "pdfplumber",
+    parser: str = "auto",
     model: str = "openai/gpt-4o",
 ) -> str:
     """Analyze a document and auto-generate an extraction schema.
@@ -127,7 +127,7 @@ async def discover_schema(
 async def compare_documents(
     file_paths: list[str],
     schema_name: str = "invoice",
-    parser: str = "pdfplumber",
+    parser: str = "auto",
     model: str = "openai/gpt-4o",
 ) -> str:
     """Compare extracted fields across multiple documents.
@@ -158,7 +158,7 @@ async def compare_documents(
 async def process_batch(
     folder_path: str,
     schema_name: str = "invoice",
-    parser: str = "pdfplumber",
+    parser: str = "auto",
     model: str = "openai/gpt-4o",
     pattern: str = "**/*.pdf",
     concurrency: int = 5,
@@ -242,7 +242,7 @@ async def show_template(name: str) -> str:
 async def search_in_document(
     file_path: str,
     query: str,
-    parser: str = "pdfplumber",
+    parser: str = "auto",
 ) -> str:
     """Search for text in a document with page and bounding box locations.
 
@@ -254,23 +254,19 @@ async def search_in_document(
     Returns:
         JSON with hits including page number, bounding box, and context
     """
+    from pathlib import Path
+
     from docuflow.ingestion.local import ingest_file
+    from docuflow.ingestion.mime import detect_source_kind
+    from docuflow.processor import DocumentPipeline
     from docuflow.search import search_document
 
     doc = await ingest_file(file_path)
 
-    if parser == "pdfplumber":
-        from docuflow.parsing.pdfplumber_parser import PdfplumberParser
-        doc = await PdfplumberParser().parse(doc)
-    elif parser == "tesseract":
-        from docuflow.parsing.tesseract_parser import TesseractParser
-        doc = await TesseractParser().parse(doc)
-    elif parser == "docling":
-        from docuflow.parsing.docling_parser import DoclingParser
-        doc = await DoclingParser().parse(doc)
-    elif parser == "smart":
-        from docuflow.parsing.smart_parser import SmartParser
-        doc = await SmartParser().parse(doc)
+    source_kind = detect_source_kind(Path(file_path))
+    parser_obj = DocumentPipeline(parser=parser)._resolve_parser_for_source(source_kind)
+    if parser_obj is not None:
+        doc = await parser_obj.parse(doc)
 
     result = search_document(doc, query)
     return result.model_dump_json(indent=2)

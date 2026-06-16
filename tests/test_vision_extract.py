@@ -121,6 +121,13 @@ class TestDocumentPipelineVision:
         )
         assert pipeline._extraction_type == "vision"
 
+    def test_vision_with_default_auto_parser_ok(self):
+        from docuflow.processor import DocumentPipeline
+
+        pipeline = DocumentPipeline(extraction_type="vision")
+        assert pipeline._parser == "auto"
+        assert pipeline._extraction_type == "vision"
+
     def test_text_with_parser_ok(self):
         from docuflow.processor import DocumentPipeline
 
@@ -129,6 +136,30 @@ class TestDocumentPipelineVision:
             extraction_type="text",
         )
         assert pipeline._extraction_type == "text"
+
+    async def test_parserless_vision_reads_image_input(self, monkeypatch, tmp_path):
+        image_mod = pytest.importorskip("PIL.Image")
+        from docuflow.processor import DocumentPipeline
+
+        image_path = tmp_path / "invoice.png"
+        image_mod.new("RGB", (32, 16), "white").save(image_path)
+
+        mock_llm = AsyncMock()
+        mock_llm.complete = AsyncMock(return_value=_make_llm_response())
+        monkeypatch.setattr(
+            VisionExtractionEngine,
+            "_enrich_document_with_ocr",
+            AsyncMock(),
+        )
+
+        pipeline = DocumentPipeline(parser=None, extraction_type="vision", vision_dpi=100)
+        pipeline._resolve_llm = lambda: mock_llm  # type: ignore[method-assign]
+
+        result = await pipeline.run(str(image_path), Invoice)
+
+        assert result.data["supplier_name"] == "Acme Corp"
+        assert result.data["total"] == 1234.56
+        assert mock_llm.complete.call_count == 1
 
 
 class TestVisionExtractionEngine:

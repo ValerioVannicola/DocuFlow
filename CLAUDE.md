@@ -37,9 +37,9 @@ result = extract("invoice.pdf", schema=Invoice, model="openai/gpt-4o")
 from docuflow import DocumentPipeline
 
 pipeline = DocumentPipeline(
-    parser="pdfplumber",           # "pdfplumber" | "tesseract" | "docling" | "smart"
+    parser="auto",              # "auto" | "pdfplumber" | "tesseract" | "docling" | "smart"
     model="openai/gpt-4o",      # any litellm model string
-    extraction_type="text",     # "text" | "vision" | "hybrid"
+    extraction_type="text",     # "text" | "vision" | "hybrid" | "auto"
     extraction_mode="single",   # "single" | "multi"
     storage="local",            # None | "local" | Storage instance
 )
@@ -88,6 +88,7 @@ Invoice = load_template("invoice")  # built-in: invoice, contract, receipt
 
 | Parser | Use when | Speed | Install |
 |--------|----------|-------|---------|
+| `"auto"` | Source-aware default: text/email skip parsing, images use OCR, PDFs use native/smart parsing, Office files use Docling | Varies | Depends on input type |
 | `"pdfplumber"` | Digital/native PDFs | Fast (~100ms) | `docuflow[pdf]` |
 | `"tesseract"` | Scanned documents | Slow (1-5s/page) | `docuflow[ocr]` |
 | `"docling"` | Complex layouts, tables | Slow (4-5s/page) | `docuflow[docling]` |
@@ -110,6 +111,12 @@ pipeline = DocumentPipeline(parser={"type": "google-docai", "project": "p", "pro
 ```
 
 All parsers produce the same standardized `Document`: pages of **line-level blocks**, where OCR-based parsers also fill per-word `words` (text, bbox, confidence) and a line `confidence`. Native parsers (pdfplumber) leave confidence empty — downstream code treats that as "no OCR ran". Docling is hybrid: when its internal OCR fires (scanned pages), the OCR cell confidences are attached to the layout blocks; native Docling parses report no OCR confidence, by design.
+
+Default `parser="auto"` keeps `Document` as the internal standard across input types:
+text-like files (`txt`, `md`, `html`, `csv`, `json`, `xml`, `eml`) are normalized by
+ingestion into a one-page parsed document, images are OCR'd for text extraction or
+rendered directly for vision/hybrid, PDFs use native/smart parsing, and Office/spreadsheet
+files route to Docling.
 
 ## Extraction Types
 

@@ -186,6 +186,7 @@ Generated requirements include `docuflow[...]` extras inferred from the workflow
 | Workflow feature | Added extras/deps |
 | --- | --- |
 | Always | `llm`, `serve` |
+| `parser: auto` | `pdf`, `ocr`, `docling`, system `tesseract-ocr` |
 | `parser: pdfplumber` | `pdf` |
 | `parser: smart` | `pdf`, `ocr`, system `tesseract-ocr` |
 | `parser: tesseract` | `pdf`, `ocr`, system `tesseract-ocr` |
@@ -263,7 +264,7 @@ Arguments/options:
 | `FOLDER_PATH` | Required | Folder to scan. |
 | `--schema`, `-s` | Required | Schema template name or dotted Python path. |
 | `--model`, `-m` | `"openai/gpt-4o"` | LLM model. |
-| `--parser`, `-p` | `"pdfplumber"` | Parser string. |
+| `--parser`, `-p` | `"auto"` | Parser string. `"auto"` selects from the input type. |
 | `--output`, `-o` | `None` | CSV output file. |
 | `--pattern` | `"**/*.pdf"` | Glob pattern inside folder. |
 | `--concurrency`, `-c` | `5` | Max concurrent extractions. |
@@ -407,7 +408,7 @@ The server name is `DocuFlow`. It exposes the following tools.
 extract_document(
     file_path: str,
     schema_name: str = "invoice",
-    parser: str = "pdfplumber",
+    parser: str = "auto",
     model: str = "openai/gpt-4o",
     extraction_mode: str = "single",
     n_instances: int = 5,
@@ -437,7 +438,7 @@ result payload.
 ```python
 discover_schema(
     file_path: str,
-    parser: str = "pdfplumber",
+    parser: str = "auto",
     model: str = "openai/gpt-4o",
 ) -> str
 ```
@@ -455,7 +456,7 @@ Returns JSON with:
 compare_documents(
     file_paths: list[str],
     schema_name: str = "invoice",
-    parser: str = "pdfplumber",
+    parser: str = "auto",
     model: str = "openai/gpt-4o",
 ) -> str
 ```
@@ -468,7 +469,7 @@ Returns comparison result JSON.
 process_batch(
     folder_path: str,
     schema_name: str = "invoice",
-    parser: str = "pdfplumber",
+    parser: str = "auto",
     model: str = "openai/gpt-4o",
     pattern: str = "**/*.pdf",
     concurrency: int = 5,
@@ -501,12 +502,12 @@ Returns YAML template content.
 search_in_document(
     file_path: str,
     query: str,
-    parser: str = "pdfplumber",
+    parser: str = "auto",
 ) -> str
 ```
 
-Parses the document with `pdfplumber`, `tesseract`, `docling`, or `smart`, then returns
-`SearchResult` JSON.
+Parses the document with the source-aware `auto` behavior, or with an explicit parser string,
+then returns `SearchResult` JSON. Text/email inputs can be searched without a parser.
 
 ### `get_pending_reviews`
 

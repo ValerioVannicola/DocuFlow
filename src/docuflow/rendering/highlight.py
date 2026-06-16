@@ -127,21 +127,18 @@ async def highlight_fields_async(
 ) -> list[str]:
     """Render each page that has field evidence, draw colored bounding boxes, save to disk.
 
-    Returns a list of saved file paths (one per page with evidence).
-
     Args:
-        file_path: Path to the source PDF.
+        file_path: Path to the source PDF or image document.
         result: Extraction result whose field evidence provides bounding boxes.
         output_dir: Directory to save annotated images. Created if absent.
-        fields: Field names to highlight. None highlights every field.
-        dpi: Render resolution (150 = readable, 72 = fast).
-        format: Output image format ("png" or "jpeg").
-        color: Highlight color. Accepts:
-            - None (default): semi-transparent yellow for all fields
-            - A CSS color name string: ``"red"``, ``"cyan"``, ``"#ff0"``
-            - An RGB/RGBA tuple: ``(255, 0, 0)`` or ``(255, 0, 0, 120)``
-            - ``"auto"``: a distinct color per field from the built-in palette
-        show_labels: Draw the field name above each box. Default True.
+        fields: Field names to highlight. ``None`` highlights every field.
+        dpi: Render resolution. Higher values produce larger images.
+        format: Output image format, usually ``png`` or ``jpeg``.
+        color: Highlight color. Accepts ``None``, ``"auto"``, CSS strings, or RGBA tuples.
+        show_labels: Draw the field name above each box.
+
+    Returns:
+        list[str]: Saved file paths, one per page with evidence.
     """
     from docuflow.rendering.renderer import render_page
 
@@ -174,17 +171,20 @@ def highlight_fields(
     color: str | tuple | None = None,
     show_labels: bool = True,
 ) -> list[str]:
-    """Sync version of :func:`highlight_fields_async`. Returns saved file paths.
+    """Sync version of :func:`highlight_fields_async`.
 
     Args:
-        file_path: Path to the source PDF.
+        file_path: Path to the source PDF or image document.
         result: Extraction result whose field evidence provides bounding boxes.
         output_dir: Directory to save annotated images. Created if absent.
-        fields: Field names to highlight. None highlights every field.
-        dpi: Render resolution (150 = readable, 72 = fast).
-        format: Output image format ("png" or "jpeg").
-        color: Highlight color — None (yellow), CSS name, RGB/RGBA tuple, or ``"auto"``.
-        show_labels: Draw the field name above each box. Default True.
+        fields: Field names to highlight. ``None`` highlights every field.
+        dpi: Render resolution. Higher values produce larger images.
+        format: Output image format, usually ``png`` or ``jpeg``.
+        color: Highlight color. Accepts ``None``, ``"auto"``, CSS strings, or RGBA tuples.
+        show_labels: Draw the field name above each box.
+
+    Returns:
+        list[str]: Saved file paths, one per page with evidence.
     """
     return run_sync(
         highlight_fields_async(

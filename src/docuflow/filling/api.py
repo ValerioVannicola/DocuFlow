@@ -58,7 +58,33 @@ async def fill_pdf_form_async(
     unmatched: UnmatchedPolicy = "warn",
     overflow: OverflowPolicy = "shrink",
 ) -> FillingResult:
-    """Fill a PDF with values from a Pydantic instance or mapping."""
+    """Fill a PDF with values from a Pydantic instance or mapping.
+
+    Args:
+        path: Input PDF path.
+        data: Pydantic model instance or mapping used to fill the form.
+        output_path: Optional output PDF path. Defaults to a sibling ``filled`` file.
+        document_id: Optional document identifier.
+        review: If ``True``, prepare a fill without writing it yet.
+        strategy: Form filling strategy (``auto``, ``acroform``, ``overlay``).
+        match_by: How to match model fields to PDF fields.
+        field_map: Explicit field placements or AcroForm mapping.
+        formats: Optional field-format overrides.
+        flatten: Flatten AcroForm widgets after fill when supported.
+        detect_blank_spaces: Enable blank-space detection for overlay filling.
+        blank_detection_mode: Heuristic, LLM, or hybrid blank detection.
+        llm: Optional LLM adapter for blank detection.
+        model: Model used for LLM-assisted blank detection.
+        llm_kwargs: Extra LLM kwargs.
+        vision_dpi: Render DPI used by visual detection.
+        min_detection_confidence: Minimum confidence for visual blank detection.
+        skip_none: Skip ``None`` values from ``data``.
+        unmatched: Policy for unmatched fields.
+        overflow: Overflow policy for overlay filling.
+
+    Returns:
+        FillingResult: Planned or committed fill result.
+    """
     return await _fill_pdf_form(
         path,
         data,
@@ -106,7 +132,33 @@ def fill_pdf_form(
     unmatched: UnmatchedPolicy = "warn",
     overflow: OverflowPolicy = "shrink",
 ) -> FillingResult:
-    """Synchronously fill a PDF and return a FillingResult."""
+    """Synchronously fill a PDF and return a FillingResult.
+
+    Args:
+        path: Input PDF path.
+        data: Pydantic model instance or mapping used to fill the form.
+        output_path: Optional output PDF path. Defaults to a sibling ``filled`` file.
+        document_id: Optional document identifier.
+        review: If ``True``, prepare a fill without writing it yet.
+        strategy: Form filling strategy (``auto``, ``acroform``, ``overlay``).
+        match_by: How to match model fields to PDF fields.
+        field_map: Explicit field placements or AcroForm mapping.
+        formats: Optional field-format overrides.
+        flatten: Flatten AcroForm widgets after fill when supported.
+        detect_blank_spaces: Enable blank-space detection for overlay filling.
+        blank_detection_mode: Heuristic, LLM, or hybrid blank detection.
+        llm: Optional LLM adapter for blank detection.
+        model: Model used for LLM-assisted blank detection.
+        llm_kwargs: Extra LLM kwargs.
+        vision_dpi: Render DPI used by visual detection.
+        min_detection_confidence: Minimum confidence for visual blank detection.
+        skip_none: Skip ``None`` values from ``data``.
+        unmatched: Policy for unmatched fields.
+        overflow: Overflow policy for overlay filling.
+
+    Returns:
+        FillingResult: Planned or committed fill result.
+    """
     return run_sync(
         _fill_pdf_form(
             path,
@@ -288,8 +340,12 @@ async def _fill_pdf_form(
 async def commit_fill_async(result: FillingResult, *, force: bool = False) -> FillingResult:
     """Write an approved (reviewed) fill to its output PDF.
 
-    Use this after ``fill_pdf_form(..., review=True)`` and ``result.approve(...)``.
-    Pass ``force=True`` to write a still-pending result without approval.
+    Args:
+        result: Filling result to commit.
+        force: Write even if the result has not been approved yet.
+
+    Returns:
+        FillingResult: The same result marked as committed.
     """
     if result.committed:
         raise ValueError("This filling result has already been committed.")
@@ -310,7 +366,15 @@ async def commit_fill_async(result: FillingResult, *, force: bool = False) -> Fi
 
 
 def commit_fill(result: FillingResult, *, force: bool = False) -> FillingResult:
-    """Synchronous version of :func:`commit_fill_async`."""
+    """Synchronous version of :func:`commit_fill_async`.
+
+    Args:
+        result: Filling result to commit.
+        force: Write even if the result has not been approved yet.
+
+    Returns:
+        FillingResult: The same result marked as committed.
+    """
     return run_sync(commit_fill_async(result, force=force))
 
 
@@ -438,14 +502,20 @@ async def fill_docx_form_async(
 ) -> FillingResult:
     """Fill a DOCX form (content controls or Jinja2 template) and return a FillingResult.
 
-    Strategies:
-    - ``"auto"`` - inspect the file: content controls first, then template variables.
-    - ``"content_controls"`` - Word SDT form fields (text, checkbox, dropdown, date).
-    - ``"template"`` - Jinja2 ``{{ field }}`` placeholders rendered via docxtpl.
+    Args:
+        path: Input DOCX path.
+        data: Pydantic model instance or mapping used to fill the form.
+        output_path: Optional output DOCX path.
+        document_id: Optional document identifier.
+        review: If ``True``, prepare a fill without writing it yet.
+        strategy: DOCX fill strategy (``auto``, ``content_controls``, ``template``).
+        formats: Optional field-format overrides.
+        flatten: Flatten content controls after fill.
+        skip_none: Skip ``None`` values from ``data``.
+        unmatched: Policy for unmatched fields.
 
-    Pass ``review=True`` to defer the write: inspect, plan, and populate the result
-    without writing the output file.  Use :func:`commit_fill` after approving.
-    Pass ``flatten=True`` (content_controls only) to remove SDT wrappers after filling.
+    Returns:
+        FillingResult: Planned or committed fill result.
     """
     return await _fill_docx_form(
         path,
@@ -474,7 +544,23 @@ def fill_docx_form(
     skip_none: bool = True,
     unmatched: UnmatchedPolicy = "warn",
 ) -> FillingResult:
-    """Synchronous version of :func:`fill_docx_form_async`."""
+    """Synchronous version of :func:`fill_docx_form_async`.
+
+    Args:
+        path: Input DOCX path.
+        data: Pydantic model instance or mapping used to fill the form.
+        output_path: Optional output DOCX path.
+        document_id: Optional document identifier.
+        review: If ``True``, prepare a fill without writing it yet.
+        strategy: DOCX fill strategy (``auto``, ``content_controls``, ``template``).
+        formats: Optional field-format overrides.
+        flatten: Flatten content controls after fill.
+        skip_none: Skip ``None`` values from ``data``.
+        unmatched: Policy for unmatched fields.
+
+    Returns:
+        FillingResult: Planned or committed fill result.
+    """
     return run_sync(
         _fill_docx_form(
             path,

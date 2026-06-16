@@ -28,6 +28,8 @@ class FieldDifference(BaseModel):
 
 
 class ComparisonResult(BaseModel):
+    """Side-by-side comparison report for a schema across documents."""
+
     schema_name: str
     documents: list[str] = Field(default_factory=list)
     fields: dict[str, list[ComparisonCell]] = Field(default_factory=dict)
@@ -70,6 +72,18 @@ async def compare_documents(
     pipeline: Any,
     concurrency: int = 5,
 ) -> ComparisonResult:
+    """Extract the same schema from multiple documents and compare the results.
+
+    Args:
+        files: Document paths to process.
+        schema: Pydantic schema to extract from every file.
+        pipeline: Object exposing ``run(path, schema)``.
+        concurrency: Maximum number of concurrent extractions.
+
+    Returns:
+        ComparisonResult: Field-by-field comparison data and the original results.
+    """
+
     semaphore = asyncio.Semaphore(concurrency)
 
     async def _extract(path: str) -> ExtractionResult:
@@ -135,4 +149,16 @@ def compare_documents_sync(
     pipeline: Any,
     concurrency: int = 5,
 ) -> ComparisonResult:
+    """Synchronous wrapper for :func:`compare_documents`.
+
+    Args:
+        files: Document paths to process.
+        schema: Pydantic schema to extract from every file.
+        pipeline: Object exposing ``run(path, schema)``.
+        concurrency: Maximum number of concurrent extractions.
+
+    Returns:
+        ComparisonResult: Field-by-field comparison data and the original results.
+    """
+
     return run_sync(compare_documents(files, schema, pipeline, concurrency))

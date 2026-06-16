@@ -5,11 +5,23 @@
 
 #### DocuFlow turns unstructured documents into production-ready data. Unlike typical extraction tools that stop at raw JSON, DocuFlow adds evidence, consensus, verification, validation, and auditability so you can trust, review, and ship the result.
 
+
 ## Why DocuFlow?
 
 Most document extraction tools focus on one part of the problem: parsing a PDF, running OCR, or calling an LLM. In real workflows, that is rarely enough. Teams also need schemas, evidence, trust signals, validation, privacy controls, review steps, corrections, storage, and an audit trail they can rely on.
 
 DocuFlow is a workflow runtime for document extraction and PDF write-back. It combines parsers, OCR, LLMs, validation rules, review logic, consensus, verification, form filling, and deployment options into one reproducible pipeline, so document data can move from messy PDFs into production systems, and trusted data can be written back into forms, with traceability and control.
+
+## What It Can Process
+
+DocuFlow accepts these source types today:
+
+- PDF: `.pdf`
+- Images: `.png`, `.jpg`, `.jpeg`, `.tiff`, `.tif`, `.bmp`, `.gif`, `.webp`
+- Text-like files: `.txt`, `.md`, `.html`, `.htm`, `.csv`, `.json`, `.xml`
+- Office documents: `.docx`
+- Spreadsheets: `.xlsx`
+- Email: `.eml`
 
 ## Installation
 
@@ -50,11 +62,12 @@ print(result.fields["total"].evidence[0])   # page 0, bbox, source text
 
 ### Parsing
 - **7 parsers**: pdfplumber (native PDFs), Tesseract OCR (scanned docs), Docling (tables/layout), Smart (auto per-page), Azure Document Intelligence, AWS Textract, Google Document AI
-- **Permissive licensing throughout**: every dependency is MIT/BSD/Apache-2.0 — no copyleft (AGPL/GPL) anywhere in the tree
+- **Source-aware ingestion**: the default `parser="auto"` accepts PDFs, images, text/Markdown/HTML/CSV/JSON/XML/email files, and Docling-backed Office/spreadsheet documents while still normalizing everything to DocuFlow's `Document` model
+- **Commercial-use friendly licensing**: the core dependency set is MIT/BSD/Apache-2.0, and the only weak-copyleft optional package is `docxtpl` (LGPL-2.1-only) for DOCX Jinja2 template filling
 - Every parser produces blocks with bounding boxes for evidence grounding
 
 ### Extraction
-- **3 extraction types**: text (parser → LLM), vision (images → vision LLM), hybrid (both in parallel)
+- **4 extraction types**: text (parser or parserless text → LLM), vision (PDF/image pages → vision LLM), hybrid (both in parallel), and auto (escalate weak OCR to vision)
 - **Single or multi-agent**: multi mode runs N parallel LLM calls at varied temperatures with a decider
 - **Domain context**: tell the LLM your industry for better extraction
 - **JSON reliability**: JSON mode, concrete examples, auto-retry on parse failure

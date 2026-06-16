@@ -62,6 +62,26 @@ class TestGenerateDeployment:
             assert "serve" in content
             assert "llm" in content
 
+    def test_auto_parser_requirements_include_source_aware_deps(self, tmp_path):
+        config = {
+            "name": "auto-workflow",
+            "schema": {"total": {"type": "float"}},
+            "parser": "auto",
+            "model": "openai/gpt-4o",
+        }
+        path = tmp_path / "workflow.yaml"
+        path.write_text(yaml.dump(config), encoding="utf-8")
+
+        with tempfile.TemporaryDirectory() as out:
+            result = generate_deployment(path, out)
+            requirements = (result / "requirements.txt").read_text()
+            dockerfile = (result / "Dockerfile").read_text()
+
+        assert "pdf" in requirements
+        assert "ocr" in requirements
+        assert "docling" in requirements
+        assert "tesseract-ocr" in dockerfile
+
     def test_workflow_copied(self, workflow_yaml):
         with tempfile.TemporaryDirectory() as out:
             result = generate_deployment(workflow_yaml, out)

@@ -47,6 +47,9 @@ def _required_extras(config) -> tuple[set[str], bool]:
     parser = config.parser_type
     extraction = config.extraction_type
 
+    if parser == "auto":
+        extras.update({"pdf", "ocr", "docling"})
+        needs_tesseract = True
     if parser in ("pdfplumber", "smart") or extraction in ("vision", "hybrid", "auto"):
         extras.add("pdf")
     if parser in ("tesseract", "smart") or extraction in ("vision", "hybrid", "auto"):

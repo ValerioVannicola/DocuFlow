@@ -1,5 +1,6 @@
 ﻿from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel
@@ -7,12 +8,39 @@ from pydantic import BaseModel
 from docuflow._sync import run_sync
 from docuflow.constants import DEFAULT_DPI
 from docuflow.extraction.models import ExtractionResult
+from docuflow.ingestion.mime import SourceKind, detect_source_kind
 
 
 class DocumentPipeline:
+    """Configure and run DocuFlow extraction pipelines.
+
+    This is the main reusable user-facing pipeline object. It selects a parser,
+    applies optional privacy, validation, review, and verification steps, and
+    returns an :class:`~docuflow.extraction.models.ExtractionResult`.
+
+    Args:
+        parser: Parser selector, parser config dict, parser object, or ``"auto"``.
+        model: LLM model name passed to LiteLLM.
+        storage: Optional storage backend name, config, or instance.
+        validators: Optional validation rules.
+        review_rules: Optional review rules.
+        privacy: Optional privacy policy.
+        extraction_mode: ``"single"`` or ``"multi"``.
+        extraction_type: ``"text"``, ``"vision"``, ``"hybrid"``, or ``"auto"``.
+        n_instances: Number of parallel LLM candidates in multi mode.
+        temperatures: Optional candidate temperatures for multi mode.
+        vision_dpi: Render DPI used for vision-based steps.
+        context: Optional domain instructions injected into prompts.
+        escalation: Auto-escalation thresholds for ``extraction_type="auto"``.
+        verification: Zoom-and-verify thresholds.
+        schema_shards: Optional number of schema shards for wide schemas.
+        llm_kwargs: Extra LiteLLM keyword arguments.
+        normalize_output: Preserve source text by default or normalize values.
+    """
+
     def __init__(
         self,
-        parser: Any | str | dict | None = "pdfplumber",
+        parser: Any | str | dict | None = "auto",
         ocr: Any | str | None = None,
         model: str = "openai/gpt-4o",
         storage: Any | str | dict | None = None,
@@ -52,19 +80,19 @@ class DocumentPipeline:
 
         parser_type = self._parser
         if isinstance(self._parser, dict):
-            parser_type = self._parser.get("type", "pdfplumber")
+            parser_type = self._parser.get("type", "auto")
 
         if (
             self._extraction_type in ("vision", "hybrid")
             and parser_type is not None
             and isinstance(parser_type, str)
-            and parser_type != "none"
+            and parser_type not in ("none", "auto")
         ):
-                raise ValueError(
-                    f"extraction_type='{self._extraction_type}' cannot be used with a parser. "
-                    f"{self._extraction_type.title()} extraction reads the PDF directly. "
-                    "Set parser=None or parser='none'."
-                )
+            raise ValueError(
+                f"extraction_type='{self._extraction_type}' cannot be used with a parser. "
+                f"{self._extraction_type.title()} extraction reads the document directly. "
+                "Set parser=None, parser='none', or parser='auto'."
+            )
 
         if self._extraction_type in ("vision", "hybrid") and self._privacy is not None:
             raise ValueError(
@@ -84,6 +112,8 @@ class DocumentPipeline:
         return self._parser
 
     def _resolve_parser_from_str(self, name: str) -> Any:
+        if name == "auto":
+            return "auto"
         if name == "pdfplumber":
             from docuflow.parsing.pdfplumber_parser import PdfplumberParser
             return PdfplumberParser()
@@ -108,7 +138,10 @@ class DocumentPipeline:
         raise ValueError(f"Unknown parser: {name!r}")
 
     def _resolve_parser_from_dict(self, cfg: dict) -> Any:
-        parser_type = cfg.get("type", "pdfplumber")
+        parser_type = cfg.get("type", "auto")
+
+        if parser_type == "auto":
+            return "auto"
 
         if parser_type == "pdfplumber":
             from docuflow.parsing.pdfplumber_parser import PdfplumberParser
@@ -173,6 +206,61 @@ class DocumentPipeline:
 
         raise ValueError(f"Unknown parser type: {parser_type!r}")
 
+    def _default_parser_for_source(self, source_kind: SourceKind, *, auto_mode: bool = False) -> Any:
+        if source_kind in ("text", "email"):
+            return None
+        if source_kind == "image":
+            from docuflow.parsing.tesseract_parser import TesseractParser
+
+            return TesseractParser()
+        if source_kind == "pdf":
+            if auto_mode:
+                from docuflow.parsing.smart_parser import SmartParser
+
+                return SmartParser()
+            from docuflow.parsing.pdfplumber_parser import PdfplumberParser
+
+            return PdfplumberParser()
+        if source_kind in ("office", "spreadsheet"):
+            from docuflow.parsing.docling_parser import DoclingParser
+
+            return DoclingParser()
+        raise ValueError(f"No default parser for source kind: {source_kind!r}")
+
+    def _resolve_parser_for_source(self, source_kind: SourceKind, *, auto_mode: bool = False) -> Any:
+        if self._parser is None or self._parser == "none":
+            return None
+
+        if isinstance(self._parser, dict):
+            parser_type = self._parser.get("type", "auto")
+            if parser_type == "auto":
+                return self._default_parser_for_source(source_kind, auto_mode=auto_mode)
+            return self._resolve_parser_from_dict(self._parser)
+
+        if isinstance(self._parser, str):
+            if self._parser == "auto":
+                return self._default_parser_for_source(source_kind, auto_mode=auto_mode)
+            return self._resolve_parser_from_str(self._parser)
+
+        return self._parser
+
+    def _validate_parserless_source(self, source_kind: SourceKind) -> None:
+        if self._extraction_type in ("vision", "hybrid"):
+            if source_kind not in ("pdf", "image"):
+                raise ValueError(
+                    f"extraction_type='{self._extraction_type}' with parser=None supports "
+                    "PDF and image inputs. Use extraction_type='text' for text-like files, "
+                    "or parser='auto' for parser-backed formats."
+                )
+            return
+
+        if source_kind not in ("text", "email"):
+            raise ValueError(
+                "parser=None with text extraction is only supported for text-like inputs. "
+                "Use parser='auto' to select an appropriate parser, or use "
+                "extraction_type='vision' for PDF/image inputs."
+            )
+
     def _resolve_llm(self) -> Any:
         from docuflow.extraction.llm.litellm_adapter import LiteLLMAdapter
 
@@ -212,6 +300,17 @@ class DocumentPipeline:
         schema: type[BaseModel],
         **kwargs: Any,
     ) -> ExtractionResult:
+        """Run the configured pipeline on one document.
+
+        Args:
+            path: Input document path.
+            schema: Pydantic schema used to validate the extraction.
+            **kwargs: Extra metadata forwarded into the pipeline state.
+
+        Returns:
+            ExtractionResult: Final extraction result for the document.
+        """
+
         from docuflow.workflow.pipeline import Pipeline
         from docuflow.workflow.steps import (
             Extract,
@@ -226,10 +325,16 @@ class DocumentPipeline:
 
         llm = self._resolve_llm()
         storage = self._resolve_storage()
+        source_kind = detect_source_kind(Path(path))
 
         steps: list = [Ingest(path=path)]
 
         if self._extraction_type == "vision":
+            if source_kind not in ("pdf", "image"):
+                raise ValueError(
+                    "Vision extraction currently supports PDF and image inputs. "
+                    "Use extraction_type='text' with parser='auto' for text and office files."
+                )
             if self._privacy:
                 from docuflow.workflow.steps import Anonymize
 
@@ -246,6 +351,11 @@ class DocumentPipeline:
                 )
             )
         elif self._extraction_type == "hybrid":
+            if source_kind not in ("pdf", "image"):
+                raise ValueError(
+                    "Hybrid extraction currently supports PDF and image inputs. "
+                    "Use extraction_type='text' with parser='auto' for text and office files."
+                )
             if self._privacy:
                 from docuflow.workflow.steps import Anonymize
 
@@ -263,45 +373,55 @@ class DocumentPipeline:
         elif self._extraction_type == "auto":
             from docuflow.extraction.escalation import EscalationPolicy
 
-            # Auto mode needs an OCR-capable parser to judge OCR quality;
-            # upgrade the bare default to the smart parser.
-            parser_cfg = self._parser
-            if parser_cfg in (None, "none", "pdfplumber"):
-                parser_cfg = "smart"
-            if isinstance(parser_cfg, dict):
-                parser = self._resolve_parser_from_dict(parser_cfg)
-            elif isinstance(parser_cfg, str):
-                parser = self._resolve_parser_from_str(parser_cfg)
+            parser = self._resolve_parser_for_source(source_kind, auto_mode=True)
+            if parser is None and self._parser in (None, "none"):
+                self._validate_parserless_source(source_kind)
+            if parser is not None:
+                steps.append(Parse(parser=parser))
+            if self._privacy:
+                from docuflow.workflow.steps import Anonymize
+
+                steps.append(Anonymize(policy=self._privacy))
+
+            if parser is None:
+                steps.append(
+                    Extract(
+                        schema=schema, llm=llm,
+                        mode=self._extraction_mode,
+                        n_instances=self._n_instances,
+                        temperatures=self._temperatures,
+                        context=self._context,
+                        schema_shards=self._schema_shards,
+                        normalize_output=self._normalize_output,
+                    )
+                )
             else:
-                parser = parser_cfg
-            steps.append(Parse(parser=parser))
+                steps.append(
+                    ExtractAuto(
+                        schema=schema, llm=llm,
+                        mode=self._extraction_mode,
+                        n_instances=self._n_instances,
+                        temperatures=self._temperatures,
+                        dpi=self._vision_dpi,
+                        context=self._context,
+                        policy=EscalationPolicy(**(self._escalation or {})),
+                        # Vision sends raw page images to the LLM, bypassing
+                        # anonymization — never escalate when privacy is on.
+                        allow_escalation=self._privacy is None and source_kind in ("pdf", "image"),
+                        normalize_output=self._normalize_output,
+                    )
+                )
+        else:
+            parser = self._resolve_parser_for_source(source_kind)
+            if parser is None and self._parser in (None, "none"):
+                self._validate_parserless_source(source_kind)
+            if parser is not None:
+                steps.append(Parse(parser=parser))
             if self._privacy:
                 from docuflow.workflow.steps import Anonymize
 
                 steps.append(Anonymize(policy=self._privacy))
             steps.append(
-                ExtractAuto(
-                    schema=schema, llm=llm,
-                    mode=self._extraction_mode,
-                    n_instances=self._n_instances,
-                    temperatures=self._temperatures,
-                    dpi=self._vision_dpi,
-                    context=self._context,
-                    policy=EscalationPolicy(**(self._escalation or {})),
-                    # Vision sends raw page images to the LLM, bypassing
-                    # anonymization — never escalate when privacy is on.
-                    allow_escalation=self._privacy is None,
-                    normalize_output=self._normalize_output,
-                )
-            )
-        else:
-            parser = self._resolve_parser()
-            steps.append(Parse(parser=parser))
-            if self._privacy:
-                from docuflow.workflow.steps import Anonymize
-
-                steps.append(Anonymize(policy=self._privacy))
-                steps.append(
                 Extract(
                     schema=schema, llm=llm,
                     mode=self._extraction_mode,
@@ -358,6 +478,8 @@ class DocumentPipeline:
         schema: type[BaseModel],
         **kwargs: Any,
     ) -> ExtractionResult:
+        """Synchronous wrapper for :meth:`run`."""
+
         return run_sync(self.run(path, schema, **kwargs))
 
     def export(

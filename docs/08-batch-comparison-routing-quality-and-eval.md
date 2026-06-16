@@ -592,7 +592,7 @@ Options:
 | --- | --- | --- |
 | `--schema`, `-s` | Required | Template name or dotted Python path. |
 | `--model`, `-m` | `"openai/gpt-4o"` | Extraction model. |
-| `--parser`, `-p` | `"pdfplumber"` | Parser string. |
+| `--parser`, `-p` | `"auto"` | Parser string. `"auto"` selects from the input type. |
 | `--output`, `-o` | `None` | CSV output file. |
 | `--pattern` | `"**/*.pdf"` | File glob pattern. |
 | `--concurrency`, `-c` | `5` | Concurrent extractions. |
