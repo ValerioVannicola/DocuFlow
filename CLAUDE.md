@@ -516,8 +516,9 @@ The `FillForm` pipeline step takes `review=True` too. MCP exposes `get_pending_f
 
 ### DOCX Form Filling
 
-`fill_docx_form` fills `.docx` and `.doc` files and reuses the same `FillingResult`,
-review/approval, `edit_field`, and `commit_fill` surface as PDF filling.
+`fill_docx_form` fills `.docx` files by writing into native Word content controls,
+reusing the same `FillingResult`, review/approval, `edit_field`, and `commit_fill`
+surface as PDF filling.
 
 ```python
 from docuflow import fill_docx_form
@@ -527,30 +528,28 @@ result = fill_docx_form(
     "blank-form.docx",
     data=form_data,              # Pydantic instance or mapping
     output_path="filled-form.docx",
-    strategy="auto",             # "auto" | "content_controls" | "template"
+    strategy="auto",             # "auto" | "content_controls"
     review=False,
 )
 ```
 
-Two write strategies:
+Write strategy:
 
 | Strategy | When to use |
 |----------|-------------|
 | `"content_controls"` | Word has native form fields (`w:sdt` SDT elements — dropdowns, checkboxes, date pickers, plain-text controls). Auto-detected. |
-| `"template"` | DOCX is a Jinja2 template with `{{ variable }}` placeholders. Rendered via docxtpl. Auto-detected. |
-| `"auto"` | Inspects for SDT elements first; if found uses `content_controls`. Otherwise inspects for `{{ }}` vars and uses `template`. |
+| `"auto"` | Inspects for SDT elements and fills them via `content_controls`. |
 
 ```bash
-pip install docuflow[forms]   # includes python-docx and docxtpl
+pip install docuflow[forms]   # includes python-docx
 ```
 
-Lower-level inspect helpers:
+Lower-level inspect helper:
 
 ```python
-from docuflow.filling import inspect_content_controls, inspect_template_vars
+from docuflow.filling import inspect_content_controls
 
 fields = inspect_content_controls("form.docx")  # list[FormField]
-vars   = inspect_template_vars("template.docx") # list[str]  — variable names only
 ```
 
 The review/approval workflow, `edit_field`, `preview_fill`, and `commit_fill` all work
@@ -809,7 +808,7 @@ from docuflow import fill_pdf_form, fill_docx_form, commit_fill, preview_fill
 from docuflow.filling import (
     FillingResult, FilledField, FieldPlacement, FormField, FillCorrection,
     commit_fill, commit_fill_async, preview_fill, preview_fill_async, evaluate_fill_review,
-    inspect_content_controls, inspect_template_vars,
+    inspect_content_controls,
 )
 from docuflow.splitting import DocumentSection, SplitResult, SectionResult
 from docuflow.workflow_config import load_workflow_config, run_workflow, WorkflowConfig

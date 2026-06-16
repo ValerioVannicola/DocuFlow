@@ -79,6 +79,9 @@ def write_overlay(
         page_height = float(page.mediabox.top) - float(page.mediabox.bottom)
         page_sizes.append((page_width, page_height))
         overlay_fields = by_page.get(page_number, [])
+        # Attach the page to the writer before merging. Merging onto a page that
+        # is not yet owned by a writer is deprecated in pypdf and removed in v7.
+        writer.add_page(page)
         if overlay_fields:
             packet = io.BytesIO()
             canvas = canvas_cls(packet, pagesize=(page_width, page_height))
@@ -113,8 +116,7 @@ def write_overlay(
             canvas.save()
             packet.seek(0)
             overlay_pdf = pdf_reader_cls(packet)
-            page.merge_page(overlay_pdf.pages[0])
-        writer.add_page(page)
+            writer.pages[-1].merge_page(overlay_pdf.pages[0])
 
     if not by_page:
         warnings.append("No overlay placements were available; output PDF was not modified.")
@@ -305,7 +307,10 @@ def _draw_continuation_page(
     remaining: list[str] = []
     for i, line in enumerate(lines):
         y = y_top - i * line_height
-        if y < y_min:
+        # Always render at least the first line, even if the page is too short
+        # to hold it. Otherwise a single oversized line would be returned
+        # unchanged and the caller's append-page loop would never terminate.
+        if y < y_min and i > 0:
             remaining = lines[i:]
             break
         canvas.drawString(placement.bbox.x0, y, line)

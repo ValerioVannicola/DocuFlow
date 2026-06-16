@@ -45,8 +45,12 @@ result.warnings         # non-fatal issues (e.g. a malformed annotation)
 result.errors           # fatal errors (file not found, missing dependency)
 ```
 
-Dispatches automatically on file extension: `.docx` / `.doc` → DOCX extractor;
-everything else → PDF extractor.
+Dispatches automatically on file extension: `.docx` → DOCX extractor;
+everything else → PDF extractor. Legacy `.doc` (binary Word) is not supported
+and returns a result with an error explaining to convert to `.docx` or PDF.
+
+`extract_metadata_async` runs the blocking extractor in a worker thread, so it is
+safe to call from an event loop without stalling it.
 
 ## `DocumentMetadataResult`
 

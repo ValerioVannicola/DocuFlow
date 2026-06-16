@@ -732,6 +732,75 @@ def test_write_overlay_appends_pages_on_overflow(tmp_path) -> None:
     assert any("appended" in w for w in filled_field.warnings)
 
 
+def test_draw_continuation_page_always_makes_progress() -> None:
+    """A continuation page too short for even one line must still consume a line.
+
+    Otherwise the same line list is returned unchanged and write_overlay's
+    ``while remaining_lines:`` loop appends pages forever.
+    """
+    pytest.importorskip("reportlab")
+
+    from reportlab.pdfgen import canvas as canvas_mod
+
+    from docuflow.documents.models import BoundingBox
+    from docuflow.filling.models import FieldPlacement, FilledField
+    from docuflow.filling.writer import _draw_continuation_page
+
+    placement = FieldPlacement(
+        bbox=BoundingBox(x0=10, y0=10, x1=190, y1=40),
+        font_size=10,
+        multiline=True,
+    )
+    filled_field = FilledField(field_name="notes", value="x", formatted_value="x")
+    lines = ["line one", "line two", "line three"]
+
+    # page_height far smaller than the top margin (font_size * 2) so y < y_min
+    # for the very first line — the unguarded version would return lines unchanged.
+    canvas = canvas_mod.Canvas(io.BytesIO(), pagesize=(200, 5))
+    remaining = _draw_continuation_page(
+        canvas, lines, placement, 5, filled_field, field_name="notes"
+    )
+
+    assert len(remaining) < len(lines), "Continuation page must consume at least one line"
+
+
+def test_write_overlay_terminates_with_oversized_lines(tmp_path) -> None:
+    """overflow='page' on a page too short for a single wrapped line must finish."""
+    pytest.importorskip("pypdf")
+
+    from docuflow.documents.models import BoundingBox
+    from docuflow.filling.models import FieldPlacement, FilledField, FillPlan
+    from docuflow.filling.writer import write_overlay
+
+    src = tmp_path / "src.pdf"
+    dst = tmp_path / "dst.pdf"
+    # Extremely short page: continuation pages cannot fit a full line either.
+    _make_single_page_pdf(src, page_width=200, page_height=30)
+
+    placement = FieldPlacement(
+        bbox=BoundingBox(x0=10, y0=5, x1=190, y1=25),
+        font_size=10,
+        multiline=True,
+    )
+    long_value = " ".join([f"word{i}" for i in range(40)])
+    filled_field = FilledField(
+        field_name="notes", value=long_value, formatted_value=long_value
+    )
+    plan = FillPlan(
+        strategy="overlay",
+        fields={"notes": filled_field},
+        placements={"notes": placement},
+    )
+
+    # Must return rather than loop forever appending pages.
+    write_overlay(src, dst, plan, overflow="page")
+
+    from pypdf import PdfReader
+
+    reader = PdfReader(str(dst))
+    assert reader.get_num_pages() >= 2
+
+
 def test_write_overlay_raises_on_single_line_error_overflow(tmp_path) -> None:
     """overflow='error' must also protect non-multiline placements."""
     pytest.importorskip("pypdf")

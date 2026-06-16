@@ -516,22 +516,18 @@ The `FillForm` pipeline step takes `review=True` too. MCP exposes `get_pending_f
 
 ### DOCX Form Filling (opt-in)
 
-`fill_docx_form` fills Word documents. Two strategies: `"content_controls"` (Word SDT
-fields) and `"template"` (Jinja2 `{{ }}` via docxtpl). `"auto"` picks the right one.
+`fill_docx_form` fills Word documents by writing into native content controls
+(`"content_controls"`, Word SDT fields). `"auto"` detects and uses them.
 
 ```python
 from docuflow import fill_docx_form, commit_fill
-from docuflow.filling import inspect_content_controls, inspect_template_vars
+from docuflow.filling import inspect_content_controls
 
-# content_controls strategy
+# content_controls strategy (auto-detected)
 result = fill_docx_form("form.docx", data, output_path="filled.docx")
-
-# template strategy
-result = fill_docx_form("template.docx", data, strategy="template")
 
 # discover what fields exist
 controls = inspect_content_controls("form.docx")   # list[FormField]
-vars_    = inspect_template_vars("template.docx")  # list[str]
 ```
 
 The same `review=True` / `edit_field` / `approve` / `commit_fill` workflow applies.
@@ -768,7 +764,7 @@ from docuflow import fill_pdf_form, fill_docx_form, commit_fill, preview_fill
 from docuflow.filling import (
     FillingResult, FilledField, FieldPlacement, FormField, FillCorrection,
     commit_fill, commit_fill_async, preview_fill, preview_fill_async, evaluate_fill_review,
-    fill_docx_form, fill_docx_form_async, inspect_content_controls, inspect_template_vars,
+    fill_docx_form, fill_docx_form_async, inspect_content_controls,
 )
 from docuflow.splitting import split_document, split_document_async, DocumentSection, SplitResult
 from docuflow.metadata import extract_metadata, extract_metadata_async, DocumentMetadataResult, Comment, Highlight, Hyperlink, Signature, Revision

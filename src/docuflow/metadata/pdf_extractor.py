@@ -85,6 +85,29 @@ def _str(val: Any) -> str:
         return ""
 
 
+def _resolve(val: Any) -> Any:
+    """Resolve an indirect PDF object reference to the underlying object."""
+    if val is not None and hasattr(val, "get_object"):
+        return val.get_object()
+    return val
+
+
+def _get_inherited(annot: Any, key: str) -> Any:
+    """Look up a key on the annotation, falling back to its parent field.
+
+    Widget annotations are often merged with their field dictionary, but for
+    separate field/widget pairs attributes like /FT, /T, and /V live on the
+    /Parent field, not the widget annotation itself.
+    """
+    val = annot.get(key)
+    if val is not None:
+        return val
+    parent = _resolve(annot.get("/Parent"))
+    if parent is not None:
+        return parent.get(key)
+    return None
+
+
 def _process_annotation(
     annot: Any,
     page_num: int,
@@ -134,19 +157,18 @@ def _process_annotation(
         ))
 
     elif subtype == _WIDGET_SUBTYPE:
-        field_type = _str(annot.get("/FT")).lstrip("/")
+        field_type = _str(_get_inherited(annot, "/FT")).lstrip("/")
         if field_type == "Sig":
-            sig_value = annot.get("/V")
+            sig_value = _resolve(_get_inherited(annot, "/V"))
             signed = sig_value is not None
             signer = ""
             date = ""
-            if signed and hasattr(sig_value, "get_object"):
-                sig_obj = sig_value.get_object()
-                signer = _str(sig_obj.get("/Name"))
-                date = _str(sig_obj.get("/M"))
+            if signed and hasattr(sig_value, "get"):
+                signer = _str(sig_value.get("/Name"))
+                date = _str(sig_value.get("/M"))
             result.signatures.append(Signature(
                 page_number=page_num,
-                field_name=_str(annot.get("/T")),
+                field_name=_str(_get_inherited(annot, "/T")),
                 signer=signer,
                 date=date,
                 signed=signed,
