@@ -19,10 +19,45 @@ def attach_evidence(
     matched words, and `rects` carries one rectangle per line — including
     spans that cross line or page boundaries. Falls back to a page-level
     match (no bbox), then to the LLM-reported page.
+
+    Composite values (lists and nested objects) are decomposed into their leaf
+    strings, and each leaf is grounded independently — so a ``List[str]`` or a
+    ``List[SomeModel]`` field gets one box per locatable item instead of a
+    single unsearchable Python ``repr`` (e.g. ``"[{'code': ...}]"``).
     """
     hint_page = evidence_hints.get("page", 0) if evidence_hints else 0
-    text_snippet = evidence_hints.get("text", "") if evidence_hints else ""
+    hint_text = evidence_hints.get("text", "") if evidence_hints else ""
 
+    # Composite values: ground each leaf string separately so list/nested-object
+    # fields produce one box per locatable piece. Falls through to the scalar
+    # path below when nothing could be located.
+    if isinstance(extracted_value, (list, tuple, dict)):
+        evidences: list[Evidence] = []
+        seen: set[str] = set()
+        for target in _leaf_strings(extracted_value):
+            if target in seen:
+                continue
+            seen.add(target)
+            spans = locate_text(document, target, hint_page=hint_page, stream=stream)
+            if not spans:
+                continue
+            span = spans[0]
+            if span.bbox is None and not span.rects:
+                continue
+            evidences.append(Evidence(
+                document_id=document.id,
+                page_number=span.page_number,
+                text=target,
+                bbox=span.bbox,
+                rects=span.rects,
+                block_id=span.block_ids[0] if span.block_ids else None,
+                confidence=span.confidence,
+            ))
+        if evidences:
+            return evidences
+        # Nothing located: fall back to the hint text / page below.
+
+    text_snippet = hint_text
     if not text_snippet and extracted_value is not None:
         text_snippet = str(extracted_value)
 
@@ -78,3 +113,30 @@ def attach_evidence(
             text=text_snippet,
         )
     ]
+
+
+def _leaf_strings(value: object) -> list[str]:
+    """Flatten a value into its locatable leaf strings, in document-ish order.
+
+    Lists/tuples/sets are expanded element-wise; dicts (nested Pydantic objects
+    dumped to plain data) contribute their values. Booleans and ``None`` are
+    skipped — ``"True"``/``"False"`` are not text that appears in the document.
+    """
+    out: list[str] = []
+
+    def walk(v: object) -> None:
+        if v is None or isinstance(v, bool):
+            return
+        if isinstance(v, dict):
+            for sub in v.values():
+                walk(sub)
+        elif isinstance(v, (list, tuple, set)):
+            for sub in v:
+                walk(sub)
+        else:
+            s = str(v).strip()
+            if s:
+                out.append(s)
+
+    walk(value)
+    return out
