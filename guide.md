@@ -21,6 +21,7 @@
 3. [Quick Start](#3-quick-start)
 4. [Core Concepts](#4-core-concepts)
 5. [Defining Schemas](#5-defining-schemas)
+5b. [The Levels of "auto"](#5b-the-levels-of-auto)
 6. [Parsers](#6-parsers)
 6b. [Structured Tables](#6b-structured-tables)
 7. [Extraction Engines](#7-extraction-engines)
@@ -728,13 +729,90 @@ This is useful when you have a new document type and want a quick starting point
 
 ---
 
+## 5b. The Levels of "auto"
+
+DocuFlow has three different "auto" mechanisms, and they are easy to confuse because they all promise the same thing — "I'll figure it out for you." But they act at **different stages of the pipeline**, decide **different questions**, and read **different signals**. Knowing the split is the difference between "it just works" and "why did it miss the scanned page?"
+
+| Level | Knob | Question it answers | Decision unit | Signal it reads | When it runs |
+|---|---|---|---|---|---|
+| **1. Parser selection** | `parser="auto"` *(default)* | *Which parser* reads the file? | Whole document | File type (`source_kind`) | Before parsing |
+| **2. Per-page reading** | `parser="smart"` | *How is each page read* — native text or OCR? | A single page | Does the page have a usable text layer? | During parsing |
+| **3. Extraction escalation** | `extraction_type="auto"` | *Which modality extracts* — text or vision? | Whole document | Measured OCR confidence, after parsing | After parsing, before the LLM |
+
+They are **independent** and **stack**: Level 1 chooses a parser, Level 2 can be that parser's internal per-page strategy, and Level 3 sits above both and may throw the parsed text away in favour of vision. You can use any one without the others.
+
+### Level 1 — `parser="auto"`: pick a parser by *file type*
+
+The default. It looks at the document's `source_kind` **once** and routes the whole file to one parser. It does **not** look at content quality.
+
+| Source | Parser chosen |
+|---|---|
+| PDF | `pdfplumber` (native text layer) — but see the nuance below |
+| Image (`png`, `jpg`, `tiff`, …) | `tesseract` (OCR) |
+| Office / spreadsheet (`docx`, `xlsx`) | `docling` |
+| Text-like (`txt`, `md`, `html`, `csv`, `json`, `xml`, `eml`) | none — ingestion already produced usable text |
+
+Because it routes purely by type, for PDFs it assumes a real text layer exists. A **scanned PDF** (images, no text layer) parses to near-empty text and `parser="auto"` alone will not catch that — Levels 2 and 3 exist precisely for that case.
+
+> **Nuance:** when you combine `parser="auto"` with `extraction_type="auto"`, the auto-parser *upgrades* its PDF choice from `pdfplumber` to the **smart** parser automatically (the `auto_mode` path). So `parser="auto", extraction_type="auto"` already gives you per-page reading for PDFs without naming `smart` yourself.
+
+### Level 2 — `parser="smart"`: pick native-vs-OCR *per page*
+
+`SmartParser` works **inside** a single PDF. It goes page by page: a page with a usable native text layer is read directly (fast, free); a page that fails that test falls back to Tesseract OCR. One file can therefore come back as a *mix* of native and OCR'd pages.
+
+A page triggers OCR when its text is shorter than `min_text_length` (default 20 chars), it has no text blocks, it has embedded images but little text, or more than ~10% of its characters are garbled. This is what makes **part-digital, part-scanned** PDFs work — the exact case `parser="auto"` misses.
+
+### Level 3 — `extraction_type="auto"`: escalate text → vision on *poor quality*
+
+This is **not a parser**. It runs after parsing and decides whether the *text that came out* is trustworthy enough to extract from, or whether the document should be re-read by a **vision LLM** instead. The signal is measured, not guessed: it reads the OCR confidence produced during parsing.
+
+It escalates to vision (or hybrid) when:
+- there is almost no text at all — below `min_chars_per_page` (default 20) per page — *this is what catches scanned PDFs*, or
+- mean OCR confidence is below `min_ocr_score` (default 0.6), or
+- more than `max_low_confidence_ratio` of words are low-confidence (default 40%).
+
+Otherwise it stays on the cheap text path. The choice and its reason are recorded on the result (`result.escalated`, `result.escalation_reason`). See [Auto Extraction](#auto-extraction-extraction_typeauto) for the full details, thresholds, and the privacy interaction.
+
+### How they compose
+
+The "I don't know what these documents look like" combo:
+
+```python
+DocumentPipeline(parser="smart", extraction_type="auto")
+```
+
+Walking the levels for one PDF:
+
+```
+Level 1  parser picks how to read the file        → smart (per-page)
+Level 2  each page: native text or OCR fallback    → mix as needed
+Level 3  is the resulting text trustworthy?         → if not, re-read with vision
+```
+
+Each level only engages the more expensive option when the cheaper one is insufficient: native text is free, OCR is cheap and per-page, vision is the last resort and only for documents whose text came out unusable.
+
+### `parser="auto"` vs `parser="smart"` — the common confusion
+
+They overlap on the easy cases (a clean native PDF → both read the text layer; a pure image → both OCR it) and **diverge on mixed PDFs**:
+
+| | `parser="auto"` | `parser="smart"` |
+|---|---|---|
+| Decision unit | whole document | individual page |
+| Based on | file type | actual page content |
+| Scanned page *inside* a native PDF | ❌ sent to pdfplumber, comes back empty | ✅ that page is OCR'd |
+| Emits OCR confidence | only when it picked tesseract (images) | yes, for every page it OCR'd |
+
+Rule of thumb: `parser="auto"` is "pick the obvious tool for this file type"; `parser="smart"` is "this is a PDF and I'm not sure every page has text, so check each one." If your PDFs might be partly scanned, prefer `smart` — and because `smart` emits per-page OCR confidence, it is also the parser that feeds Level 3's escalation decision.
+
+---
+
 ## 6. Parsers
 
 Parsers convert raw documents into structured `Document` objects with pages, blocks, bounding boxes, and text. DocuFlow includes 4 local parsers and 3 cloud OCR parsers — all producing the same standardized output, so everything downstream (evidence, confidence, search) works identically regardless of which one you pick.
 
-The default `parser="auto"` is source-aware:
+The default `parser="auto"` is source-aware — it picks a parser by file type. This is **Level 1** of the three "auto" mechanisms; see [The Levels of "auto"](#5b-the-levels-of-auto) for how it relates to the `smart` parser and `extraction_type="auto"`.
 
-- PDF inputs use native PDF parsing for text extraction, or Smart parsing in auto-escalation workflows.
+- PDF inputs use native PDF parsing (`pdfplumber`) for text extraction, or the **smart** parser in auto-escalation workflows (`extraction_type="auto"`).
 - Image inputs use Tesseract OCR for text extraction, or are rendered directly for vision/hybrid extraction.
 - Text-like inputs (`txt`, `md`, `html`, `csv`, `json`, `xml`, `eml`) are normalized by ingestion into a one-page parsed `Document`, so no parser is needed.
 - Office and spreadsheet inputs route to Docling when that extra is installed.
@@ -794,7 +872,7 @@ pipeline = DocumentPipeline(parser="docling")
 
 ### SmartParser (`"smart"`)
 
-Automatically picks the best approach per page. First tries native text extraction (pdfplumber). For pages where that fails (scanned, sparse, garbled), falls back to Tesseract OCR.
+**Level 2** of the "auto" mechanisms (see [The Levels of "auto"](#5b-the-levels-of-auto)): unlike `parser="auto"`, which picks one parser for the whole file by type, `smart` decides per page. It first tries native text extraction (pdfplumber); for pages where that fails (scanned, sparse, garbled), it falls back to Tesseract OCR.
 
 ```python
 pipeline = DocumentPipeline(parser="smart")
@@ -996,7 +1074,7 @@ After parsing, the extraction engine sends the document content to an LLM and ge
 
 ### Extraction Types
 
-DocuFlow has 3 extraction types, each using a different approach to read the document.
+DocuFlow has 4 extraction types: `text`, `vision`, and `hybrid` each use a fixed approach to read the document, while `auto` adaptively escalates from text to vision based on measured OCR quality (it is Level 3 of [The Levels of "auto"](#5b-the-levels-of-auto)).
 
 ### Choosing the right PDF strategy
 
@@ -1086,6 +1164,11 @@ How it works:
 The decider can actually look at the document to break ties — it's not just a majority vote.
 
 #### Auto Extraction (`extraction_type="auto"`)
+
+**Level 3** of the "auto" mechanisms (see [The Levels of "auto"](#5b-the-levels-of-auto)).
+Unlike `parser="auto"` (which picks a parser by file type) and `parser="smart"` (which
+picks native-vs-OCR per page), this operates *after* parsing and decides the extraction
+**modality**: keep the cheap text path, or re-read the document with a vision LLM.
 
 Text extraction with **automatic vision escalation** — for document streams where most
 files are fine but some are extremely unstructured (handwriting, stamps, crumpled photos,

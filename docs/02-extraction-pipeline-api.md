@@ -161,6 +161,12 @@ the standard DocuFlow `Document` model.
 | Text-like (`txt`, `md`, `html`, `csv`, `json`, `xml`, `eml`) | Ingestion builds a one-page parsed `Document`; no parser is required. |
 | Office/spreadsheet (`docx`, `xlsx`) | `parser="auto"` routes to Docling. Install `docuflow[docling]`. |
 
+There are three distinct "auto" mechanisms, acting at different stages: `parser="auto"`
+(picks a parser by file type), `parser="smart"` (picks native-vs-OCR per page within a PDF),
+and `extraction_type="auto"` (escalates text → vision on poor measured OCR quality after
+parsing). They are independent and compose. See the guide's "The Levels of 'auto'" for the
+full breakdown and how `parser="auto"` upgrades PDFs to `smart` when `extraction_type="auto"`.
+
 ### Parser Options
 
 String values:

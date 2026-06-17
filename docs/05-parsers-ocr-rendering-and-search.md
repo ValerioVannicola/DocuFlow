@@ -44,6 +44,22 @@ Text-like inputs (`txt`, `md`, `html`, `csv`, `json`, `xml`, `eml`) are normaliz
 ingestion into a one-page `Document` with `status="parsed"`, so no parser is required for
 text extraction. Image inputs can be rendered as one-page documents for vision or OCR.
 
+### `"auto"` vs `"smart"` — two different "auto" levels
+
+These are not the same mechanism and decide at different granularities:
+
+- **`"auto"`** picks *one parser for the whole file* by type (image → tesseract, PDF →
+  pdfplumber, Office → docling, text → none). It never inspects content, so a scanned page
+  inside an otherwise-native PDF is sent to pdfplumber and comes back empty.
+- **`"smart"`** decides *per page within a PDF*: native text layer where present, Tesseract
+  OCR fallback where not. This is what handles part-digital/part-scanned PDFs.
+
+A third "auto" lives one layer up: `extraction_type="auto"` escalates from text to a vision
+LLM based on measured OCR confidence after parsing (see
+`docs/02-extraction-pipeline-api.md` and the guide's "The Levels of 'auto'"). Note the
+interaction: `parser="auto"` combined with `extraction_type="auto"` upgrades its PDF choice
+from `pdfplumber` to `smart` automatically (`auto_mode`).
+
 ## Parser Config Dicts
 
 ```python
