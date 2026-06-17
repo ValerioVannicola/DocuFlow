@@ -39,7 +39,8 @@ async def extract_document(
         context: Domain context for the LLM (e.g. "You work in insurance")
 
     Returns:
-        JSON with extracted data, per-field evidence, trust scores, and confidence
+        JSON with extracted data, per-field evidence, trust gates, OCR confidence
+        score, and consensus score
     """
     from docuflow.cli.utils import load_schema
     from docuflow.processor import DocumentPipeline
@@ -174,7 +175,7 @@ async def process_batch(
         concurrency: Max parallel extractions
 
     Returns:
-        JSON with total/succeeded/failed counts, average confidence,
+        JSON with total/succeeded/failed counts, legacy average trust-gate rate,
         top review reasons, and per-document results
     """
     from pathlib import Path

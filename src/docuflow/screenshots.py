@@ -1,25 +1,20 @@
 ﻿from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from docuflow._sync import run_sync
 from docuflow.constants import DEFAULT_DPI
 
-if TYPE_CHECKING:
-    pass
-
 
 class PageScreenshot(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     page_number: int
     width: int = 0
     height: int = 0
     file_path: str = ""
-
-    class Config:
-        arbitrary_types_allowed = True
 
 
 async def screenshot_pages(

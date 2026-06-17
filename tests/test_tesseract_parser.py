@@ -25,6 +25,15 @@ class TestTesseractParser:
 class TestTesseractParserExecution:
     @pytest.mark.integration
     async def test_parse_real_pdf(self, tmp_path):
+        pytesseract = pytest.importorskip(
+            "pytesseract",
+            reason="pytesseract extra is not installed",
+        )
+        try:
+            pytesseract.get_tesseract_version()
+        except Exception as exc:
+            pytest.skip(f"tesseract binary is not available: {exc}")
+
         from tests.conftest import make_test_pdf
 
         pdf_path = tmp_path / "test.pdf"

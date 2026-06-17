@@ -111,7 +111,7 @@ def extract_folder(
     click.echo(f"  Succeeded:    {report.succeeded}")
     click.echo(f"  Failed:       {report.failed}")
     click.echo(f"  Needs review: {report.needs_review}")
-    click.echo(f"  Avg confidence: {report.average_confidence:.2f}")
+    click.echo(f"  Avg trust-gate rate: {report.average_confidence:.2f}")
 
     if report.top_review_reasons:
         click.echo("\nTop review reasons:")

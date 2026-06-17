@@ -441,7 +441,7 @@ The returned `ExtractionResult` is the full final document payload, not just the
 `data` dict. It includes:
 
 - `document_id`, `schema_name`, `data`, `fields`
-- `confidence`, `confidence_score`, `consensus_score`, `ocr`, `usage`
+- `confidence` (legacy overall trust-gate rate), `confidence_score` (OCR-based), `consensus_score`, `ocr`, `usage`
 - `escalated`, `escalation_reason`
 - `needs_review`, `review_status`, `reviewed_by`, `reviewed_at`, `rejection_reason`
 - `review_reasons`, `review_verdicts`, `corrections`, `validation_errors`

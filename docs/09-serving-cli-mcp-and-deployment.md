@@ -94,8 +94,8 @@ Behavior:
 - Runs synchronous extraction.
 - Deletes the temporary file.
 - Runs `quality_report(result)`.
-- Returns the full final `ExtractionResult` JSON, including `data`, `fields`, `confidence`,
-  `confidence_score`, `consensus_score`, `ocr`, `usage`, `escalated`, `review_status`, `validation_errors`, `corrections`,
+- Returns the full final `ExtractionResult` JSON, including `data`, `fields`, `confidence`
+  (legacy overall trust-gate rate), `confidence_score`, `consensus_score`, `ocr`, `usage`, `escalated`, `review_status`, `validation_errors`, `corrections`,
   `trace_id`, `model_name`, `parser_name`, and `raw_text`, plus:
   - `quality_score`
   - `quality_ok`
@@ -476,7 +476,7 @@ process_batch(
 ) -> str
 ```
 
-Returns summary JSON with totals, average confidence, review reasons, and document summaries.
+Returns summary JSON with totals, legacy average trust-gate rate, review reasons, and document summaries.
 Each successful document summary can be correlated with the full `ExtractionResult` stored in
 `result` when using the Python API or retrieved later with `get_extraction_result()`.
 

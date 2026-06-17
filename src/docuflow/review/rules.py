@@ -19,7 +19,7 @@ class OverallConfidenceBelow:
     def check(self, result: ExtractionResult) -> str | None:
         if result.confidence < self.threshold:
             return (
-                f"Overall confidence {result.confidence:.2f} "
+                f"Overall trust-gate rate {result.confidence:.2f} "
                 f"is below threshold {self.threshold}"
             )
         return None

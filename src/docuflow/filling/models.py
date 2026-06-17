@@ -83,7 +83,7 @@ class FillCorrection(BaseModel):
 
 
 class FillPlan(BaseModel):
-    """Internal write plan produced before modifying the PDF."""
+    """Internal write plan produced before modifying the target document."""
 
     strategy: Literal["acroform", "overlay", "content_controls"]
     assignments: dict[str, Any] = Field(default_factory=dict)
@@ -97,7 +97,7 @@ class FillPlan(BaseModel):
 
 
 class FillingResult(BaseModel):
-    """Result returned by PDF form filling.
+    """Result returned by PDF or DOCX form filling.
 
     This is intentionally separate from ExtractionResult: filling writes
     trusted user data into a document, while extraction reads a document into

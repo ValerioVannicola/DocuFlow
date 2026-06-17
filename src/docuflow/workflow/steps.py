@@ -627,7 +627,7 @@ class FillForm:
 
         data = self.data or state.metadata.get("fill_data") or state.metadata.get("data")
         if data is None:
-            state.errors.append("No data provided for PDF form filling")
+            state.errors.append("No data provided for form filling")
             state.status = "failed"
             return state
 

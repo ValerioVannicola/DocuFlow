@@ -13,6 +13,10 @@ class TestDoclingParser:
 
     @pytest.mark.integration
     async def test_parse_real_pdf(self, tmp_path):
+        pytest.importorskip(
+            "docling.document_converter",
+            reason="docling extra is not installed",
+        )
         from tests.conftest import make_test_pdf
 
         pdf_path = tmp_path / "test.pdf"

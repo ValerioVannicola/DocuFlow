@@ -86,7 +86,7 @@ Fields:
 | `failed` | `int` | `0` | Failed extractions. |
 | `needs_review` | `int` | `0` | Successful documents flagged for review. |
 | `approved` | `int` | `0` | Successful documents not needing review. |
-| `average_confidence` | `float` | `0.0` | Mean confidence across successful documents. |
+| `average_confidence` | `float` | `0.0` | Legacy mean trust-gate rate across successful documents. |
 | `usage` | `TokenUsage \| None` | `None` | Aggregated token usage. |
 | `top_review_reasons` | `dict[str, int]` | `{}` | Top review reasons and counts. |
 | `field_names` | `list[str]` | `[]` | Union of field names seen in results, ordered by first appearance. |
@@ -405,7 +405,7 @@ Single-result score formula:
 0.15 * completeness_rate
 + 0.25 * evidence_coverage
 + 0.25 * grounding_rate
-+ 0.20 * mean_confidence
++ 0.20 * mean_confidence  # legacy trust-gate-rate component
 + 0.15 * auto_accept_rate
 ```
 
@@ -417,7 +417,7 @@ Single-result score formula:
 | `completeness_rate` | `float` | `0.0` | Present fields / total fields. |
 | `grounding_rate` | `float` | `0.0` | Present fields found in source / present fields. |
 | `evidence_coverage` | `float` | `0.0` | Present fields with evidence / present fields. |
-| `mean_confidence` | `float` | `0.0` | Average confidence for present fields. |
+| `mean_confidence` | `float` | `0.0` | Average field trust-gate rate for present fields. |
 | `auto_accept_rate` | `float` | `0.0` | Present fields auto-accepted / present fields. |
 | `correction_rate` | `float` | `0.0` | Present fields corrected / present fields. |
 | `needs_review_count` | `int` | `0` | Number of review reasons for a single result, summed for lists. |
@@ -460,7 +460,7 @@ Fields:
 | `completeness_rate` | `float` | `0.0` | Report metric. |
 | `grounding_rate` | `float` | `0.0` | Report metric. |
 | `evidence_coverage` | `float` | `0.0` | Report metric. |
-| `mean_confidence` | `float` | `0.0` | Report metric. |
+| `mean_confidence` | `float` | `0.0` | Legacy trust-gate-rate report metric. |
 | `auto_accept_rate` | `float` | `0.0` | Report metric. |
 | `correction_rate` | `float` | `0.0` | Report metric. |
 | `field_count` | `int` | `0` | Report field count. |

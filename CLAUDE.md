@@ -213,7 +213,9 @@ result.fields["total"].trust_gate    # True/False
 result.fields["total"].evidence[0].text        # "1234.56"
 result.fields["total"].evidence[0].page_number # 0
 result.fields["total"].evidence[0].bbox        # BoundingBox(x0=72, y0=130, x1=200, y1=148)
-result.confidence                    # 0.85 (overall)
+result.confidence_score              # OCR-based final score, or None
+result.consensus_score               # multi-instance agreement score, or None
+result.confidence                    # legacy overall trust-gate rate
 result.usage                         # TokenUsage | None — aggregated LLM token usage
 result.usage.prompt_tokens           # summed across ALL calls (instances, decider,
 result.usage.completion_tokens       #   JSON-repair retries, LLM reviewers)
@@ -335,7 +337,7 @@ report = process_batch(
     pipeline=pipeline,
 )
 report.total, report.succeeded, report.failed, report.needs_review
-report.average_confidence
+report.average_confidence       # legacy average trust-gate rate
 report.usage               # TokenUsage | None — tokens/cost summed over the whole batch
 report.top_review_reasons
 report.to_csv()            # CSV string
@@ -628,7 +630,7 @@ report.score               # 0.85 — overall quality (0-1)
 report.completeness_rate   # 7/8 fields have a non-None value
 report.grounding_rate      # 7/7 present fields found in source text
 report.evidence_coverage   # 7/7 present fields have evidence
-report.mean_confidence     # average field confidence
+report.mean_confidence     # average field trust-gate rate
 report.auto_accept_rate    # fields passing auto-accept
 report.correction_rate     # fields human-corrected
 report.ok                  # True if score >= threshold

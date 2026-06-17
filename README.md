@@ -35,7 +35,7 @@ Or install only what you need:
 pip install docuflow[pdf,llm]      # pdfplumber parser + LLM extraction
 pip install docuflow[ocr,llm]      # Tesseract OCR + LLM extraction
 pip install docuflow[docling,llm]  # Docling parser (best quality) + LLM
-pip install docuflow[forms]        # PDF form filling
+pip install docuflow[forms]        # PDF and DOCX form filling
 pip install docuflow[privacy]      # PII anonymization via Presidio
 ```
 
@@ -87,7 +87,7 @@ print(result.fields["total"].evidence[0])   # page 0, bbox, source text
 - Full provenance chain: parser → model → evidence → validation → review → correction
 
 ### Review
-- **6 built-in rules**: confidence thresholds, field presence, validation errors, evidence checks
+- **6 built-in rules**: trust-gate thresholds, field presence, validation errors, evidence checks
 - **LLM reviewers**: prompt-driven agents that review extractions and return Approved/Not Approved
 - **Human corrections**: correct fields with audit trail, approve/reject with timestamp
 

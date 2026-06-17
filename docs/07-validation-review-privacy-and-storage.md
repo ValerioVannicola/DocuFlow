@@ -212,7 +212,9 @@ Return a reason string to mark the document for review, or `None` to pass.
 OverallConfidenceBelow(threshold: float = 0.7)
 ```
 
-Flags review when `result.confidence < threshold`.
+Flags review when the legacy overall trust-gate rate (`result.confidence`) is below
+`threshold`. For new reporting, prefer `result.confidence_score` for OCR quality and
+`result.consensus_score` for multi-run agreement.
 
 ### `FieldConfidenceBelow`
 
@@ -224,7 +226,7 @@ Parameters:
 
 | Parameter | Description |
 | --- | --- |
-| `fields` | Mapping of field name to minimum confidence threshold. |
+| `fields` | Mapping of field name to threshold value. The threshold name is legacy; the rule currently flags mapped fields whose `trust_gate` is `False`. |
 
 Flags any named field whose `trust_gate` is `False`.
 

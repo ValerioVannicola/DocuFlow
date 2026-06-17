@@ -201,7 +201,7 @@ This is where the LLM reads the document and produces structured data. The extra
    - In **multi mode**: N parallel LLM calls run at different temperatures. A decider LLM reviews all candidates and picks the best value per field. Trust is based on how many agents agreed (consensus) plus source verification
    - `trust_gate = True` only when all agents agree AND the value exists in the source text
 
-7. **Returns an `ExtractionResult`** with the extracted data, per-field details (value, trust, evidence, validation status), and overall confidence.
+7. **Returns an `ExtractionResult`** with the extracted data, per-field details (value, trust gate, evidence, validation status), OCR confidence score, consensus score, and the legacy trust-gate-rate aggregate.
 
 #### How Multi-Agent Extraction Works Internally
 
@@ -254,7 +254,7 @@ If storage is configured (`storage="local"`), the Store step persists everything
 - `{document_id}/original.pdf` — copy of the source file
 - `{document_id}/document.json` — the parsed Document (pages, blocks, text, tables)
 - `{document_id}/extraction.json` — the ExtractionResult (data, fields, evidence, trust, review status, corrections)
-- `{document_id}/filling.json` — the FillingResult for PDF form filling workflows
+- `{document_id}/filling.json` — the FillingResult for PDF or DOCX form filling workflows
 - `{document_id}/trace.json` — processing trace (every step's timing, model calls, errors)
 
 **On failure**: if the pipeline fails at any step and storage is configured, partial state is automatically saved. The trace shows exactly which step failed and why.
@@ -291,7 +291,7 @@ Install only what you need:
 pip install docuflow[pdf,llm]        # pdfplumber parser + LLM (lightweight)
 pip install docuflow[ocr,llm]        # Tesseract OCR + LLM
 pip install docuflow[docling,llm]    # Docling parser + LLM (best quality)
-pip install docuflow[forms]          # PDF form filling
+pip install docuflow[forms]          # PDF and DOCX form filling
 pip install docuflow[privacy]        # Presidio anonymization
 ```
 
@@ -300,7 +300,7 @@ pip install docuflow[privacy]        # Presidio anonymization
 | Group | Packages | Purpose |
 |-------|----------|---------|
 | `pdf` | pdfplumber, pypdfium2 | PDF text extraction (pdfplumber) and page rendering (pypdfium2) |
-| `forms` | pypdf, reportlab, pdfplumber | PDF form filling, explicit static-PDF overlays, and opt-in blank detection |
+| `forms` | pypdf, reportlab, pdfplumber, python-docx | PDF form filling, DOCX content controls, explicit static-PDF overlays, and opt-in blank detection |
 | `ocr` | pytesseract, Pillow | OCR with Tesseract |
 | `llm` | litellm | LLM calls (OpenAI, Anthropic, Gemini, etc.) |
 | `privacy` | presidio-analyzer, presidio-anonymizer | PII detection and anonymization |
@@ -324,7 +324,7 @@ DocuFlow itself is ~3 MB. The dependencies vary significantly by what you instal
 | `docuflow[pdf]` | ~70 MB | + pdfplumber (~50 MB) — digital PDF parsing |
 | `docuflow[ocr]` | ~30 MB | + pytesseract + Pillow (~15 MB) — OCR (requires Tesseract binary) |
 | `docuflow[llm]` | ~80 MB | + litellm (~55 MB) + OpenAI/HTTP clients |
-| `docuflow[forms]` | ~20 MB | + pypdf + reportlab — write values into PDF forms |
+| `docuflow[forms]` | ~20 MB | + pypdf + reportlab + python-docx — write values into PDF and DOCX forms |
 | `docuflow[pdf,llm]` | ~140 MB | pdfplumber + LLM — the lightweight production setup |
 | `docuflow[ocr,llm]` | ~110 MB | Tesseract + LLM — for scanned documents |
 | `docuflow[privacy]` | ~50 MB | + Presidio analyzer + anonymizer + spaCy model |
@@ -417,7 +417,9 @@ for name, field in result.fields.items():
             print(f"    BBox: ({ev.bbox.x0}, {ev.bbox.y0}) -> ({ev.bbox.x1}, {ev.bbox.y1})")
 
 # Overall result
-print(f"\nOverall confidence: {result.confidence:.2f}")
+print(f"\nOCR confidence score: {result.confidence_score}")
+print(f"Consensus score: {result.consensus_score}")
+print(f"Trust-gate rate: {result.confidence:.2f}")
 print(f"Needs review: {result.needs_review}")
 print(f"Model used: {result.model_name}")
 
@@ -1762,9 +1764,9 @@ pipeline = DocumentPipeline(
 
 | Rule | Parameters | When it flags |
 |------|-----------|---------------|
-| `OverallConfidenceBelow(threshold)` | `threshold: float = 0.7` | Average confidence below threshold |
-| `FieldConfidenceBelow(fields)` | `fields: dict[str, float]` | Any named field below its threshold |
-| `AnyFieldConfidenceBelow(threshold)` | `threshold: float = 0.6` | Any single field below threshold |
+| `OverallConfidenceBelow(threshold)` | `threshold: float = 0.7` | Legacy overall trust-gate rate below threshold |
+| `FieldConfidenceBelow(fields)` | `fields: dict[str, float]` | Any named field has `trust_gate=False`; names are legacy |
+| `AnyFieldConfidenceBelow(threshold)` | `threshold: float = 0.6` | Any field has `trust_gate=False`; name is legacy |
 | `HasValidationErrors()` | (none) | Validation step found errors |
 | `FieldMissing(fields)` | `fields: list[str]` | Critical fields are None or absent |
 | `NoEvidence(fields)` | `fields: list[str] \| None` | Fields have no supporting evidence |
@@ -2047,7 +2049,7 @@ print(f"Succeeded: {report.succeeded}")
 print(f"Failed: {report.failed}")
 print(f"Needs review: {report.needs_review}")
 print(f"Approved: {report.approved}")
-print(f"Avg confidence: {report.average_confidence:.2f}")
+print(f"Avg trust-gate rate: {report.average_confidence:.2f}")
 
 # Top reasons for review
 for reason, count in report.top_review_reasons.items():
@@ -2317,7 +2319,7 @@ report = quality_report(result)
 | `completeness_rate` | Fraction of fields with a non-None value (detects fields the model failed to extract) |
 | `grounding_rate` | Fraction of present fields whose extracted value was found verbatim in the source text |
 | `evidence_coverage` | Fraction of present fields that have at least one evidence object (page, bbox, text) |
-| `mean_confidence` | Average confidence across present fields |
+| `mean_confidence` | Average field trust-gate rate across present fields |
 | `auto_accept_rate` | Fraction of present fields that pass the trust threshold (no review needed) |
 | `correction_rate` | Fraction of present fields that were human-corrected via `correct_field()` |
 | `ok` | `True` if `score >= threshold` (default threshold: 0.7) |
@@ -2386,7 +2388,7 @@ history = await log.history(last_n=50, tags={"schema": "Invoice"})
 history = log.history_sync(last_n=50, tags={"schema": "Invoice"})
 ```
 
-Each snapshot contains: `snapshot_id`, `timestamp`, `tags`, `score`, `completeness_rate`, `grounding_rate`, `evidence_coverage`, `mean_confidence`, `auto_accept_rate`, `correction_rate`, `field_count`, `ok`.
+Each snapshot contains: `snapshot_id`, `timestamp`, `tags`, `score`, `completeness_rate`, `grounding_rate`, `evidence_coverage`, `mean_confidence` (legacy trust-gate-rate metric), `auto_accept_rate`, `correction_rate`, `field_count`, `ok`.
 
 You can also build a snapshot manually:
 
@@ -2451,7 +2453,8 @@ from docuflow import run_workflow
 
 result = run_workflow("invoice.yaml", "invoice.pdf")
 result.data       # {"supplier_name": "Acme", "total": 1234.56, ...}
-result.confidence # 0.88
+result.confidence_score # OCR-based final score, or None
+result.consensus_score  # multi-instance agreement score, or None
 ```
 
 Or from the CLI:
@@ -2953,7 +2956,7 @@ Files saved per document:
 - `original.pdf` — copy of the source file
 - `document.json` — parsed Document (pages, blocks, text, metadata)
 - `extraction.json` — ExtractionResult (fields, values, evidence, corrections, review status)
-- `filling.json` — FillingResult for PDF form filling workflows
+- `filling.json` — FillingResult for PDF or DOCX form filling workflows
 - `trace.json` — processing trace (events, timing)
 
 ### On Failure

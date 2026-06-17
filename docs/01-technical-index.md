@@ -27,7 +27,7 @@ public API, supported options, and examples.
 - `10-extension-points-tracing-and-errors.md` — custom adapters/providers, ingestion, rendering,
   tracing, strategy protocol, and exceptions.
 - `11-pdf-form-filling.md` — `fill_pdf_form()`, `fill_docx_form()`, `FillingResult`,
-  AcroForm filling, static overlay placements, DOCX content controls and Jinja2 templates,
+  AcroForm filling, static overlay placements, DOCX content controls,
   opt-in blank detection, the opt-in review/approval workflow
   (`edit_field()`, `approve()`/`reject()`, `commit_fill()`, `preview_fill()`), and the
   `FillForm` workflow step.
@@ -51,7 +51,7 @@ Install smaller extras when you only need part of the stack:
 | Extra | Installs | Use when |
 | --- | --- | --- |
 | `pdf` | `pdfplumber`, `pypdfium2` | Native PDF text extraction and page rendering. |
-| `forms` | `pypdf`, `reportlab`, `pdfplumber` | Write values into AcroForm fields, explicit static-PDF overlay placements, and opt-in blank detection. |
+| `forms` | `pypdf`, `reportlab`, `pdfplumber`, `python-docx` | Write values into AcroForm fields, static-PDF overlay placements, and DOCX content controls; includes opt-in blank detection. |
 | `ocr` | `pytesseract`, `Pillow` | Local OCR through Tesseract. Requires the system `tesseract` binary. |
 | `llm` | `litellm` | LLM-backed extraction, review, schema discovery, routing. |
 | `privacy` | Presidio analyzer/anonymizer | Text anonymization before LLM calls. |
@@ -159,7 +159,7 @@ These are the most common selectable values across the high-level APIs.
 | PDF form unmatched policy | `unmatched` | `"error"`, `"warn"`, `"ignore"`. |
 | PDF blank detection | `detect_blank_spaces` | `False` by default; set `True` to opt into heuristic static blank detection. |
 | PDF blank detection mode | `blank_detection_mode` | `"heuristic"`, `"llm"`, `"hybrid"`. |
-| PDF/DOCX overlay overflow | `overflow` | `"shrink"` (default), `"wrap"`, `"error"`, `"page"` (appends continuation pages). |
+| PDF overlay overflow | `overflow` | `"shrink"` (default), `"wrap"`, `"error"`, `"page"` (appends continuation pages). |
 | Document metadata type | `DocumentMetadataResult` | `.comments`, `.highlights`, `.hyperlinks`, `.signatures`, `.revisions`. |
 
 ## Coordinate And Evidence Contract
