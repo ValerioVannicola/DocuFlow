@@ -1181,24 +1181,29 @@ pipeline = DocumentPipeline(
 )
 ```
 
-How it works — three tiers, each engaged only when the cheaper one fails:
+How it works — a cost ladder that only climbs to a more expensive rung when the cheaper
+one is insufficient:
 
 ```
-Tier 1: native text layer (pdfplumber)      — free
-Tier 2: OCR for pages that need it (smart)  — cheap
-Tier 3: OCR quality too poor → re-read the  — vision LLM
-        original file with vision/hybrid
+Rung 1: native text layer, per page     — free    ┐ the smart parser does both,
+Rung 2: OCR only the pages that need it  — cheap   ┘ deciding per page (Level 2)
+Rung 3: resulting text too poor → re-read           — vision LLM (this escalation,
+        the whole file with vision (or hybrid)                     Level 3)
 ```
+
+So rungs 1–2 are the `smart` parser's per-page work and rung 3 is auto mode's own
+escalation decision. (See [The Levels of "auto"](#5b-the-levels-of-auto) for why these
+are distinct mechanisms.)
 
 The key insight: OCR **fails confidently** — on a bad input it doesn't error, it returns
 plausible garbage, and a text LLM will happily extract wrong values from it. Auto mode
 uses the OCR confidence scores as a quality gate after parsing. The document escalates
-to vision when:
+to vision when (in this order):
 
-- the document's mean OCR confidence is below `min_ocr_score` (default 0.6), or
-- more than `max_low_confidence_ratio` of words are low-confidence (default 40%), or
 - there is almost no text at all (below `min_chars_per_page`, default 20) — neither the
-  text layer nor OCR produced anything usable
+  text layer nor OCR produced anything usable, *which is what catches scanned PDFs*, or
+- the document's mean OCR confidence is below `min_ocr_score` (default 0.6), or
+- more than `max_low_confidence_ratio` of words are low-confidence (default 40%)
 
 Escalated results are marked so the (more expensive) vision call is always visible:
 
