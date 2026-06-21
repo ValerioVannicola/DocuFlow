@@ -25,6 +25,10 @@ class PrivacyFinding(BaseModel):
     score: float = 0.0
     page_number: int | None = None
     bbox: BoundingBox | None = None
+    # If set, used verbatim as the substitution text, overriding AnonymizationMode
+    # (e.g. DictionaryProvider literal replacements). Findings without it fall
+    # back to the policy's mode (redact/mask/pseudonymize/hash) as before.
+    replacement: str | None = None
 
 
 class TokenMapping(BaseModel):

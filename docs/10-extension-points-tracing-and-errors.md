@@ -172,6 +172,12 @@ async def arestore_text(
 ) -> str
 ```
 
+Before implementing this protocol from scratch, check whether `docuflow.privacy.DictionaryProvider` (literal terms / regex patterns -> a mode-driven label or a literal replacement) or `docuflow.privacy.CompositeProvider` (merge several providers) already cover the need — see [Dictionary Provider](07-validation-review-privacy-and-storage.md#dictionary-provider). A custom provider is for detection logic neither of those can express (e.g. calling an external classification service).
+
+Only `adetect_text` is actually called by `Anonymizer` — `aanonymize_text` and `arestore_text` exist on the protocol for parity with `PresidioProvider` and for callers that invoke a provider directly, but the built-in pipeline (`Anonymize` step, `Anonymizer.anonymize_document`) only ever calls `adetect_text` and then applies `PrivacyPolicy.mode` itself. A minimal custom provider only needs `adetect_text` implemented; the other two methods can be no-ops if you never call them directly.
+
+Each `PrivacyFinding` returned by `adetect_text` may set `replacement: str | None` — when set, `Anonymizer` substitutes that exact string regardless of `mode`; when `None` (the default, and what Presidio always returns), the substitution is derived from `mode` as usual.
+
 ### `ImagePrivacyProvider`
 
 ```python

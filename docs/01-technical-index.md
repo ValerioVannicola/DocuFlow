@@ -54,7 +54,7 @@ Install smaller extras when you only need part of the stack:
 | `forms` | `pypdf`, `reportlab`, `pdfplumber`, `python-docx` | Write values into AcroForm fields, static-PDF overlay placements, and DOCX content controls; includes opt-in blank detection. |
 | `ocr` | `pytesseract`, `Pillow` | Local OCR through Tesseract. Requires the system `tesseract` binary. |
 | `llm` | `litellm` | LLM-backed extraction, review, schema discovery, routing. |
-| `privacy` | Presidio analyzer/anonymizer | Text anonymization before LLM calls. |
+| `privacy` | Presidio analyzer/anonymizer | PII-based text anonymization before LLM calls (`PresidioProvider`). Not needed for `DictionaryProvider`/`CompositeProvider`, which have no extra dependencies. |
 | `docling` | Docling | Complex layouts and first-class table extraction. |
 | `markitdown` | Markitdown | Quick text extraction across a wide format range (PDF, Office, HTML, images, audio, ZIP, ...); no confidence scoring. |
 | `azure` | Azure Document Intelligence SDK | Cloud OCR with Azure Document Intelligence. |

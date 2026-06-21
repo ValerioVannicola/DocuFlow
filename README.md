@@ -94,6 +94,7 @@ print(result.fields["total"].evidence[0])   # page 0, bbox, source text
 
 ### Privacy
 - PII detection and anonymization before LLM calls via Presidio
+- Custom-term masking via `DictionaryProvider` (company names, project codes, anything Presidio doesn't know) — no extra dependencies, combine with Presidio via `CompositeProvider`
 - Modes: redact, mask, pseudonymize (reversible), hash
 - Image redaction via OCR bounding boxes
 - Fail-closed: pipeline stops if anonymization fails

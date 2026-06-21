@@ -508,3 +508,24 @@ pipeline = DocumentPipeline(
     privacy=PrivacyPolicy(provider=PresidioProvider(), mode="pseudonymize"),
 )
 ```
+
+Masking terms Presidio doesn't know about (company names, internal codes), instead of or alongside PII detection — see [Dictionary Provider](07-validation-review-privacy-and-storage.md#dictionary-provider):
+
+```python
+from docuflow import PrivacyPolicy
+from docuflow.privacy import CompositeProvider, DictionaryProvider, PresidioProvider
+
+pipeline = DocumentPipeline(
+    parser="tesseract",
+    privacy=PrivacyPolicy(
+        provider=CompositeProvider([
+            PresidioProvider(),
+            DictionaryProvider(
+                mask={"Acme Corp": "ORG"},                   # mode decides the replacement
+                replacements={"PRJ-1234": "[PROJECT-CODE]"},  # always this exact text
+            ),
+        ]),
+        mode="redact",
+    ),
+)
+```

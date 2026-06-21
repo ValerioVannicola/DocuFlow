@@ -60,7 +60,15 @@ class Anonymizer:
             original = finding.text
             mode = self.policy.mode
 
-            if mode == AnonymizationMode.REDACT:
+            if finding.replacement is not None:
+                replacement = finding.replacement
+                if mode == AnonymizationMode.PSEUDONYMIZE:
+                    mappings.append(
+                        TokenMapping(
+                            token=replacement, original=original, entity_type=finding.entity_type
+                        )
+                    )
+            elif mode == AnonymizationMode.REDACT:
                 replacement = "[REDACTED]"
             elif mode == AnonymizationMode.MASK:
                 replacement = "*" if len(original) <= 1 else original[0] + "*" * (len(original) - 1)

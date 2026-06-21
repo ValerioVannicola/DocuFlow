@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pytest
 import yaml
 
 from docuflow.processor import DocumentPipeline
@@ -663,6 +664,73 @@ class TestPrivacyDictConfig:
         assert policy.mode.value == "redact"
         assert policy.fail_closed is True
         assert policy.reversible is False
+
+    def test_privacy_provider_dictionary_type(self):
+        cfg = load_workflow_config({
+            "schema": {"a": {"type": "str"}},
+            "privacy": {
+                "provider": {
+                    "type": "dictionary",
+                    "mask": {"Acme Corp": "ORG"},
+                    "replacements": {"PRJ-1234": "[PROJECT-CODE]"},
+                },
+                "mode": "redact",
+                "reversible": False,
+            },
+        })
+        policy = cfg.build_privacy()
+        from docuflow.privacy.dictionary_provider import DictionaryProvider
+        assert isinstance(policy.provider, DictionaryProvider)
+        assert policy.provider.mask == {"Acme Corp": "ORG"}
+        assert policy.provider.replacements == {"PRJ-1234": "[PROJECT-CODE]"}
+
+    def test_privacy_provider_composite_type(self):
+        cfg = load_workflow_config({
+            "schema": {"a": {"type": "str"}},
+            "privacy": {
+                "provider": {
+                    "type": "composite",
+                    "providers": [
+                        {"type": "presidio", "language": "en"},
+                        {"type": "dictionary", "mask": {"Acme Corp": "ORG"}},
+                    ],
+                },
+                "mode": "redact",
+                "reversible": False,
+            },
+        })
+        policy = cfg.build_privacy()
+        from docuflow.privacy.composite_provider import CompositeProvider
+        from docuflow.privacy.dictionary_provider import DictionaryProvider
+        from docuflow.privacy.presidio_provider import PresidioProvider
+        assert isinstance(policy.provider, CompositeProvider)
+        assert len(policy.provider.providers) == 2
+        assert isinstance(policy.provider.providers[0], PresidioProvider)
+        assert isinstance(policy.provider.providers[1], DictionaryProvider)
+
+    def test_privacy_provider_explicit_presidio_type(self):
+        cfg = load_workflow_config({
+            "schema": {"a": {"type": "str"}},
+            "privacy": {
+                "provider": {"type": "presidio", "language": "fr"},
+                "mode": "redact",
+                "reversible": False,
+            },
+        })
+        policy = cfg.build_privacy()
+        assert policy.provider.language == "fr"
+
+    def test_privacy_provider_unknown_type_raises(self):
+        cfg = load_workflow_config({
+            "schema": {"a": {"type": "str"}},
+            "privacy": {
+                "provider": {"type": "nonexistent"},
+                "mode": "redact",
+                "reversible": False,
+            },
+        })
+        with pytest.raises(ValueError, match="Unknown privacy provider type"):
+            cfg.build_privacy()
 
 
 # ---------------------------------------------------------------------------

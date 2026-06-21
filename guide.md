@@ -303,8 +303,9 @@ pip install docuflow[privacy]        # Presidio anonymization
 | `forms` | pypdf, reportlab, pdfplumber, python-docx | PDF form filling, DOCX content controls, explicit static-PDF overlays, and opt-in blank detection |
 | `ocr` | pytesseract, Pillow | OCR with Tesseract |
 | `llm` | litellm | LLM calls (OpenAI, Anthropic, Gemini, etc.) |
-| `privacy` | presidio-analyzer, presidio-anonymizer | PII detection and anonymization |
+| `privacy` | presidio-analyzer, presidio-anonymizer | PII detection via `PresidioProvider`. Not needed for `DictionaryProvider`/`CompositeProvider`, which have no extra dependencies |
 | `docling` | docling | Advanced document parsing with layout understanding |
+| `markitdown` | markitdown[pdf,docx,pptx,xlsx,xls,outlook] | Quick text extraction across a wide format range; no confidence scoring |
 | `azure` | azure-ai-documentintelligence | Azure Document Intelligence cloud OCR |
 | `aws` | boto3 | AWS Textract cloud OCR |
 | `gcp` | google-cloud-documentai | Google Document AI cloud OCR |
@@ -1955,7 +1956,9 @@ Provenance is a read-only view assembled from `ExtractionResult` and `ExtractedF
 
 ## 13. Privacy & Anonymization
 
-The privacy module detects and anonymizes PII before document content reaches the LLM. It runs as a pipeline step between Parse and Extract.
+The privacy module detects and anonymizes text before document content reaches the LLM — PII via `PresidioProvider`, or your own terms (company names, project codes, anything Presidio doesn't know about) via `DictionaryProvider`. It runs as a pipeline step between Parse and Extract.
+
+To turn it on you need two things: a `PrivacyPolicy` (which `provider` detects what, and what `mode` replaces it with) and that policy passed to `DocumentPipeline(privacy=...)` or a workflow YAML's `privacy:` block. Skip either one and parsing/extraction runs on the original, un-anonymized text — the `Anonymize` step only exists in the pipeline when a policy is supplied.
 
 ### Basic Usage
 
@@ -2024,6 +2027,58 @@ print(anon.mapping_id) # UUID for this mapping
 restored = await anonymizer.restore_text(anon.text, anon.mapping_id)
 print(restored)        # "John Doe sent email john@example.com"
 ```
+
+### Masking Custom Terms (DictionaryProvider)
+
+Presidio only detects PII it has a model for. To mask anything else — company names, internal project codes, account number formats — use `DictionaryProvider` instead of (or alongside) `PresidioProvider`. It implements the same provider interface, so it's a drop-in `provider=` value; nothing else about the pipeline changes.
+
+```python
+from docuflow import DocumentPipeline, PrivacyPolicy
+from docuflow.privacy import DictionaryProvider
+
+pipeline = DocumentPipeline(
+    parser="tesseract",
+    privacy=PrivacyPolicy(
+        provider=DictionaryProvider(
+            mask={"Acme Corp": "ORG"},                    # mode below decides the replacement
+            replacements={"PRJ-1234": "[PROJECT-CODE]"},   # always this exact text, ignores mode
+        ),
+        mode="redact",
+        reversible=False,
+    ),
+)
+```
+
+Two dicts you can pass, either or both:
+
+| Param | Maps | Replacement |
+|---|---|---|
+| `mask` | term/pattern → entity type label (e.g. `"ORG"`) | Decided by `mode`, same as a Presidio finding |
+| `replacements` | term/pattern → literal text | That exact text, always, regardless of `mode` |
+
+By default keys are matched as literal substrings, case-sensitively. Pass `regex=True` to treat every key as a regex pattern, and `case_sensitive=False` to ignore case. The `entities` filter on `PrivacyPolicy` does not apply to `DictionaryProvider` — every key you provide is detected, since the dict itself is already your allowlist.
+
+### Combining Providers (CompositeProvider)
+
+To run Presidio's PII detection and your own dictionary in one pass, wrap both in `CompositeProvider`:
+
+```python
+from docuflow import DocumentPipeline, PrivacyPolicy
+from docuflow.privacy import CompositeProvider, DictionaryProvider, PresidioProvider
+
+pipeline = DocumentPipeline(
+    parser="tesseract",
+    privacy=PrivacyPolicy(
+        provider=CompositeProvider([
+            PresidioProvider(),
+            DictionaryProvider(mask={"Acme Corp": "ORG"}),
+        ]),
+        mode="redact",
+    ),
+)
+```
+
+All sub-providers run concurrently and their findings are merged before anonymization, so a document with both a person's name (caught by Presidio) and a company name (caught by the dictionary) gets both masked in one `Anonymize` step.
 
 ### Fail-Closed Behavior
 
@@ -3180,6 +3235,7 @@ from docuflow.parsing.pdfplumber_parser import PdfplumberParser
 from docuflow.parsing.tesseract_parser import TesseractParser
 from docuflow.parsing.docling_parser import DoclingParser
 from docuflow.parsing.smart_parser import SmartParser
+from docuflow.parsing.markitdown_parser import MarkitdownParser
 
 # Templates
 from docuflow.templates import load_template, list_templates
@@ -3194,7 +3250,7 @@ from docuflow.review import (
 )
 
 # Privacy
-from docuflow.privacy import PrivacyPolicy, Anonymizer, PresidioProvider
+from docuflow.privacy import PrivacyPolicy, Anonymizer, PresidioProvider, DictionaryProvider, CompositeProvider
 from docuflow.privacy.mapping_store import LocalMappingStore
 from docuflow.privacy.image_redaction import ImageRedactor
 from docuflow.privacy.scrubber import TraceScrubber

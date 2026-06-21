@@ -304,6 +304,10 @@ p.corrected, p.corrected_by, p.correction_reason
 
 ## Privacy / Anonymization
 
+Runs as a pipeline step between Parse and Extract — detect text with a provider, replace it
+per `mode`. Needs a `PrivacyPolicy` passed to `DocumentPipeline(privacy=...)` (or a workflow
+YAML `privacy:` block); without it, no anonymization happens.
+
 ```python
 from docuflow import DocumentPipeline, PrivacyPolicy
 from docuflow.privacy import PresidioProvider
@@ -311,13 +315,30 @@ from docuflow.privacy import PresidioProvider
 pipeline = DocumentPipeline(
     parser="tesseract",
     privacy=PrivacyPolicy(
-        provider=PresidioProvider(),
+        provider=PresidioProvider(),  # PII detection (requires docuflow[privacy])
         mode="pseudonymize",    # "redact" | "mask" | "pseudonymize" | "hash"
         reversible=True,
         fail_closed=True,
     ),
 )
 ```
+
+For non-PII terms (company names, project codenames, account formats) Presidio can't detect,
+use `DictionaryProvider` — no extra dependencies, works as a drop-in `provider=`:
+
+```python
+from docuflow.privacy import DictionaryProvider, CompositeProvider
+
+DictionaryProvider(
+    mask={"Acme Corp": "ORG"},              # mode-driven replacement (same as Presidio findings)
+    replacements={"Project Falcon": "[PROJECT]"},  # literal text, ignores `mode`
+)
+
+# Combine PII + custom terms in one pass:
+CompositeProvider([PresidioProvider(), DictionaryProvider(mask={"Acme Corp": "ORG"})])
+```
+
+Full reference, including how the mechanism works end-to-end: `docs/07-validation-review-privacy-and-storage.md`.
 
 ## Domain Context
 
@@ -791,7 +812,7 @@ from docuflow.review import (
 )
 
 # Privacy
-from docuflow.privacy import PrivacyPolicy, Anonymizer, PresidioProvider
+from docuflow.privacy import PrivacyPolicy, Anonymizer, PresidioProvider, DictionaryProvider, CompositeProvider
 
 # Storage
 from docuflow.storage.local import LocalDocumentStore

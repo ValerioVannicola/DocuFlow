@@ -340,6 +340,19 @@ See `06-results-and-data-models.md` for the exact result fields modified by thes
 
 Privacy anonymizes text before it is sent to the LLM in text extraction paths.
 
+### How it works
+
+Three things have to happen for anonymization to actually run, and `PrivacyPolicy` is where you configure all of them:
+
+1. **Build a `PrivacyPolicy`** with a `provider` (what to detect) and a `mode` (what to replace it with). The provider is the only required field beyond defaults — without one, `PrivacyPolicy()` is a no-op shell.
+2. **Pass it into the pipeline.** Either `DocumentPipeline(privacy=policy)` (Python API) or a `privacy:` block in a workflow YAML (see [Workflow Configs](03-workflow-configs-and-manual-pipelines.md)). Without this, the policy object exists but nothing ever calls it — parsing/extraction runs on the original, un-anonymized text.
+3. **The pipeline inserts an `Anonymize` step** between parsing and extraction when `privacy` is set. At runtime it does, in order, for `document.raw_text` and every `page.text`:
+   - calls `provider.adetect_text(text, entities=policy.entities, score_threshold=policy.score_threshold)` to get a list of `PrivacyFinding` (each one a `start`/`end` span plus an `entity_type`)
+   - for each finding, picks a replacement: if the finding carries an explicit `replacement` string (set by `DictionaryProvider`'s `replacements` dict), that value is used verbatim; otherwise the replacement is derived from `policy.mode` (redact/mask/pseudonymize/hash)
+   - splices the replacements back into the text, overwriting `document.raw_text`/`page.text` in place before the LLM ever sees them
+
+`vision`/`hybrid` extraction sends rendered page images straight to a vision LLM, bypassing this text path entirely — `DocumentPipeline(extraction_type="vision"|"hybrid", privacy=...)` raises `ValueError` rather than silently leaking text, and `extraction_type="auto"` will not escalate to vision while a privacy policy is configured.
+
 ```python
 from docuflow import PrivacyPolicy
 from docuflow.privacy import PresidioProvider
@@ -368,7 +381,7 @@ Fields:
 | `anonymize_before_llm` | `bool` | `True` | Policy flag indicating anonymization should happen before LLM calls. |
 | `mode` | `AnonymizationMode` | `PSEUDONYMIZE` | `"redact"`, `"mask"`, `"pseudonymize"`, or `"hash"`. |
 | `reversible` | `bool` | `True` | Whether mappings can restore original values. Requires `mode="pseudonymize"`. |
-| `provider` | `Any` | `None` | Privacy provider, usually `PresidioProvider()`. |
+| `provider` | `Any` | `None` | Privacy provider: `PresidioProvider()` for PII, `DictionaryProvider()` for custom terms, or `CompositeProvider([...])` to combine providers. |
 | `entities` | `list[str]` | Common PII entities | Entity types to detect. |
 | `fail_closed` | `bool` | `True` | If true, anonymization failure fails the workflow. |
 | `score_threshold` | `float` | `0.35` | Minimum PII detection score. |
@@ -467,6 +480,87 @@ await provider.arestore_text(
 
 Requires `docuflow[privacy]`.
 
+## Dictionary Provider
+
+Presidio detects PII via NLP models — it doesn't know about company names, project codenames, or internal ID formats. `DictionaryProvider` detects user-supplied literal terms or regex patterns instead, and implements the same `PrivacyProvider` protocol, so it drops into `PrivacyPolicy` (and the `Anonymize` workflow step, mapping store, reversible pseudonymization, risk scoring) with no other changes.
+
+Import:
+
+```python
+from docuflow.privacy import DictionaryProvider
+```
+
+Constructor:
+
+```python
+DictionaryProvider(
+    mask: dict[str, str] | None = None,
+    replacements: dict[str, str] | None = None,
+    *,
+    regex: bool = False,
+    case_sensitive: bool = True,
+)
+```
+
+Two ways to populate the dictionary, and they can be mixed in one provider:
+
+| Parameter | Value means | Replacement decided by |
+| --- | --- | --- |
+| `mask` | `term -> entity_type` label (e.g. `{"Acme Corp": "ORG"}`) | The policy's `mode` (redact/mask/pseudonymize/hash) — same as Presidio findings. |
+| `replacements` | `term -> literal replacement text` (e.g. `{"PRJ-1234": "[PROJECT-CODE]"}`) | The literal value itself, always, regardless of `mode`. |
+
+```python
+from docuflow import PrivacyPolicy
+from docuflow.privacy import DictionaryProvider
+
+policy = PrivacyPolicy(
+    provider=DictionaryProvider(
+        mask={"Acme Corp": "ORG"},                    # mode decides replacement
+        replacements={"PRJ-1234": "[PROJECT-CODE]"},   # always this literal value
+    ),
+    mode="redact",
+    reversible=False,
+)
+```
+
+Notes:
+
+- Keys are literal substrings by default; pass `regex=True` to treat every key in both dicts as a regex pattern instead.
+- `case_sensitive=False` matches keys case-insensitively.
+- The `entities` filter on `PrivacyPolicy`/`adetect_text` is ignored — the dictionary you provide is already an explicit allowlist, so PII-oriented entity filtering doesn't apply to it.
+- No extra dependency: unlike Presidio, this provider has zero external requirements.
+
+## Composite Provider
+
+Combine multiple providers (e.g. Presidio for PII plus a `DictionaryProvider` for custom terms) so `PrivacyPolicy` only needs one `provider`. Detection from all sub-providers runs concurrently and the findings are merged into a single pass.
+
+Import:
+
+```python
+from docuflow.privacy import CompositeProvider
+```
+
+Constructor:
+
+```python
+CompositeProvider(providers: list[PrivacyProvider])
+```
+
+```python
+from docuflow import PrivacyPolicy
+from docuflow.privacy import CompositeProvider, DictionaryProvider, PresidioProvider
+
+policy = PrivacyPolicy(
+    provider=CompositeProvider([
+        PresidioProvider(),
+        DictionaryProvider(mask={"Acme Corp": "ORG"}),
+    ]),
+    mode="redact",
+)
+```
+
+Findings from different sub-providers are not deduplicated or checked for overlap, matching existing single-provider behavior.
+
 ## Anonymizer
 
 Import:
@@ -522,6 +616,7 @@ Parameters:
 | `score` | `float` | Detection score. |
 | `page_number` | `int \| None` | Page number when available. |
 | `bbox` | `BoundingBox \| None` | Source bbox when available. |
+| `replacement` | `str \| None` | When set, used verbatim as the substitution text, overriding `mode`. Set by `DictionaryProvider`'s `replacements` dict; `None` for Presidio findings, which always go through `mode`. |
 
 ### `TokenMapping`
 

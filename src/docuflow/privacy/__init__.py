@@ -1,4 +1,6 @@
 from docuflow.privacy.anonymizer import Anonymizer
+from docuflow.privacy.composite_provider import CompositeProvider
+from docuflow.privacy.dictionary_provider import DictionaryProvider
 from docuflow.privacy.models import (
     AnonymizationMode,
     AnonymizationResult,
@@ -14,6 +16,8 @@ __all__ = [
     "AnonymizationResult",
     "AnonymizedText",
     "Anonymizer",
+    "CompositeProvider",
+    "DictionaryProvider",
     "PrivacyFinding",
     "PrivacyPolicy",
     "PrivacyProvider",

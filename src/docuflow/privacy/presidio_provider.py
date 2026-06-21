@@ -93,7 +93,9 @@ class PresidioProvider:
         for finding in sorted_findings:
             original = finding.text
 
-            if mode == AnonymizationMode.REDACT:
+            if finding.replacement is not None:
+                replacement = finding.replacement
+            elif mode == AnonymizationMode.REDACT:
                 replacement = "[REDACTED]"
             elif mode == AnonymizationMode.MASK:
                 replacement = (

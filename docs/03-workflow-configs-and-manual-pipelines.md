@@ -221,6 +221,8 @@ Mapping:
 
 ### Privacy Config
 
+A `privacy:` block builds a `PrivacyPolicy` and inserts an `Anonymize` step into the pipeline automatically — no other YAML wiring needed. `mode` controls what every detected span is replaced with; `provider` controls what gets detected (see [Privacy Policy](07-validation-review-privacy-and-storage.md#privacy-policy) for the detect → replace mechanism).
+
 ```yaml
 privacy:
   provider: presidio
@@ -236,15 +238,52 @@ Supported keys:
 
 | Key | Description |
 | --- | --- |
-| `provider` | `"presidio"` or a dict. Dict supports `language` and `model`. |
+| `provider` | `"presidio"`, or a dict (see below). |
 | `language` | Shortcut language for `provider: presidio`. |
 | `mode` | `"redact"`, `"mask"`, `"pseudonymize"`, `"hash"`. |
 | `reversible` | Requires `mode: pseudonymize`. |
-| `entities` | Presidio entity list. |
+| `entities` | Presidio entity list. Ignored by `dictionary`-type providers. |
 | `fail_closed` | Fail the pipeline if anonymization fails. |
 | `score_threshold` | Minimum Presidio confidence. |
 | `log_scrubbing` | Policy flag for scrubbed logging. |
 | `mapping_store` | String path or dict with `path`. |
+
+`provider` as a dict is discriminated by `type` (defaults to `presidio` if `type` is omitted, for backward compatibility):
+
+```yaml
+# type: presidio (PII via NLP) — equivalent to the shortcut form above
+privacy:
+  mode: pseudonymize
+  provider:
+    type: presidio
+    language: en
+
+# type: dictionary (your own terms — company names, project codes, etc.)
+# `mask` entries go through `mode` like Presidio findings do; `replacements`
+# entries are substituted with that exact text regardless of `mode`.
+privacy:
+  mode: redact
+  provider:
+    type: dictionary
+    mask:
+      Acme Corp: ORG
+    replacements:
+      PRJ-1234: "[PROJECT-CODE]"
+    regex: false        # set true to treat mask/replacements keys as regex
+    case_sensitive: true
+
+# type: composite (run several providers, merge their findings)
+privacy:
+  mode: redact
+  provider:
+    type: composite
+    providers:
+      - type: presidio
+        language: en
+      - type: dictionary
+        mask:
+          Acme Corp: ORG
+```
 
 ### Storage Config
 

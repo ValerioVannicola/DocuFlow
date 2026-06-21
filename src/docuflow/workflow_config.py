@@ -146,16 +146,8 @@ class WorkflowConfig(BaseModel):
         if "mode" in cfg:
             cfg["mode"] = AnonymizationMode(cfg["mode"])
         provider_cfg = cfg.get("provider")
-        if provider_cfg == "presidio" or isinstance(provider_cfg, dict):
-            from docuflow.privacy.presidio_provider import PresidioProvider
-            if isinstance(provider_cfg, dict):
-                cfg["provider"] = PresidioProvider(
-                    language=provider_cfg.get("language", "en"),
-                    model=provider_cfg.get("model"),
-                )
-            else:
-                lang = cfg.pop("language", "en")
-                cfg["provider"] = PresidioProvider(language=lang)
+        if provider_cfg is not None:
+            cfg["provider"] = _build_privacy_provider(provider_cfg, cfg)
         if "mapping_store" in cfg:
             ms = cfg["mapping_store"]
             if isinstance(ms, dict):
@@ -372,6 +364,50 @@ def _review_rules_to_list(rules: list) -> list[dict[str, Any]]:
         elif isinstance(r, NoEvidence):
             result.append({"no_evidence": r.fields if r.fields else True})
     return result
+
+
+def _build_privacy_provider(provider_cfg: Any, cfg: dict[str, Any]) -> Any:
+    """Build a PrivacyProvider from a workflow YAML ``provider`` value.
+
+    Accepts the bare string ``"presidio"`` (reads a sibling ``language`` key off
+    ``cfg`` for backward compatibility), or a dict with ``type: presidio``,
+    ``type: dictionary``, or ``type: composite`` (nesting any of the above under
+    a ``providers`` list). A dict with no ``type`` key defaults to presidio,
+    matching the pre-dictionary-provider config shape.
+    """
+    if provider_cfg == "presidio":
+        from docuflow.privacy.presidio_provider import PresidioProvider
+        return PresidioProvider(language=cfg.pop("language", "en"))
+
+    if not isinstance(provider_cfg, dict):
+        raise ValueError(f"Unsupported privacy provider config: {provider_cfg!r}")
+
+    provider_type = provider_cfg.get("type", "presidio")
+
+    if provider_type == "presidio":
+        from docuflow.privacy.presidio_provider import PresidioProvider
+        return PresidioProvider(
+            language=provider_cfg.get("language", "en"),
+            model=provider_cfg.get("model"),
+        )
+
+    if provider_type == "dictionary":
+        from docuflow.privacy.dictionary_provider import DictionaryProvider
+        return DictionaryProvider(
+            mask=provider_cfg.get("mask"),
+            replacements=provider_cfg.get("replacements"),
+            regex=provider_cfg.get("regex", False),
+            case_sensitive=provider_cfg.get("case_sensitive", True),
+        )
+
+    if provider_type == "composite":
+        from docuflow.privacy.composite_provider import CompositeProvider
+        sub_providers = [
+            _build_privacy_provider(sub_cfg, cfg) for sub_cfg in provider_cfg.get("providers", [])
+        ]
+        return CompositeProvider(sub_providers)
+
+    raise ValueError(f"Unknown privacy provider type: {provider_type!r}")
 
 
 def _export_parser(pipeline: Any) -> str | dict[str, Any]:
