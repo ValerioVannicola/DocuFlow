@@ -399,7 +399,24 @@ Or:
 python -m docuflow.mcp_server
 ```
 
-The server name is `DocuFlow`. It exposes the following tools.
+The server name is `DocuFlow`. In BeaverMate, this is the document-intelligence layer. It exposes the following tools.
+
+## MCP Agent Playbook
+
+This is the guidance the LLM should follow when using the MCP surface.
+
+- If the schema is unknown, call `list_templates` first. If a built-in template fits, inspect it with `show_template`. Otherwise call `discover_schema`.
+- Use `extract_document` for normal text, native PDF, image, and OCR-based extraction. Use `extract_with_vision` when scans, tables, or layout make parser-based extraction unreliable.
+- Use `compare_documents` for version diffs and `process_batch` for folder-wide processing.
+- Use `search_in_document` to locate evidence or decisions. Use `screenshot_document` when a visual artifact will help review or explain a result.
+- Use `split_document` to map pages into named sections. Use `extract_document_metadata` for comments, highlights, hyperlinks, signatures, and tracked changes.
+- Use `get_pending_reviews` -> `get_extraction_result` -> `correct_field` -> `approve_document` / `reject_document` for extraction review.
+- Use `fill_docx_form` for Word content-control forms. Use `get_pending_fills` -> `edit_fill_field` -> `approve_fill` / `reject_fill` for staged form writes.
+- `store_path` defaults to `./.docuflow_store`. `document_id` links stored review/fill artifacts to follow-up actions.
+- `correct_field` and `edit_fill_field` accept `new_value` as a string even when the underlying value is numeric or date-like.
+- `sections` for `split_document` must be valid JSON text. `pages` is a comma-separated list of zero-based page numbers.
+- Most tools return JSON strings. Parse them before chaining another tool.
+- This MCP surface does not expose every Python-only helper. If a task needs workflow routing, PDF form filling, quality reporting, or another library feature that is not in the tool list, say that clearly instead of inventing a tool.
 
 ## MCP Tools
 
