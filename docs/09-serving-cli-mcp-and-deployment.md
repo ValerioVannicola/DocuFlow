@@ -191,6 +191,7 @@ Generated requirements include `docuflow[...]` extras inferred from the workflow
 | `parser: smart` | `pdf`, `ocr`, system `tesseract-ocr` |
 | `parser: tesseract` | `pdf`, `ocr`, system `tesseract-ocr` |
 | `parser: docling` | `docling` |
+| `parser: markitdown` | `markitdown` |
 | `parser: azure-di` | `azure` |
 | `parser: textract` | `aws`, `pdf` |
 | `parser: google-docai` | `gcp` |

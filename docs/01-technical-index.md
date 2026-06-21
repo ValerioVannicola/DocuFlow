@@ -56,6 +56,7 @@ Install smaller extras when you only need part of the stack:
 | `llm` | `litellm` | LLM-backed extraction, review, schema discovery, routing. |
 | `privacy` | Presidio analyzer/anonymizer | Text anonymization before LLM calls. |
 | `docling` | Docling | Complex layouts and first-class table extraction. |
+| `markitdown` | Markitdown | Quick text extraction across a wide format range (PDF, Office, HTML, images, audio, ZIP, ...); no confidence scoring. |
 | `azure` | Azure Document Intelligence SDK | Cloud OCR with Azure Document Intelligence. |
 | `aws` | `boto3` | Cloud OCR with AWS Textract. |
 | `gcp` | Google Document AI SDK | Cloud OCR with Google Document AI. |
@@ -139,7 +140,7 @@ These are the most common selectable values across the high-level APIs.
 
 | Family | Parameter | Supported values |
 | --- | --- | --- |
-| Parser | `parser` | `"auto"` (default), `"pdfplumber"`, `"tesseract"`, `"docling"`, `"smart"`, `"azure-di"`, `"textract"`, `"google-docai"`, `"none"`/`None` for parserless modes. |
+| Parser | `parser` | `"auto"` (default), `"pdfplumber"`, `"tesseract"`, `"docling"`, `"smart"`, `"markitdown"`, `"azure-di"`, `"textract"`, `"google-docai"`, `"none"`/`None` for parserless modes. |
 | Extraction type | `extraction_type` | `"text"`, `"vision"`, `"hybrid"`, `"auto"`. |
 | Extraction mode | `extraction_mode` / `mode` | `"single"`, `"multi"`. |
 | Output style | `normalize_output` | `False` preserves exact source text for textual fields; `True` canonicalizes text such as ISO dates. |

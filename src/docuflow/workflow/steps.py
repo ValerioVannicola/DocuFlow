@@ -85,6 +85,9 @@ class Parse:
         elif parser == "smart":
             from docuflow.parsing.smart_parser import SmartParser
             parser = SmartParser()
+        elif parser == "markitdown":
+            from docuflow.parsing.markitdown_parser import MarkitdownParser
+            parser = MarkitdownParser()
         elif parser == "azure-di":
             from docuflow.parsing.azure_di import AzureDocumentIntelligenceParser
             parser = AzureDocumentIntelligenceParser()

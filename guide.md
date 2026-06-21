@@ -281,7 +281,7 @@ Each step receives the state, does its work, and returns the updated state. The 
 pip install docuflow[all]
 ```
 
-This installs everything: all parsers (pdfplumber, Tesseract, Docling, and the Azure/AWS/Google cloud OCR SDKs), LLM support, serving, privacy/anonymization, and all dependencies. This is the heaviest option (~500MB+ due to PyTorch from Docling).
+This installs everything: all parsers (pdfplumber, Tesseract, Docling, Markitdown, and the Azure/AWS/Google cloud OCR SDKs), LLM support, serving, privacy/anonymization, and all dependencies. This is the heaviest option (~500MB+ due to PyTorch from Docling).
 
 ### Selective Installation
 
@@ -810,7 +810,7 @@ Rule of thumb: `parser="auto"` is "pick the obvious tool for this file type"; `p
 
 ## 6. Parsers
 
-Parsers convert raw documents into structured `Document` objects with pages, blocks, bounding boxes, and text. DocuFlow includes 4 local parsers and 3 cloud OCR parsers — all producing the same standardized output, so everything downstream (evidence, confidence, search) works identically regardless of which one you pick.
+Parsers convert raw documents into structured `Document` objects with pages, blocks, bounding boxes, and text. DocuFlow includes 5 local parsers and 3 cloud OCR parsers — all producing the same standardized output, so everything downstream (evidence, confidence, search) works identically regardless of which one you pick.
 
 The default `parser="auto"` is source-aware — it picks a parser by file type. This is **Level 1** of the three "auto" mechanisms; see [The Levels of "auto"](#5b-the-levels-of-auto) for how it relates to the `smart` parser and `extraction_type="auto"`.
 
@@ -900,6 +900,33 @@ A page triggers OCR if:
 - **Best for**: mixed documents where some pages are digital and some are scanned
 - **Install**: `pip install docuflow[pdf,ocr]`
 
+### MarkitdownParser (`"markitdown"`)
+
+Wraps Microsoft's [Markitdown](https://github.com/microsoft/markitdown) library, which converts
+a very wide range of file types into a single Markdown string. It is a one-shot text converter,
+not a layout/OCR engine: there is no page-by-page breakdown, no bounding boxes, and — unlike
+every other parser in this table — no confidence score of any kind, because there is no
+OCR/layout model behind it to score.
+
+```python
+pipeline = DocumentPipeline(parser="markitdown")
+```
+
+- **Speed**: fast, comparable to pdfplumber for most formats
+- **Best for**: quickly pulling text out of formats DocuFlow's other parsers don't natively
+  cover (PowerPoint, Excel, HTML, audio transcripts, ZIP archives, Outlook `.msg`, EPub, and more)
+- **Produces**: a single page with a single text block — `document.raw_text` holds the full
+  Markdown. No bounding boxes, no `block.confidence`, no `result.ocr`.
+- **Trade-off**: because there's no confidence score, `extraction_type="auto"` never escalates
+  to vision off a Markitdown parse (escalation gates on OCR confidence, which doesn't exist
+  here), and evidence highlighting has no bbox to draw — search/locate still work off the text.
+- **Formats**: `docuflow[markitdown]` pulls Markitdown's PDF, DOCX, PPTX, XLSX/XLS, and Outlook
+  `.msg` extras — HTML, CSV, JSON, XML, and plain text work with no extra dependency. Audio
+  transcription and YouTube support are not included; install `markitdown[audio-transcription]`
+  or `markitdown[youtube-transcription]` directly for those.
+- **Fails on**: formats Markitdown doesn't recognize at all, surfaced as a DocuFlow `ParsingError`
+- **Install**: `pip install docuflow[markitdown]`
+
 ### Cloud OCR Parsers
 
 Three managed OCR services plug in as parsers. They produce the same line-level blocks
@@ -941,17 +968,17 @@ authentication via Google application default credentials.
 
 ### Comparison Table
 
-| Feature | pdfplumber | Tesseract | Docling | Smart | azure-di | textract | google-docai |
-|---------|---------|-----------|---------|-------|----------|----------|--------------|
-| Digital PDFs | Excellent | Good | Excellent | Excellent | Excellent | Good | Excellent |
-| Scanned PDFs | Fails | Good | Good | Good | Excellent | Excellent | Excellent |
-| Speed | ~100ms | 1-5s/page | 4-5s/page | Varies | API call | API call/page | API call |
-| Cost | Free | Free | Free | Free | Per page | Per page | Per page |
-| Bounding boxes | Yes (word) | Yes (word) | Yes | Yes | Yes (word) | Yes (word) | Yes (word) |
-| Per-word confidence | No | Yes (0-1) | When OCR fires | Per page | Yes (0-1) | Yes (0-1) | Yes (0-1) |
-| Table extraction | Basic | Basic | Excellent | Per page | Basic | Basic | Basic |
-| Non-PDF formats | No | No | Yes | No | Yes | Images | Yes |
-| Runs locally | Yes | Yes | Yes | Yes | No | No | No |
+| Feature | pdfplumber | Tesseract | Docling | Smart | Markitdown | azure-di | textract | google-docai |
+|---------|---------|-----------|---------|-------|------------|----------|----------|--------------|
+| Digital PDFs | Excellent | Good | Excellent | Excellent | Good | Excellent | Good | Excellent |
+| Scanned PDFs | Fails | Good | Good | Good | Fails | Excellent | Excellent | Excellent |
+| Speed | ~100ms | 1-5s/page | 4-5s/page | Varies | Fast | API call | API call/page | API call |
+| Cost | Free | Free | Free | Free | Free | Per page | Per page | Per page |
+| Bounding boxes | Yes (word) | Yes (word) | Yes | Yes | No | Yes (word) | Yes (word) | Yes (word) |
+| Per-word confidence | No | Yes (0-1) | When OCR fires | Per page | No (none, ever) | Yes (0-1) | Yes (0-1) | Yes (0-1) |
+| Table extraction | Basic | Basic | Excellent | Per page | Basic (markdown) | Basic | Basic | Basic |
+| Non-PDF formats | No | No | Yes | No | Yes (widest range) | Yes | Images | Yes |
+| Runs locally | Yes | Yes | Yes | Yes | Yes | No | No | No |
 
 ### Coordinate Convention
 
@@ -1057,6 +1084,7 @@ records = table.to_dict_records()
 | pdfplumber | Empty `[]` | Tables appear as text blocks |
 | Tesseract | Empty `[]` | Tables appear as OCR'd text |
 | Smart | Empty `[]` | Tables appear as text blocks |
+| Markitdown | Empty `[]` | Tables appear as markdown text within the single text block |
 
 Only Docling produces structured tables. Other parsers include table content in their text blocks — the LLM can still read markdown tables, but you don't get cell-level structure.
 

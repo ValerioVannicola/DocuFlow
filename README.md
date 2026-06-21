@@ -34,9 +34,10 @@ Or install only what you need:
 ```bash
 pip install docuflow[pdf,llm]      # pdfplumber parser + LLM extraction
 pip install docuflow[ocr,llm]      # Tesseract OCR + LLM extraction
-pip install docuflow[docling,llm]  # Docling parser (best quality) + LLM
-pip install docuflow[forms]        # PDF and DOCX form filling
-pip install docuflow[privacy]      # PII anonymization via Presidio
+pip install docuflow[docling,llm]    # Docling parser (best quality) + LLM
+pip install docuflow[markitdown,llm] # Markitdown parser (widest format range, no confidence) + LLM
+pip install docuflow[forms]          # PDF and DOCX form filling
+pip install docuflow[privacy]        # PII anonymization via Presidio
 ```
 
 Requires Python >= 3.11.
@@ -61,7 +62,7 @@ print(result.fields["total"].evidence[0])   # page 0, bbox, source text
 ## Features
 
 ### Parsing
-- **7 parsers**: pdfplumber (native PDFs), Tesseract OCR (scanned docs), Docling (tables/layout), Smart (auto per-page), Azure Document Intelligence, AWS Textract, Google Document AI
+- **8 parsers**: pdfplumber (native PDFs), Tesseract OCR (scanned docs), Docling (tables/layout), Smart (auto per-page), Markitdown (widest format range, no confidence score), Azure Document Intelligence, AWS Textract, Google Document AI
 - **Source-aware ingestion**: the default `parser="auto"` accepts PDFs, images, text/Markdown/HTML/CSV/JSON/XML/email files, and Docling-backed Office/spreadsheet documents while still normalizing everything to DocuFlow's `Document` model
 - **Permissive licensing throughout**: the dependency set is MIT/BSD/Apache-2.0, with no copyleft packages in the tree
 - Every parser produces blocks with bounding boxes for evidence grounding

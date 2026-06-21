@@ -403,6 +403,8 @@ def _export_parser(pipeline: Any) -> str | dict[str, Any]:
         return cfg if len(cfg) > 1 else "smart"
     if "Docling" in name:
         return "docling"
+    if "Markitdown" in name:
+        return "markitdown"
     if "AzureDocumentIntelligence" in name:
         cfg = {"type": "azure-di"}
         if hasattr(parser, "model") and parser.model != "prebuilt-read":

@@ -165,6 +165,7 @@ Supported `type` values and keys:
 | `tesseract` | `languages`, `dpi`, `preprocess`. |
 | `docling` | None. |
 | `smart` | `languages`, `dpi`, `min_text_length`. |
+| `markitdown` | None. |
 | `azure-di` | `endpoint`, `key`, `model`. |
 | `textract` | `region`, `dpi`. |
 | `google-docai` | `project`, `location`, `processor_id`. |
@@ -556,8 +557,8 @@ Parse(parser: Any = None)
 | --- | --- |
 | `parser` | Parser object or parser string. `None` behaves like `"pdfplumber"` for backward compatibility. `"auto"` selects from the ingested document source type. |
 
-Supported strings: `"auto"`, `"pdfplumber"`, `"tesseract"`, `"docling"`, `"smart"`, `"azure-di"`,
-`"textract"`, `"google-docai"`.
+Supported strings: `"auto"`, `"pdfplumber"`, `"tesseract"`, `"docling"`, `"smart"`, `"markitdown"`,
+`"azure-di"`, `"textract"`, `"google-docai"`.
 
 ### `Anonymize`
 

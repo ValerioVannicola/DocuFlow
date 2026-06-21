@@ -35,6 +35,7 @@ confidence where available.
 | `"tesseract"` | Scanned PDFs/images using local OCR. | Word and line confidence. | No first-class tables. | `docuflow[pdf,ocr]` plus system `tesseract` |
 | `"docling"` | Complex layouts, headings, lists, tables. | OCR confidence when Docling OCR fires. | Yes. | `docuflow[docling]` |
 | `"smart"` | Mixed native/scanned PDFs. | Only OCR pages have confidence. | No first-class tables. | `docuflow[pdf,ocr]` plus system `tesseract` |
+| `"markitdown"` | Quick text extraction across a very wide format range (PDF, Office, HTML, images, audio, ZIP, ...). | No confidence (no OCR/layout engine). | No first-class tables (tables land as markdown text). | `docuflow[markitdown]` |
 | `"azure-di"` | Azure Document Intelligence cloud OCR. | Word and derived line confidence. | Current mapper emits text blocks. | `docuflow[azure]` |
 | `"textract"` | AWS Textract OCR. | Word and line confidence. | Current parser uses DetectDocumentText text output. | `docuflow[aws,pdf]` |
 | `"google-docai"` | Google Document AI OCR. | Token and line confidence. | Current mapper emits text blocks. | `docuflow[gcp]` |
@@ -78,6 +79,7 @@ Supported configs:
 {"type": "tesseract", "languages": ["eng"], "dpi": 300, "preprocess": []}
 {"type": "docling"}
 {"type": "smart", "languages": ["eng"], "dpi": 300, "min_text_length": 20}
+{"type": "markitdown"}
 {"type": "azure-di", "endpoint": "...", "key": "...", "model": "prebuilt-read"}
 {"type": "textract", "region": "eu-west-1", "dpi": 200}
 {"type": "google-docai", "project": "p", "location": "us", "processor_id": "x"}
@@ -260,6 +262,50 @@ Docling block label mapping includes:
 | `page_header` | `HEADER` |
 | `page_footer` | `FOOTER` |
 | `caption`, `footnote`, `code`, `reference` | `TEXT` |
+
+### `MarkitdownParser`
+
+Import:
+
+```python
+from docuflow.parsing.markitdown_parser import MarkitdownParser
+```
+
+Constructor:
+
+```python
+MarkitdownParser()
+```
+
+Method:
+
+```python
+await parser.parse(document: Document) -> Document
+```
+
+Behavior:
+
+- Wraps Microsoft's `markitdown` library, which converts a very wide range of file
+  types (PDF, DOCX, PPTX, XLSX, HTML, images, audio transcripts, ZIP, and more) into
+  one Markdown string.
+- Markitdown is a one-shot text converter, not a layout/OCR engine: it does not report
+  page boundaries, bounding boxes, or any confidence score.
+- Output lands as a single-page `Document` with one `TEXT` block holding the full
+  Markdown text — the same shape DocuFlow uses to normalize plain-text inputs during
+  ingestion. `block.confidence`, `block.bbox`, and `block.words` are always empty/`None`.
+- Because there is no confidence score, `result.ocr` is always `None` and
+  `extraction_type="auto"` never escalates to vision off a Markitdown parse — escalation
+  needs an OCR confidence signal to gate on.
+- `docuflow[markitdown]` installs Markitdown with its PDF, DOCX, PPTX, XLSX/XLS, and Outlook
+  `.msg` extras. HTML, CSV, JSON, XML, and plain text need no extra dependency. Audio and
+  YouTube transcription are not included by default.
+- Unsupported or unrecognized formats raise a DocuFlow `ParsingError`.
+
+```python
+from docuflow import DocumentPipeline
+
+pipeline = DocumentPipeline(parser="markitdown", model="openai/gpt-4o")
+```
 
 ### `AzureDocumentIntelligenceParser`
 

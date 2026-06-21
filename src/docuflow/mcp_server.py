@@ -32,7 +32,7 @@ async def extract_document(
     Args:
         file_path: Path to the document file
         schema_name: Template name (invoice, contract, receipt) or Python dotted path
-        parser: Parser to use (auto, pdfplumber, tesseract, docling, smart, azure-di, textract, google-docai)
+        parser: Parser to use (auto, pdfplumber, tesseract, docling, smart, markitdown, azure-di, textract, google-docai)
         model: LLM model (openai/gpt-4o, anthropic/claude-sonnet-4-20250514, etc)
         extraction_mode: single (1 call) or multi (N calls + decider)
         n_instances: Number of parallel agents for multi mode

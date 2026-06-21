@@ -178,6 +178,7 @@ String values:
 | `"tesseract"` | Render pages and run local Tesseract OCR. | `docuflow[ocr,pdf]` plus system `tesseract` |
 | `"docling"` | Docling layout parser with first-class tables. | `docuflow[docling]` |
 | `"smart"` | Native PDF extraction first, OCR only pages that need it. | `docuflow[pdf,ocr]` plus system `tesseract` |
+| `"markitdown"` | Wide-format text extraction (PDF, Office, HTML, images, audio, ZIP, ...) via Microsoft's Markitdown. No confidence (no OCR/layout engine). | `docuflow[markitdown]` |
 | `"azure-di"` | Azure Document Intelligence OCR. | `docuflow[azure]` |
 | `"textract"` | AWS Textract OCR. Renders pages locally, no S3 required. | `docuflow[aws,pdf]` |
 | `"google-docai"` | Google Document AI OCR. | `docuflow[gcp]` |
@@ -197,6 +198,7 @@ Supported parser dict keys:
 | `"tesseract"` | `languages: list[str]`, `dpi: int`, `preprocess: list[str]`. |
 | `"docling"` | None. |
 | `"smart"` | `languages: list[str]`, `dpi: int`, `min_text_length: int`. |
+| `"markitdown"` | None. |
 | `"azure-di"` | `endpoint: str`, `key: str`, `model: str`. |
 | `"textract"` | `region: str`, `dpi: int`. |
 | `"google-docai"` | `project: str`, `location: str`, `processor_id: str`. |

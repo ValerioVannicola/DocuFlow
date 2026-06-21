@@ -82,6 +82,22 @@ class TestGenerateDeployment:
         assert "docling" in requirements
         assert "tesseract-ocr" in dockerfile
 
+    def test_markitdown_parser_requirements_include_markitdown_extra(self, tmp_path):
+        config = {
+            "name": "markitdown-workflow",
+            "schema": {"total": {"type": "float"}},
+            "parser": "markitdown",
+            "model": "openai/gpt-4o",
+        }
+        path = tmp_path / "workflow.yaml"
+        path.write_text(yaml.dump(config), encoding="utf-8")
+
+        with tempfile.TemporaryDirectory() as out:
+            result = generate_deployment(path, out)
+            requirements = (result / "requirements.txt").read_text()
+
+        assert "markitdown" in requirements
+
     def test_workflow_copied(self, workflow_yaml):
         with tempfile.TemporaryDirectory() as out:
             result = generate_deployment(workflow_yaml, out)

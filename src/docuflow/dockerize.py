@@ -57,6 +57,8 @@ def _required_extras(config) -> tuple[set[str], bool]:
         needs_tesseract = True
     if parser == "docling":
         extras.add("docling")
+    if parser == "markitdown":
+        extras.add("markitdown")
     if parser == "azure-di":
         extras.add("azure")
     if parser == "textract":

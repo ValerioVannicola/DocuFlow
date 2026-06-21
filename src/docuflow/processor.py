@@ -126,6 +126,9 @@ class DocumentPipeline:
         if name == "smart":
             from docuflow.parsing.smart_parser import SmartParser
             return SmartParser()
+        if name == "markitdown":
+            from docuflow.parsing.markitdown_parser import MarkitdownParser
+            return MarkitdownParser()
         if name == "azure-di":
             from docuflow.parsing.azure_di import AzureDocumentIntelligenceParser
             return AzureDocumentIntelligenceParser()
@@ -172,6 +175,10 @@ class DocumentPipeline:
             if "min_text_length" in cfg:
                 kwargs["min_text_length"] = cfg["min_text_length"]
             return SmartParser(**kwargs)
+
+        if parser_type == "markitdown":
+            from docuflow.parsing.markitdown_parser import MarkitdownParser
+            return MarkitdownParser()
 
         if parser_type == "azure-di":
             from docuflow.parsing.azure_di import AzureDocumentIntelligenceParser
