@@ -132,11 +132,20 @@ def _narrow_window(window: list[_StreamWord], query: str) -> list[_StreamWord]:
 
 
 def _window_match(window: list[_StreamWord], query: str) -> float | None:
-    """Match ratio of query against a window: 1.0 exact, <1.0 fuzzy, None poor."""
+    """Match ratio of query against a window: 1.0 exact, <1.0 fuzzy, None poor.
+
+    This is the locator's innermost loop body, run at every stream position, so
+    it reuses the space-joined string for both the exact check and the fuzzy
+    fallback instead of rebuilding it (the previous code joined the window twice
+    via a separate ``_exact_contains`` call).
+    """
     spaced = _joined(window, tight=False)
     if not spaced:
         return None
-    if _exact_contains(window, query):
+    if query == spaced or query in spaced:
+        return 1.0
+    tight = _joined(window, tight=True)
+    if tight != spaced and (query == tight or query in tight):
         return 1.0
 
     matcher = SequenceMatcher(None, query, spaced)

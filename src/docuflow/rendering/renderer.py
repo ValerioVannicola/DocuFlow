@@ -90,6 +90,39 @@ def _page_count_sync(file_path: str) -> int:
             pdf.close()
 
 
+def _render_all_pages_sync(file_path: str, dpi: int) -> list[Image]:
+    """Render every page of a document with a single PDF open.
+
+    Rendering is serialized behind the PDFium lock regardless, so opening the
+    file once and rendering all pages in one critical section avoids re-parsing
+    the whole PDF per page (the previous code opened it once to count pages and
+    again for every page rendered — N+1 opens for an N-page document).
+    """
+    if detect_source_kind(Path(file_path)) == "image":
+        return [_open_image_sync(file_path)]
+
+    pdfium = _import_pdfium()
+
+    with _PDFIUM_LOCK:
+        try:
+            pdf = pdfium.PdfDocument(file_path)
+        except Exception as exc:
+            raise ParsingError(f"Failed to open PDF: {file_path}") from exc
+        try:
+            scale = dpi / 72.0
+            images: list[Image] = []
+            for i in range(len(pdf)):
+                page = pdf[i]
+                try:
+                    bitmap = page.render(scale=scale)
+                    images.append(bitmap.to_pil().convert("RGB"))
+                finally:
+                    page.close()
+            return images
+        finally:
+            pdf.close()
+
+
 async def render_page(file_path: str | Path, page_number: int = 0, dpi: int = DEFAULT_DPI) -> Image:
     import asyncio
 
@@ -103,9 +136,9 @@ async def render_all_pages(file_path: str | Path, dpi: int = DEFAULT_DPI) -> lis
     import asyncio
 
     loop = asyncio.get_event_loop()
-    page_count = await loop.run_in_executor(
-        _EXECUTOR, partial(_page_count_sync, str(file_path))
+    # One executor hop, one PDF open, all pages rendered under a single lock
+    # acquisition — PDFium serializes rendering anyway, so fanning out per page
+    # only added redundant file parses and lock churn.
+    return await loop.run_in_executor(
+        _EXECUTOR, partial(_render_all_pages_sync, str(file_path), dpi)
     )
-
-    tasks = [render_page(file_path, i, dpi) for i in range(page_count)]
-    return await asyncio.gather(*tasks)

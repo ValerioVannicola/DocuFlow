@@ -61,6 +61,7 @@ def compute_field_ocr_confidence(
     hint_page: int | None = None,
     fuzzy_threshold: float = DEFAULT_FUZZY_THRESHOLD,
     stream: list | None = None,
+    has_ocr: bool | None = None,
 ) -> OCRFieldConfidence | None:
     """Match an extracted value back to OCR text and score it.
 
@@ -71,13 +72,18 @@ def compute_field_ocr_confidence(
     the exact highlight rectangles. Returns None when the document has no
     OCR confidences at all; match_method="unmatched" when OCR exists but
     the value cannot be located.
+
+    ``has_ocr`` lets a caller that already knows OCR ran (e.g. it computed the
+    document-level confidence) skip the full per-field document rescan — that
+    scan is O(words) and was previously repeated for every field.
     """
-    has_ocr = any(
-        (b.words and any(w.confidence is not None for w in b.words))
-        or b.confidence is not None
-        for page in document.pages
-        for b in page.blocks
-    )
+    if has_ocr is None:
+        has_ocr = any(
+            (b.words and any(w.confidence is not None for w in b.words))
+            or b.confidence is not None
+            for page in document.pages
+            for b in page.blocks
+        )
     if not has_ocr:
         return None
 

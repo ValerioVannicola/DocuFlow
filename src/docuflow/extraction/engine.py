@@ -499,6 +499,9 @@ def _build_result(
                     hint_text=evidence_hints.get("text", "") if evidence_hints else "",
                     hint_page=evidence_hints.get("page") if evidence_hints else None,
                     stream=stream,
+                    # doc_ocr is not None here, so OCR confidences exist —
+                    # skip the O(words) per-field rescan.
+                    has_ocr=True,
                 )
             except Exception as exc:
                 if trace:
