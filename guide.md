@@ -82,6 +82,7 @@ DocuFlow accepts these source types today:
 - Office documents: `.docx`
 - Spreadsheets: `.xlsx`
 - Email: `.eml`
+- Also: `.pptx`, `.xls`, `.msg` (Outlook), `.jsonl`, `.epub`, `.ipynb`, `.zip`
 
 With `parser="auto"`, DocuFlow routes each source to the right path and still normalizes
 everything to the same internal `Document` model.
