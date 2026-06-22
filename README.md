@@ -19,10 +19,10 @@ DocuFlow accepts these source types today:
 - PDF: `.pdf`
 - Images: `.png`, `.jpg`, `.jpeg`, `.tiff`, `.tif`, `.bmp`, `.gif`, `.webp`
 - Text-like files: `.txt`, `.md`, `.html`, `.htm`, `.csv`, `.json`, `.xml`
-- Office documents: `.docx`
+- Office documents: `.docx`,`.pptx`, `.xls`, `.msg` (Outlook)
 - Spreadsheets: `.xlsx`
 - Email: `.eml`
-- Also: `.pptx`, `.xls`, `.msg` (Outlook), `.jsonl`, `.epub`, `.ipynb`, `.zip`
+- Also: `.jsonl`, `.epub`, `.ipynb`, `.zip`
   
 ## Installation
 
