@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from docuflow.privacy.dictionary_provider import DictionaryProvider
@@ -59,6 +61,68 @@ class TestDictionaryProviderDetect:
         with pytest.raises(ValueError, match="requires at least one"):
             DictionaryProvider()
 
+    async def test_overlapping_terms_longest_wins(self):
+        # Both terms match at the same spot; the longer one must win and the
+        # emitted findings must not overlap (otherwise the splice corrupts text).
+        provider = DictionaryProvider(mask={"Acme": "ORG", "Acme Corp": "ORG"})
+        findings = await provider.adetect_text("Acme Corp signed")
+        assert len(findings) == 1
+        assert findings[0].text == "Acme Corp"
+
+    async def test_many_terms_single_pass(self):
+        terms = {f"TERM{i:05d}": "T" for i in range(5000)}
+        provider = DictionaryProvider(mask=terms)
+        findings = await provider.adetect_text("see TERM04999 and TERM00001 here")
+        assert {f.text for f in findings} == {"TERM04999", "TERM00001"}
+
+
+class TestDictionaryProviderNumbered:
+    def test_numbers_follow_list_order(self):
+        provider = DictionaryProvider.numbered(["Acme Corp", "Globex", "Initech"], root="company")
+        assert provider.replacements == {
+            "Acme Corp": "company_1",
+            "Globex": "company_2",
+            "Initech": "company_3",
+        }
+
+    def test_duplicates_keep_first_number(self):
+        provider = DictionaryProvider.numbered(["A", "B", "A", "C"], root="x")
+        assert provider.replacements == {"A": "x_1", "B": "x_2", "C": "x_3"}
+
+    def test_custom_start(self):
+        provider = DictionaryProvider.numbered(["A", "B"], root="x", start=100)
+        assert provider.replacements == {"A": "x_100", "B": "x_101"}
+
+    def test_empty_terms_raises(self):
+        with pytest.raises(ValueError, match="non-empty list"):
+            DictionaryProvider.numbered([], root="x")
+
+    async def test_numbered_applies_verbatim(self):
+        provider = DictionaryProvider.numbered(["Acme Corp"], root="company")
+        findings = await provider.adetect_text("Acme Corp here")
+        assert findings[0].replacement == "company_1"
+
+    def test_cache_path_persists_mapping(self, tmp_path):
+        cache = tmp_path / "map.json"
+        DictionaryProvider.numbered(["Acme Corp", "Globex"], root="company", cache_path=cache)
+        assert cache.exists()
+        assert json.loads(cache.read_text()) == {"Acme Corp": "company_1", "Globex": "company_2"}
+
+    def test_cache_path_reloads_and_ignores_new_terms(self, tmp_path):
+        cache = tmp_path / "map.json"
+        DictionaryProvider.numbered(["Acme Corp", "Globex"], root="company", cache_path=cache)
+        # Different list/order, but the persisted mapping must win for stable tokens.
+        reloaded = DictionaryProvider.numbered(
+            ["Globex", "NewCo", "Acme Corp"], root="company", cache_path=cache
+        )
+        assert reloaded.replacements == {"Acme Corp": "company_1", "Globex": "company_2"}
+
+    def test_cache_path_can_load_without_terms(self, tmp_path):
+        cache = tmp_path / "map.json"
+        DictionaryProvider.numbered(["Acme Corp"], root="company", cache_path=cache)
+        reloaded = DictionaryProvider.numbered(None, root="company", cache_path=cache)
+        assert reloaded.replacements == {"Acme Corp": "company_1"}
+
 
 class TestDictionaryProviderAnonymize:
     async def test_replacement_overrides_mode(self):
@@ -73,7 +137,7 @@ class TestDictionaryProviderAnonymize:
     async def test_label_entry_uses_redact_mode(self):
         provider = DictionaryProvider(mask={"Acme Corp": "ORG"})
         findings = await provider.adetect_text("Acme Corp signed")
-        result, mappings = await provider.aanonymize_text(
+        result, _ = await provider.aanonymize_text(
             "Acme Corp signed", findings, AnonymizationMode.REDACT
         )
         assert result == "[REDACTED] signed"

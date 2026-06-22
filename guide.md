@@ -2059,6 +2059,31 @@ Two dicts you can pass, either or both:
 
 By default keys are matched as literal substrings, case-sensitively. Pass `regex=True` to treat every key as a regex pattern, and `case_sensitive=False` to ignore case. The `entities` filter on `PrivacyPolicy` does not apply to `DictionaryProvider` — every key you provide is detected, since the dict itself is already your allowlist.
 
+**Scale and matching.** Literal terms (the default) are compiled into a single combined regex once, when the provider is constructed, so detection is one pass over the text regardless of how many terms you load — tens of thousands of terms stay fast (≈1s to build a 90k-term matcher, a few tens of milliseconds per page to scan). Matches are non-overlapping and longest-first, so when two terms match at the same spot the longer one wins (`"Acme Corp"` beats `"Acme"`) and the emitted findings never overlap. `regex=True` keys are matched one pattern at a time instead, so use that mode only for a handful of patterns, not a huge literal list.
+
+#### Auto-numbering terms (`DictionaryProvider.numbered`)
+
+When you have a long list of terms and just want each mapped to a numbered token (`org_1`, `org_2`, …), use the `numbered` factory instead of hand-building the dict. Numbering follows **list order** — the first term becomes `{root}_{start}`, the next `{root}_{start+1}`, and so on (duplicates keep their first number). Each term is registered as a literal `replacements` entry, so the token is written verbatim regardless of `mode`.
+
+```python
+from docuflow.privacy import DictionaryProvider
+
+provider = DictionaryProvider.numbered(["Acme Corp", "Globex", "Initech"], root="org")
+# replacements = {"Acme Corp": "org_1", "Globex": "org_2", "Initech": "org_3"}
+```
+
+**Persisting the mapping (`cache_path`).** For a large list, the `term → token` mapping is the artifact worth keeping: it fixes the numbering so the same term maps to the same token on every run. Pass `cache_path` and the mapping is built once and written there (atomically, as JSON); later runs load it straight from that file and ignore the `terms` argument — so you can even pass `terms=None` once the cache exists. Delete the file to renumber.
+
+```python
+# First run: builds the mapping from `terms` and writes it to disk.
+provider = DictionaryProvider.numbered(big_term_list, root="org", cache_path="org_map.json")
+
+# Later runs / other processes: loaded from disk, numbering stays identical.
+provider = DictionaryProvider.numbered(None, root="org", cache_path="org_map.json")
+```
+
+The combined matcher is recompiled in-process from the loaded mapping — a single fast compile, not a per-term rebuild. (Only the mapping is persisted, by design: rebuilding the matcher from it is cheap, and a JSON mapping stays portable and inspectable across Python/library versions.)
+
 ### Combining Providers (CompositeProvider)
 
 To run Presidio's PII detection and your own dictionary in one pass, wrap both in `CompositeProvider`:

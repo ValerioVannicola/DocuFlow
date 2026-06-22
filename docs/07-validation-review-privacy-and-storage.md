@@ -529,6 +529,23 @@ Notes:
 - `case_sensitive=False` matches keys case-insensitively.
 - The `entities` filter on `PrivacyPolicy`/`adetect_text` is ignored — the dictionary you provide is already an explicit allowlist, so PII-oriented entity filtering doesn't apply to it.
 - No extra dependency: unlike Presidio, this provider has zero external requirements.
+- **Scale:** literal terms are compiled into a single combined regex once, at construction, so detection is one pass over the text regardless of term count (≈1s to build a 90k-term matcher, tens of ms per page to scan). Matches are non-overlapping and longest-first — when two terms match at the same position the longer one wins (`"Acme Corp"` over `"Acme"`), so the emitted findings never overlap. `regex=True` keys are scanned one pattern at a time, so reserve that mode for a small number of patterns.
+
+### Auto-numbering terms
+
+`DictionaryProvider.numbered(terms, root, *, start=1, regex=False, case_sensitive=True, cache_path=None)` builds a provider that maps each term to `{root}_{n}`, numbered by **list order** (first term → `{root}_{start}`, duplicates keep their first number). Each term becomes a literal `replacements` entry, so the token is substituted verbatim regardless of `mode`.
+
+```python
+DictionaryProvider.numbered(["Acme Corp", "Globex"], root="org")
+# replacements = {"Acme Corp": "org_1", "Globex": "org_2"}
+```
+
+`cache_path` persists the generated `term -> token` mapping as JSON so numbering is stable across runs: the first call with a non-existent path builds the mapping from `terms` and writes it there; later calls load it from that file and ignore `terms` (pass `terms=None` to load only — delete the file to renumber). Only the mapping is persisted; the combined matcher is recompiled in-process from it (a single fast compile, not a per-term rebuild).
+
+```python
+DictionaryProvider.numbered(big_term_list, root="org", cache_path="org_map.json")  # build + save once
+DictionaryProvider.numbered(None, root="org", cache_path="org_map.json")            # reload later
+```
 
 ## Composite Provider
 

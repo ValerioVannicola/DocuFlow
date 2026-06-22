@@ -338,6 +338,16 @@ DictionaryProvider(
 CompositeProvider([PresidioProvider(), DictionaryProvider(mask={"Acme Corp": "ORG"})])
 ```
 
+Literal terms are compiled into one combined regex at construction, so detection is a single
+pass that scales to tens of thousands of terms (non-overlapping, longest match wins). For a long
+term list, `DictionaryProvider.numbered(terms, root="org")` maps each term to `org_1`, `org_2`, …
+in **list order**; pass `cache_path=` to persist that `term -> token` mapping as JSON (built once,
+reloaded on later runs so numbering stays stable — pass `terms=None` once the cache exists):
+
+```python
+DictionaryProvider.numbered(big_term_list, root="org", cache_path="org_map.json")
+```
+
 Full reference, including how the mechanism works end-to-end: `docs/07-validation-review-privacy-and-storage.md`.
 
 ## Domain Context
