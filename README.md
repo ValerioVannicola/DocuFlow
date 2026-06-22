@@ -23,7 +23,7 @@ DocuFlow accepts these source types today:
 - Spreadsheets: `.xlsx`
 - Email: `.eml`
 - Also: `.pptx`, `.xls`, `.msg` (Outlook), `.jsonl`, `.epub`, `.ipynb`, `.zip`
-- 
+  
 ## Installation
 
 ```bash
