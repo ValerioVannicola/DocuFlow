@@ -10,7 +10,7 @@
 
 Most document extraction tools focus on one part of the problem: parsing a PDF, running OCR, or calling an LLM. In real workflows, that is rarely enough. Teams also need schemas, evidence, trust signals, validation, privacy controls, review steps, corrections, storage, and an audit trail they can rely on.
 
-DocuFlow is a workflow runtime for document extraction and PDF write-back. It combines parsers, OCR, LLMs, validation rules, review logic, consensus, verification, form filling, and deployment options into one reproducible pipeline, so document data can move from messy PDFs into production systems, and trusted data can be written back into forms, with traceability and control.
+DocuFlow is a workflow runtime for document extraction and PDF write-back. It combines parsers, OCR, LLMs, validation rules, review logic, consensus, verification, form filling, and deployment options into one reproducible pipeline, so document data can move from messy formats into production systems, and trusted data can be written back into forms, with traceability and control.
 
 ## What It Can Process
 
