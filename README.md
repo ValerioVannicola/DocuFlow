@@ -22,6 +22,7 @@ DocuFlow accepts these source types today:
 - Office documents: `.docx`
 - Spreadsheets: `.xlsx`
 - Email: `.eml`
+- With `parser="markitdown"` (`pip install docuflow[markitdown]`): all of the above plus `.pptx`, `.xls`, `.msg` (Outlook), `.jsonl`, `.epub`, `.ipynb`, `.zip` — widest format range, no confidence score or bounding boxes
 
 ## Installation
 
